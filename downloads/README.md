@@ -1,19 +1,22 @@
-# Đường Ngang — bản thử 0.3
+# Đường Ngang — bản thử 0.4
 
-**[Tải APK 0.3](https://github.com/cuongthinkpad-ui/app-duong-ngang/raw/refs/heads/main/downloads/DuongNgang-0.3.apk)**
+**[Tải APK 0.4](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.4.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
 
-- Giao diện gọn hơn: bỏ dải trạng thái phụ, tiêu đề/đếm điểm trên sơ đồ; giảm chữ và khoảng cách. Trang chính hiện sẵn 3 lượt tàu và tối đa 3 sự cố.
-- Thanh dưới: Tổng quan / Đường ngang / Sự cố / Cài đặt. Không còn mục lịch sử riêng trên trang chính hay thanh dưới.
-- Trạng thái lỗi: **Chưa khôi phục**. Có bản tin phục hồi đúng thiết bị và đường ngang thì mục Sự cố hiện **✓ Đã khôi phục**; vẫn có chọn ngày và bộ lọc.
-- **Cài đặt → Phạm vi theo dõi → Từ đường ngang / Đến đường ngang → Áp dụng phạm vi**. Bao gồm hai đầu; cũng chọn được một điểm riêng lẻ. Chọn phạm vi không cần nhập tài khoản khi xem minh họa. Sơ đồ, lượt tàu, sự cố và chuông báo chỉ áp dụng trong khoảng đã chọn.
+- Đầu trang và biểu tượng ứng dụng dùng hình đầu tàu trắng trên nền navy; tên “Giám sát Đường ngang”, dòng công ty bên dưới.
+- Sơ đồ luôn đủ 11 đường ngang và 2 ga dù phạm vi theo dõi chỉ chọn một đoạn. Tên hướng tàu đặt trên mũi tên; bỏ “Lý trình tăng” và chú giải hướng cố định.
+- Tổng quan tự điều chỉnh số dòng và khoảng cách để vừa một màn hình, không cuộn dọc. Có lối mở danh sách đầy đủ khi còn dữ liệu.
+- Chỉ một nút **Tắt chuông** ở đầu khối Sự cố; tắt âm không xóa lỗi. Trạng thái **Chưa khôi phục** / **✓ Đã khôi phục** giữ theo bản tin tương ứng.
+- Nền ngoài rõ hơn, dòng tên thiết kế lớn và đậm hơn.
 
-Cài APK cập nhật lên bản trước bằng cùng chữ ký thử nghiệm. Khi chưa có tài khoản, app mở sẵn chế độ minh họa có nhãn nhỏ ở đầu trang.
+Cài cập nhật lên bản 0.3 bằng cùng chữ ký thử nghiệm; giữ cài đặt và phạm vi đã lưu. Khi chưa có tài khoản, app mở dữ liệu minh họa có nhãn nhỏ trong sơ đồ.
+
+**Cài đặt → Phạm vi theo dõi → Từ đường ngang / Đến đường ngang → Áp dụng phạm vi**. Phạm vi bao gồm hai đầu, cũng chọn được một điểm riêng lẻ; lọc danh sách, sự cố và chuông, giữ nguyên toàn bộ sơ đồ.
 
 Ảnh chụp trực tiếp từ app trên giả lập Android:
 
-- [Trang chính gọn](../docs/screenshots/overview-0.3.png)
-- [Sự cố và mục đã khôi phục](../docs/screenshots/incidents-0.3.png)
-- [Chọn phạm vi](../docs/screenshots/scope-0.3.png)
-- [Ví dụ chỉ theo dõi 320+445 đến 321+780](../docs/screenshots/selected-range-0.3.png)
+- [Tổng quan](../docs/screenshots/overview-0.4.png)
+- [Phạm vi hẹp, sơ đồ đầy đủ](../docs/screenshots/selected-range-0.4.png)
+- [Màn hình thấp hơn](../docs/screenshots/compact-height-0.4.png)
+- [Biểu tượng ngoài ứng dụng](../docs/screenshots/app-icon-0.4.png)
 
-Đây vẫn là bản phát triển để kiểm tra giao diện và quy tắc, **chưa phải bản trực vận hành**. Chưa kiểm thử đăng nhập/phân trang bằng web Visitec thật; tự kích và sơ đồ tàu thật chưa bật. Phạm vi hiện dùng danh mục 11 đường ngang khu vực Vinh đã thống nhất. Đặt lại mốc do thiếu dữ liệu không đồng nghĩa thiết bị đã phục hồi. Không nhúng tài khoản hoặc mật khẩu thử nghiệm vào APK.
+Đây vẫn là bản phát triển để kiểm tra giao diện và quy tắc, **chưa phải bản trực vận hành**. Chưa kiểm thử đăng nhập/phân trang bằng web Visitec thật; tự kích và sơ đồ tàu thật chưa bật. Danh mục hiện gồm 11 đường ngang khu vực Vinh đã thống nhất. Đặt lại mốc do thiếu dữ liệu không đồng nghĩa thiết bị đã phục hồi. Không nhúng tài khoản hoặc mật khẩu thử nghiệm vào APK.

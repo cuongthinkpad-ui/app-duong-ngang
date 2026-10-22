@@ -1,8 +1,17 @@
-# Đường Ngang — Android 0.3
+# Đường Ngang — Android 0.4
 
 Ứng dụng Android native, tiếng Việt, xanh dương; sơ đồ tuyến cố định phía trên, khối tàu riêng, sự cố nền đỏ nhạt, lịch sử chọn ngày và ghi chú đếm trục. Dòng sự kiện: **Giờ · Đường ngang · Nội dung**. Không chứa tài khoản thử nghiệm trong mã nguồn.
 
-## Giao diện 0.3
+## Giao diện 0.4
+
+- Đầu trang “Giám sát Đường ngang” / “Công ty CP Đường sắt Vinh”; biểu tượng đầu tàu trắng trên nền navy dùng thống nhất trong app và ngoài màn hình điện thoại.
+- Sơ đồ luôn giữ đủ 11 đường ngang và 2 ga, kể cả khi chọn phạm vi theo dõi hẹp. Bỏ “Lý trình tăng” và chú giải cố định; hướng “Tàu lẻ” / “Tàu chẵn” nằm ngay trên mũi tên. Đoạn tàu hiện vẫn là minh họa có nhãn.
+- Trang Tổng quan tự chia chiều cao giữa hai khối tàu và sự cố để vừa màn hình, không cuộn dọc. Số dòng và khoảng cách thích ứng theo chiều cao, cỡ chữ và lượng dữ liệu; xem phần còn lại tại danh sách đầy đủ. Không cố định ba dòng mỗi khối.
+- Chỉ một nút “Tắt chuông” cạnh biểu tượng chuông ở đầu khối Sự cố; không lặp nút sau từng lỗi. Tắt chuông giữ nguyên trạng thái lỗi.
+- Nền ngoài tương phản hơn với các thẻ; dòng “Designed by Cao Xuân Cường” lớn và đậm hơn.
+- Phạm vi chỉ lọc danh sách, sự cố và chuông; dữ liệu tuyến vẫn giữ đầy đủ để theo dõi ngữ cảnh.
+
+## Giao diện 0.3 (trước đây)
 
 - Bỏ dải trạng thái phụ và dòng tiêu đề/đếm điểm trên sơ đồ; nhãn minh họa thu nhỏ vào đầu trang để không nhầm với dữ liệu thật.
 - Giảm cỡ chữ, đệm thẻ, khoảng cách và chiều cao thanh điều hướng. Trang chính hiện sẵn tối đa 3 lượt tàu gần nhất và 3 sự cố; có thể mở rộng lượt tàu hoặc vào danh sách sự cố.
@@ -65,8 +74,10 @@ Tuyến từ Bắc xuống Nam gồm 11 đường ngang và 2 điểm ga. Hai nh
 
 Ga Vinh giữa 314+550 và 320+445; ga Yên Xuân giữa 328+325 và 332+350. Hai điểm ga không làm chứng cứ suy luận tự kích. Tàu lẻ đi tăng lý trình, tàu chẵn đi giảm lý trình. CB3/4 giải phóng đường ngang để nâng chắn; qua cặp cảm biến phía xa bên kia rồi một phút mới khôi phục toàn chu trình.
 
-## Ảnh chụp bản 0.3 trên Android giả lập
+## Ảnh chụp bản 0.4 trên Android giả lập
 
-![Tổng quan](docs/screenshots/overview-0.3.png)
+![Tổng quan](docs/screenshots/overview-0.4.png)
 
-![Sự cố](docs/screenshots/incidents-0.3.png)
+[Phạm vi hẹp, sơ đồ vẫn đầy đủ](docs/screenshots/selected-range-0.4.png) · [Màn hình thấp hơn](docs/screenshots/compact-height-0.4.png) · [Biểu tượng ứng dụng](docs/screenshots/app-icon-0.4.png)
+
+[Chi tiết kiểm tra bản 0.4](docs/UI_REVIEW_0.4.md)

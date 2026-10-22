@@ -19,7 +19,7 @@ public class MainActivity extends Activity {
   private static final int BLUE = 0xFF246BCE,
       INK = 0xFF1C304C,
       MUTED = 0xFF8290A5,
-      BG = 0xFFF3F6FB,
+      BG = 0xFFE3EAF3,
       LINE = 0xFFE6EDF5,
       GREEN = 0xFF219B70,
       RED = 0xFFC64A55;
@@ -148,7 +148,7 @@ public class MainActivity extends Activity {
   private LinearLayout card(int color) {
     LinearLayout c = column();
     c.setPadding(dp(12), dp(11), dp(12), dp(11));
-    c.setBackground(shape(color, 16, color == Color.WHITE ? LINE : 0));
+    c.setBackground(shape(color, 16, color == Color.WHITE ? 0xFFCBD7E7 : 0));
     LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
     p.bottomMargin = dp(8);
     c.setLayoutParams(p);
@@ -261,18 +261,17 @@ public class MainActivity extends Activity {
     return Rules.inRange(crossing, rangeFrom(), rangeTo());
   }
 
+  private List<Rules.Event> allToday() {
+    return demo
+        ? samples()
+        : store.events(
+            LocalDate.now(WebSource.ZONE).atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli(),
+            System.currentTimeMillis() + 1);
+  }
+
   private List<Rules.Event> today() {
-    List<Rules.Event> all =
-        demo
-            ? samples()
-            : store.events(
-                LocalDate.now(WebSource.ZONE)
-                    .atStartOfDay(WebSource.ZONE)
-                    .toInstant()
-                    .toEpochMilli(),
-                System.currentTimeMillis() + 1);
     List<Rules.Event> selected = new ArrayList<>();
-    for (Rules.Event e : all) if (inScope(e.crossing())) selected.add(e);
+    for (Rules.Event e : allToday()) if (inScope(e.crossing())) selected.add(e);
     return selected;
   }
 
@@ -314,40 +313,40 @@ public class MainActivity extends Activity {
     header.setPadding(dp(16), dp(8), dp(16), dp(10));
     header.setBackgroundColor(0xFF102F52);
     LinearLayout titleRow = row();
-    LinearLayout mark = row();
-    mark.setGravity(Gravity.CENTER);
-    mark.setBackground(shape(0xFF23496E, 14, 0));
-    mark.addView(icon("rail", Color.WHITE, 22));
-    titleRow.addView(mark, new LinearLayout.LayoutParams(dp(37), dp(37)));
+    ImageView mark = new ImageView(this);
+    mark.setImageResource(R.drawable.ic_train_mark);
+    mark.setScaleType(ImageView.ScaleType.FIT_CENTER);
+    mark.setContentDescription("Biểu tượng Giám sát Đường ngang");
+    titleRow.addView(mark, new LinearLayout.LayoutParams(dp(38), dp(42)));
     LinearLayout titles = column();
-    titles.setPadding(dp(12), 0, 0, 0);
-    TextView eyebrow =
-        text(demo ? "GIÁM SÁT ĐƯỜNG SẮT · MINH HỌA" : "GIÁM SÁT ĐƯỜNG SẮT", 8, 0xFF9CB8D7, true);
-    eyebrow.setLetterSpacing(.12f);
-    titles.addView(eyebrow);
-    gap(titles, 5);
-    titles.addView(
-        text(
-            page.equals("incidents")
+    titles.setPadding(dp(10), 0, dp(4), 0);
+    String heading =
+        page.equals("overview")
+            ? "Giám sát Đường ngang"
+            : page.equals("incidents")
                 ? "Sự cố đường ngang"
                 : page.equals("settings")
                     ? "Cài đặt"
                     : page.equals("detail")
                         ? "Chi tiết đường ngang"
-                        : page.equals("crossings") ? "Danh sách đường ngang" : "Đường ngang",
-            page.equals("detail") || page.equals("crossings") ? 17 : 20,
-            Color.WHITE,
-            true));
+                        : page.equals("trains") ? "Các lượt tàu" : "Danh sách đường ngang";
+    titles.addView(text(heading, page.equals("overview") ? 18 : 17, Color.WHITE, true));
+    gap(titles, 5);
+    titles.addView(text("Công ty CP Đường sắt Vinh", 11, 0xFFCAD9EC, false));
     titleRow.addView(titles, new LinearLayout.LayoutParams(0, -2, 1));
     titleRow.addView(
         iconButton(
-            page.equals("detail") ? "back" : page.equals("settings") ? "close" : "settings",
+            page.equals("detail") || page.equals("trains")
+                ? "back"
+                : page.equals("settings") ? "close" : "settings",
             page.equals("settings") ? "Về tổng quan" : "Cài đặt",
             () ->
                 navigate(
-                    page.equals("detail")
-                        ? "crossings"
-                        : page.equals("settings") ? "overview" : "settings")));
+                    page.equals("trains")
+                        ? "overview"
+                        : page.equals("detail")
+                            ? "crossings"
+                            : page.equals("settings") ? "overview" : "settings")));
     header.addView(titleRow);
     screen.addView(header);
     content = column();
@@ -359,24 +358,32 @@ public class MainActivity extends Activity {
       mapWrapper.addView(map);
       screen.addView(mapWrapper);
     }
-    ScrollView scroll = new ScrollView(this);
-    scroll.setClipToPadding(false);
-    scroll.setFillViewport(true);
-    scroll.setVerticalScrollBarEnabled(false);
-    scroll.addView(content);
-    screen.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-    if (page.equals("overview")) overview();
-    else if (page.equals("incidents")) incidents();
-    else if (page.equals("crossings")) crossingList();
-    else if (page.equals("detail")) crossingDetail();
-    else settings();
+    if (page.equals("overview")) {
+      content = new DashboardView();
+      screen.addView(content, new LinearLayout.LayoutParams(-1, 0, 1));
+    } else {
+      ScrollView scroll = new ScrollView(this);
+      scroll.setClipToPadding(false);
+      scroll.setFillViewport(true);
+      scroll.setVerticalScrollBarEnabled(false);
+      scroll.addView(content);
+      screen.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+      if (page.equals("incidents")) incidents();
+      else if (page.equals("crossings")) crossingList();
+      else if (page.equals("detail")) crossingDetail();
+      else if (page.equals("trains")) trainList();
+      else settings();
+    }
     status = text("", 11, MUTED, false);
+    status.setMaxLines(2);
+    status.setEllipsize(android.text.TextUtils.TruncateAt.END);
     if (!demo && !store.prefs.getString("status", "").isEmpty() && !page.equals("settings")) {
       status.setText(store.prefs.getString("status", ""));
       status.setPadding(dp(2), 0, 0, dp(12));
-      content.addView(status);
+      if (page.equals("overview")) screen.addView(status);
+      else content.addView(status);
     }
-    TextView credit = text("Designed by Cao Xuân Cường", 6, 0xFFA5B1C2, false);
+    TextView credit = text("Designed by Cao Xuân Cường", 8, 0xFF627A98, true);
     credit.setGravity(Gravity.END);
     credit.setPadding(0, dp(3), dp(22), dp(5));
     screen.addView(credit);
@@ -388,129 +395,229 @@ public class MainActivity extends Activity {
     LinearLayout compass = row();
     compass.setPadding(0, dp(2), 0, 0);
     compass.addView(text("BẮC", 9, MUTED, true));
-    TextView heading = text("Lý trình tăng  →", 9, MUTED, false);
-    heading.setGravity(Gravity.CENTER);
-    compass.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
+    compass.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
     compass.addView(text("NAM", 9, MUTED, true));
     c.addView(compass);
     RouteView route = new RouteView();
     route.setContentDescription(
-        "Sơ đồ từ Km "
-            + rangeFrom()
-            + " đến Km "
-            + rangeTo()
+        "Toàn tuyến Km 312+111 đến Km 334+830, gồm 11 đường ngang và 2 ga"
             + (demo ? " · Dữ liệu minh họa" : " · Chưa hiển thị vị trí tàu thật"));
-    c.addView(route, new LinearLayout.LayoutParams(-1, dp(76)));
-    LinearLayout legend = row();
-    legend.addView(pill("→  Tàu lẻ", GREEN, 0xFFEAF7F1));
-    TextView other = text("←  Tàu chẵn", 10, MUTED, false);
-    other.setPadding(dp(12), 0, 0, 0);
-    legend.addView(other, new LinearLayout.LayoutParams(0, -2, 1));
-
-    c.addView(legend);
+    c.addView(route, new LinearLayout.LayoutParams(-1, dp(84)));
+    if (demo) {
+      TextView preview = text("Minh họa", 8, MUTED, false);
+      preview.setGravity(Gravity.END);
+      c.addView(preview);
+    }
     return c;
   }
 
-  private void overview() {
-    List<Rules.Event> events = today();
+  private void setAlarmSound(boolean enabled) {
+    store.prefs.edit().putBoolean("sound", enabled).apply();
+    if (!enabled) {
+      NotificationManager manager = getSystemService(NotificationManager.class);
+      for (var notification : manager.getActiveNotifications())
+        if (notification.getId() != 1) manager.cancel(notification.getId());
+    }
+  }
+
+  /** The main dashboard owns the available viewport; it never adds a vertical scroller. */
+  private class DashboardView extends LinearLayout {
+    private int lastWidth = -1, lastHeight = -1;
+    private final Runnable rebuild =
+        () -> {
+          if (getHeight() > 0) fillDashboard(this, getHeight());
+        };
+
+    DashboardView() {
+      super(MainActivity.this);
+      setOrientation(VERTICAL);
+      setPadding(dp(14), 0, dp(14), 0);
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+      super.onLayout(changed, left, top, right, bottom);
+      int width = right - left, height = bottom - top;
+      if (height > 0 && (width != lastWidth || height != lastHeight || getChildCount() == 0)) {
+        lastWidth = width;
+        lastHeight = height;
+        removeCallbacks(rebuild);
+        post(rebuild);
+      }
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+      removeCallbacks(rebuild);
+      super.onDetachedFromWindow();
+    }
+  }
+
+  private void fillDashboard(LinearLayout panel, int height) {
+    panel.removeAllViews();
     List<Rules.Event> trains = new ArrayList<>();
-    for (var e : events) if (Rules.direction(e.text()) != 0) trains.add(e);
+    for (Rules.Event e : today()) if (Rules.direction(e.text()) != 0) trains.add(e);
+    List<Rules.Event> faults = currentFaults(today());
+    float density = getResources().getDisplayMetrics().density,
+        scale = getResources().getConfiguration().fontScale;
+    float available = height / density;
+    int tn = Math.min(trains.size(), expanded ? 10 : 6), fn = Math.min(faults.size(), 6);
+    float trainRow = 36 * Math.max(1, scale), faultRow = 56 * Math.max(1, scale);
+    while (128 + Math.max(1, tn) * trainRow + Math.max(1, fn) * faultRow > available
+        && (tn > 1 || fn > 1)) {
+      if (expanded && fn > 2) fn--;
+      else if (tn > 1 && (fn <= 1 || tn >= fn)) tn--;
+      else if (fn > 1) fn--;
+      else tn--;
+    }
+    float trainNeed = 48 + Math.max(1, tn) * trainRow, faultNeed = 56 + Math.max(1, fn) * faultRow;
+    float trainActual = (available - 8) * trainNeed / (trainNeed + faultNeed),
+        faultActual = available - 8 - trainActual;
+    boolean roomyTrain = (trainActual - 48) / Math.max(1, tn) > 46,
+        roomyFault = (faultActual - 56) / Math.max(1, fn) > 68;
     LinearLayout train = card(Color.WHITE);
-    LinearLayout title = row();
-    title.addView(icon("direction", BLUE, 19));
-    TextView caption = text("Tàu gần nhất", 13, INK, true);
-    caption.setPadding(dp(8), 0, 0, 0);
-    title.addView(caption, new LinearLayout.LayoutParams(0, -2, 1));
-    title.addView(icon(expanded ? "up" : "down", MUTED, 17));
-    train.addView(title);
-    gap(train, 9);
-    if (trains.isEmpty())
-      empty(train, "Chưa ghi nhận tàu", "Thông tin xuất hiện khi có dữ liệu mới.", "direction");
-    else {
-      int visible = expanded ? trains.size() : Math.min(3, trains.size());
-      for (int i = 0; i < visible; i++) {
-        if (i > 0) divider(train);
-        eventRow(train, trains.get(i), false);
-      }
-      if (trains.size() > 3) {
-        gap(train, 7);
-        train.addView(text(expanded ? "Thu gọn" : "Xem thêm lượt tàu", 9, MUTED, false));
-      }
-    }
-    touch(
-        train,
-        () -> {
-          expanded = !expanded;
-          render();
-        });
-    content.addView(train);
-    List<Rules.Event> faults = currentFaults(events);
-    LinearLayout faultCard = card(0xFFFFF0F1);
-    LinearLayout ft = row();
-    ft.addView(icon("alert", RED, 19));
-    TextView ftitle = text("Sự cố", 13, RED, true);
-    ftitle.setPadding(dp(8), 0, dp(9), 0);
-    ft.addView(ftitle);
-    ft.addView(pill(String.format(Locale.ROOT, "%02d", faults.size()), RED, 0xFFFFDFE2));
-    View stretch = new View(this);
-    ft.addView(stretch, new LinearLayout.LayoutParams(0, 1, 1));
-    boolean sound = store.prefs.getBoolean("sound", true);
-    View bell = icon(sound ? "bell" : "mute", RED, 21);
-    LinearLayout hit = row();
-    hit.setGravity(Gravity.CENTER);
-    hit.addView(bell);
-    hit.setContentDescription(sound ? "Tắt chuông sự cố" : "Bật chuông sự cố");
-    touch(
-        hit,
-        () -> {
-          store.prefs.edit().putBoolean("sound", !sound).apply();
-          render();
-        });
-    ft.addView(hit, new LinearLayout.LayoutParams(dp(44), dp(36)));
-    faultCard.addView(ft);
-    if (faults.isEmpty()) {
-      gap(faultCard, 16);
-      empty(
-          faultCard,
-          store.prefs.getLong("lastSuccess", 0) == 0 && !demo
-              ? "Đang chờ dữ liệu"
-              : "✓ Chưa ghi nhận lỗi mới",
-          store.prefs.getLong("lastSuccess", 0) == 0 && !demo
-              ? "Kết nối tài khoản để bắt đầu theo dõi."
-              : "Trong phần dữ liệu đã đọc.",
-          "shield");
-    }
-    for (int i = 0; i < Math.min(3, faults.size()); i++) {
-      if (i == 0) gap(faultCard, 9);
-      else divider(faultCard);
-      var e = faults.get(i);
-      eventRow(faultCard, e, true);
-      gap(faultCard, 5);
-      LinearLayout controls = row();
-      TextView indicator = text("Chưa khôi phục", 10, RED, false);
-      controls.addView(indicator, new LinearLayout.LayoutParams(0, -2, 1));
-      TextView quiet = pill("Tắt chuông", RED, 0xFFFFE1E4);
-      quiet.setPadding(dp(10), dp(7), dp(10), dp(7));
+    LinearLayout.LayoutParams trainParams = new LinearLayout.LayoutParams(-1, 0, trainNeed);
+    trainParams.bottomMargin = dp(8);
+    panel.addView(train, trainParams);
+    LinearLayout th = row();
+    th.addView(icon("direction", BLUE, 19));
+    TextView tt = text("Tàu gần nhất", 14, INK, true);
+    tt.setPadding(dp(8), 0, 0, 0);
+    th.addView(tt, new LinearLayout.LayoutParams(0, -2, 1));
+    if (trains.size() > tn || expanded) {
+      LinearLayout more = row();
+      more.addView(icon(expanded ? "up" : "down", MUTED, 17));
+      more.setPadding(dp(8), dp(4), dp(2), dp(4));
+      more.setContentDescription(expanded ? "Thu gọn lượt tàu" : "Hiển thị thêm lượt tàu");
       touch(
-          quiet,
+          more,
           () -> {
-            getSystemService(NotificationManager.class)
-                .cancel(100 + Math.floorMod(e.id().hashCode(), 1000000));
-            Toast.makeText(this, "Đã tắt thông báo; vẫn giữ trạng thái lỗi", Toast.LENGTH_SHORT)
-                .show();
+            expanded = !expanded;
+            fillDashboard(panel, panel.getHeight());
           });
-      controls.addView(quiet);
-      faultCard.addView(controls);
+      th.addView(more);
+    } else th.addView(pill("" + trains.size(), BLUE, 0xFFEDF4FF));
+    train.addView(th);
+    gap(train, 6);
+    if (tn == 0) {
+      LinearLayout placeholder = column();
+      placeholder.setGravity(Gravity.CENTER_VERTICAL);
+      empty(
+          placeholder, "Chưa ghi nhận tàu", "Thông tin xuất hiện khi có dữ liệu mới.", "direction");
+      train.addView(placeholder, new LinearLayout.LayoutParams(-1, 0, 1));
     }
-    content.addView(faultCard);
-    TextView allFaults = text("Xem tất cả sự cố  →", 11, BLUE, true);
-    allFaults.setPadding(dp(2), dp(2), 0, dp(10));
-    touch(allFaults, () -> navigate("incidents"));
-    content.addView(allFaults);
-    if (!demo && store.prefs.getString("url", "").isEmpty()) {
-      content.addView(action("Kết nối tài khoản", "link", true, () -> navigate("settings")));
-      gap(content, 16);
+    for (int i = 0; i < tn; i++) {
+      if (i > 0) dashboardDivider(train);
+      LinearLayout entry = dashboardEntry(trains.get(i), false, roomyTrain);
+      train.addView(entry, new LinearLayout.LayoutParams(-1, 0, 1));
     }
+    if (trains.size() > tn) {
+      TextView more = text("Xem tất cả lượt tàu  →", 10, BLUE, true);
+      more.setPadding(0, dp(5), 0, dp(3));
+      touch(more, () -> navigate("trains"));
+      train.addView(more);
+    }
+    LinearLayout fault = card(0xFFFFF0F1);
+    panel.addView(fault, new LinearLayout.LayoutParams(-1, 0, faultNeed));
+    LinearLayout fh = row();
+    fh.addView(icon("alert", RED, 19));
+    TextView ft = text("Sự cố", 14, RED, true);
+    ft.setPadding(dp(8), 0, dp(8), 0);
+    fh.addView(ft);
+    fh.addView(pill(String.format(Locale.ROOT, "%02d", faults.size()), RED, 0xFFFFDFE2));
+    fh.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
+    boolean sound = store.prefs.getBoolean("sound", true);
+    LinearLayout mute = row();
+    mute.setPadding(dp(8), dp(6), dp(8), dp(6));
+    mute.setGravity(Gravity.CENTER);
+    mute.setBackground(shape(0xFFFFE1E4, 10, 0));
+    mute.addView(icon(sound ? "bell" : "mute", RED, 17));
+    TextView muteText = text(sound ? "Tắt chuông" : "Bật chuông", 10, RED, true);
+    muteText.setPadding(dp(5), 0, 0, 0);
+    mute.addView(muteText);
+    mute.setContentDescription(sound ? "Tắt chuông tất cả sự cố" : "Bật chuông sự cố");
+    touch(
+        mute,
+        () -> {
+          setAlarmSound(!sound);
+          fillDashboard(panel, panel.getHeight());
+        });
+    fh.addView(mute);
+    fault.addView(fh);
+    gap(fault, 5);
+    if (fn == 0) {
+      LinearLayout placeholder = column();
+      placeholder.setGravity(Gravity.CENTER_VERTICAL);
+      boolean known = demo || store.prefs.getLong("lastSuccess", 0) > 0;
+      empty(
+          placeholder,
+          known ? "✓ Chưa ghi nhận lỗi mới" : "Đang chờ dữ liệu",
+          known ? "Trong phần dữ liệu đã đọc." : "Kết nối tài khoản để bắt đầu theo dõi.",
+          "shield");
+      fault.addView(placeholder, new LinearLayout.LayoutParams(-1, 0, 1));
+    }
+    for (int i = 0; i < fn; i++) {
+      if (i > 0) dashboardDivider(fault);
+      LinearLayout entry = dashboardEntry(faults.get(i), true, roomyFault);
+      fault.addView(entry, new LinearLayout.LayoutParams(-1, 0, 1));
+    }
+    TextView moreFaults = text("Xem tất cả sự cố  →", 10, BLUE, true);
+    moreFaults.setPadding(0, dp(5), 0, dp(3));
+    touch(moreFaults, () -> navigate("incidents"));
+    fault.addView(moreFaults);
+  }
+
+  private void dashboardDivider(LinearLayout parent) {
+    View line = new View(this);
+    line.setBackgroundColor(LINE);
+    parent.addView(line, new LinearLayout.LayoutParams(-1, dp(1)));
+  }
+
+  private LinearLayout dashboardEntry(Rules.Event e, boolean fault, boolean roomy) {
+    LinearLayout box = column();
+    box.setGravity(Gravity.CENTER_VERTICAL);
+    LinearLayout line = new LinearLayout(this);
+    line.setGravity(Gravity.TOP);
+    TextView clock = text(time(e.at()), roomy ? 12 : 11, fault ? RED : MUTED, true);
+    clock.setSingleLine(true);
+    line.addView(clock, new LinearLayout.LayoutParams(dp(roomy ? 71 : 67), -2));
+    LinearLayout words = column();
+    TextView name = text(e.crossing(), roomy ? 15 : 13, INK, true);
+    name.setSingleLine(true);
+    words.addView(name);
+    gap(words, 3);
+    int direction = Rules.direction(e.text());
+    TextView message =
+        text(
+            e.text() + (direction > 0 ? "  →" : direction < 0 ? "  ←" : ""),
+            roomy ? 12 : 11,
+            fault ? RED : direction != 0 ? GREEN : MUTED,
+            false);
+    message.setMaxLines(2);
+    message.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    words.addView(message);
+    line.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
+    box.addView(line);
+    if (fault) {
+      gap(box, 4);
+      box.addView(text("Chưa khôi phục", 10, RED, false));
+    }
+    return box;
+  }
+
+  private void trainList() {
+    LinearLayout card = card(Color.WHITE);
+    card.addView(text("Các lượt tàu trong phạm vi theo dõi", 13, INK, true));
+    gap(card, 13);
+    int count = 0;
+    for (Rules.Event e : today())
+      if (Rules.direction(e.text()) != 0) {
+        if (count++ > 0) divider(card);
+        eventRow(card, e, false);
+      }
+    if (count == 0)
+      empty(card, "Chưa có lượt tàu", "Thông tin xuất hiện khi có dữ liệu mới.", "direction");
+    content.addView(card);
   }
 
   private void eventRow(LinearLayout parent, Rules.Event e, boolean fault) {
@@ -845,7 +952,7 @@ public class MainActivity extends Activity {
             "Tắt để chỉ hiển thị cảnh báo",
             store.prefs.getBoolean("sound", true),
             options);
-    sound.setOnCheckedChangeListener((b, on) -> store.prefs.edit().putBoolean("sound", on).apply());
+    sound.setOnCheckedChangeListener((b, on) -> setAlarmSound(on));
     content.addView(options);
     content.addView(
         action(
@@ -910,7 +1017,7 @@ public class MainActivity extends Activity {
     content.addView(preview);
     TextView note =
         text(
-            "Bản thử giao diện 0.2 · Chưa dùng trực vận hành.\n"
+            "Bản thử giao diện 0.4 · Chưa dùng trực vận hành.\n"
                 + "Tự kích và vị trí tàu thật chưa bật. Theo dõi nền sử dụng thông báo thường trực."
                 + " Website HTTP không mã hóa đường truyền.",
             10,
@@ -927,7 +1034,7 @@ public class MainActivity extends Activity {
 
   private List<Rules.Event> crossingEvents(String km) {
     List<Rules.Event> list = new ArrayList<>();
-    for (Rules.Event e : today()) if (Rules.km(e.crossing()).equals(Rules.km(km))) list.add(e);
+    for (Rules.Event e : allToday()) if (Rules.km(e.crossing()).equals(Rules.km(km))) list.add(e);
     list.sort(Comparator.comparingLong(Rules.Event::at).reversed());
     return list;
   }
@@ -1074,7 +1181,10 @@ public class MainActivity extends Activity {
         icons = {"overview", "rail", "alert", "settings"};
     for (int i = 0; i < pages.length; i++) {
       String target = pages[i];
-      boolean active = page.equals(target) || (page.equals("detail") && target.equals("crossings"));
+      boolean active =
+          page.equals(target)
+              || (page.equals("detail") && target.equals("crossings"))
+              || (page.equals("trains") && target.equals("overview"));
       LinearLayout tab = column();
       tab.setGravity(Gravity.CENTER);
       tab.setPadding(0, dp(5), 0, dp(4));
@@ -1092,7 +1202,7 @@ public class MainActivity extends Activity {
 
   private class RouteView extends View {
     private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final List<String> points = Rules.routeSpan(rangeFrom(), rangeTo());
+    private final List<String> points = Rules.ROUTE;
 
     RouteView() {
       super(MainActivity.this);
@@ -1135,10 +1245,10 @@ public class MainActivity extends Activity {
       float left = points.size() == 1 ? getWidth() / 2f : dp(7),
           right = points.size() == 1 ? left : getWidth() - dp(27),
           step = points.size() > 1 ? (right - left) / (points.size() - 1) : 0,
-          y = dp(25);
+          y = dp(33);
       int trainIndex = -1, trainDirection = 1;
       if (demo)
-        for (Rules.Event e : today())
+        for (Rules.Event e : allToday())
           if (Rules.direction(e.text()) != 0) {
             trainIndex = points.indexOf(Rules.km(e.crossing()));
             trainDirection = Rules.direction(e.text());
@@ -1156,6 +1266,13 @@ public class MainActivity extends Activity {
         c.drawLine(left + step * greenStart, y, left + step * greenEnd, y, p);
         p.setStrokeWidth(dp(1.7f));
         float ax = left + step * trainIndex;
+        p.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        p.setTextSize(dp(10));
+        String direction = trainDirection > 0 ? "Tàu lẻ" : "Tàu chẵn";
+        float half = p.measureText(direction) / 2;
+        float labelCenter = Math.max(half + dp(1), Math.min(getWidth() - half - dp(1), ax));
+        c.drawText(direction, labelCenter - half, Math.max(dp(1) - p.ascent(), y - dp(25)), p);
+
         c.save();
         c.translate(ax, y - dp(13));
         c.scale(trainDirection, 1);
