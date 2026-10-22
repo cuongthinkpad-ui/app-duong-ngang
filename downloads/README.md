@@ -1,18 +1,19 @@
-# Đường Ngang — bản thử 0.2
+# Đường Ngang — bản thử 0.3
 
-**[Tải APK 0.2](https://github.com/cuongthinkpad-ui/app-duong-ngang/raw/refs/heads/main/downloads/DuongNgang-0.2.apk)**
+**[Tải APK 0.3](https://github.com/cuongthinkpad-ui/app-duong-ngang/raw/refs/heads/main/downloads/DuongNgang-0.3.apk)**
 
-Giao diện đã thiết kế lại theo mẫu: xanh navy/xanh dương, sơ đồ đủ 11 đường ngang và 2 ga, đoạn xanh và mũi tên trong chế độ minh họa, màn hình danh sách và chi tiết đường ngang, lịch sử theo ngày, màn hình nhập tài khoản riêng. Không có camera.
+- Giao diện gọn hơn: bỏ dải trạng thái phụ, tiêu đề/đếm điểm trên sơ đồ; giảm chữ và khoảng cách. Trang chính hiện sẵn 3 lượt tàu và tối đa 3 sự cố.
+- Thanh dưới: Tổng quan / Đường ngang / Sự cố / Cài đặt. Không còn mục lịch sử riêng trên trang chính hay thanh dưới.
+- Trạng thái lỗi: **Chưa khôi phục**. Có bản tin phục hồi đúng thiết bị và đường ngang thì mục Sự cố hiện **✓ Đã khôi phục**; vẫn có chọn ngày và bộ lọc.
+- **Cài đặt → Phạm vi theo dõi → Từ đường ngang / Đến đường ngang → Áp dụng phạm vi**. Bao gồm hai đầu; cũng chọn được một điểm riêng lẻ. Chọn phạm vi không cần nhập tài khoản khi xem minh họa. Sơ đồ, lượt tàu, sự cố và chuông báo chỉ áp dụng trong khoảng đã chọn.
 
-1. Tải `DuongNgang-0.2.apk` và mở trên Android 8.0 trở lên. Có thể cài cập nhật bản 0.1 bằng cùng chữ ký thử nghiệm.
-2. Khi chưa có tài khoản, app mở sẵn **Dữ liệu minh họa**. Nếu đã nhập tài khoản, có thể bật minh họa trong Cài đặt.
-3. Chạm mốc đường ngang trên sơ đồ, hoặc vào **Đường ngang** rồi chọn một điểm để xem chi tiết.
+Cài APK cập nhật lên bản trước bằng cùng chữ ký thử nghiệm. Khi chưa có tài khoản, app mở sẵn chế độ minh họa có nhãn nhỏ ở đầu trang.
 
-Ảnh chụp từ app trên giả lập Android:
+Ảnh chụp trực tiếp từ app trên giả lập Android:
 
-- [Tổng quan](../docs/screenshots/overview-0.2.png)
-- [Chi tiết đường ngang](../docs/screenshots/detail-0.2.png)
-- [Lịch sử](../docs/screenshots/history-0.2.png)
-- [Cài đặt](../docs/screenshots/settings-0.2.png)
+- [Trang chính gọn](../docs/screenshots/overview-0.3.png)
+- [Sự cố và mục đã khôi phục](../docs/screenshots/incidents-0.3.png)
+- [Chọn phạm vi](../docs/screenshots/scope-0.3.png)
+- [Ví dụ chỉ theo dõi 320+445 đến 321+780](../docs/screenshots/selected-range-0.3.png)
 
-Đây là bản phát triển để xem giao diện, **chưa phải bản trực vận hành**. Chưa kiểm thử đăng nhập/phân trang bằng web Visitec thật; tự kích và sơ đồ tàu thật chưa bật. Tick xanh sau khi đặt lại mốc theo dõi chỉ nghĩa “Chưa ghi nhận lỗi mới”, không xác nhận thiết bị đã phục hồi. Không có tài khoản hoặc mật khẩu thử nghiệm được nhúng vào APK.
+Đây vẫn là bản phát triển để kiểm tra giao diện và quy tắc, **chưa phải bản trực vận hành**. Chưa kiểm thử đăng nhập/phân trang bằng web Visitec thật; tự kích và sơ đồ tàu thật chưa bật. Phạm vi hiện dùng danh mục 11 đường ngang khu vực Vinh đã thống nhất. Đặt lại mốc do thiếu dữ liệu không đồng nghĩa thiết bị đã phục hồi. Không nhúng tài khoản hoặc mật khẩu thử nghiệm vào APK.

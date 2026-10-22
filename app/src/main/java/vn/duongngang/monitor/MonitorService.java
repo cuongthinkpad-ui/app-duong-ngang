@@ -96,7 +96,12 @@ public class MonitorService extends Service {
       // First successful sync builds the baseline silently. No speculative self-trigger alerts yet.
       if (last > 0 && !reset)
         for (var e : added)
-          if (e.red() && e.at() >= store.prefs.getLong("baselineFrom", 0)) notifyFault(e);
+          if (e.red()
+              && e.at() >= store.prefs.getLong("baselineFrom", 0)
+              && Rules.inRange(
+                  e.crossing(),
+                  store.prefs.getString("rangeFrom", "312+111"),
+                  store.prefs.getString("rangeTo", "334+830"))) notifyFault(e);
       if (reset) {
         store.prefs.edit().putLong("baselineFrom", now).apply();
         var notifications = getSystemService(NotificationManager.class);

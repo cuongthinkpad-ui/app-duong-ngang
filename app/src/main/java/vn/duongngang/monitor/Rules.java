@@ -23,6 +23,31 @@ public final class Rules {
           "332+350",
           "334+830");
 
+  public static final List<String> CROSSINGS;
+
+  static {
+    List<String> all = new ArrayList<>(NORTH);
+    all.addAll(SOUTH);
+    CROSSINGS = Collections.unmodifiableList(all);
+  }
+
+  public static boolean validRange(String from, String to) {
+    return CROSSINGS.contains(km(from))
+        && CROSSINGS.contains(km(to))
+        && CROSSINGS.indexOf(km(from)) <= CROSSINGS.indexOf(km(to));
+  }
+
+  public static boolean inRange(String crossing, String from, String to) {
+    if (!validRange(from, to)) return false;
+    int i = CROSSINGS.indexOf(km(crossing));
+    return i >= CROSSINGS.indexOf(km(from)) && i <= CROSSINGS.indexOf(km(to));
+  }
+
+  public static List<String> routeSpan(String from, String to) {
+    if (!validRange(from, to)) return List.of();
+    return new ArrayList<>(ROUTE.subList(ROUTE.indexOf(km(from)), ROUTE.indexOf(km(to)) + 1));
+  }
+
   public record Event(
       String id, long at, String crossing, String text, boolean red, List<String> counts) {}
 
@@ -115,6 +140,40 @@ public final class Rules {
                 .atZone(zone)
                 .toLocalDate()
                 .equals(java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate()));
+  }
+
+  public record Incident(Event fault, Event recovery) {}
+
+  /** Pair only explicit restoration messages with earlier faults of that device and crossing. */
+  public static List<Incident> incidentHistory(List<Event> input) {
+    List<Event> ordered = new ArrayList<>(input);
+    ordered.sort(Comparator.comparingLong(Event::at));
+    List<Incident> result = new ArrayList<>();
+    Map<String, List<Integer>> open = new HashMap<>();
+    for (Event event : ordered) {
+      String key = km(event.crossing()) + "|" + faultKey(event.text());
+      if (event.red()) {
+        open.computeIfAbsent(key, k -> new ArrayList<>()).add(result.size());
+        result.add(new Incident(event, null));
+      } else if (event.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")) {
+        List<String> matches = new ArrayList<>();
+        matches.add(key);
+        String lower = event.text().toLowerCase(Locale.ROOT);
+        if (lower.contains("cần chắn") && faultKey(event.text()).equals(lower)) {
+          String prefix = km(event.crossing()) + "|cần chắn ";
+          for (String candidate : open.keySet())
+            if (candidate.startsWith(prefix)) matches.add(candidate);
+        }
+        for (String match : matches) {
+          List<Integer> indices = open.remove(match);
+          if (indices != null)
+            for (int index : indices)
+              result.set(index, new Incident(result.get(index).fault(), event));
+        }
+      }
+    }
+    result.sort(Comparator.comparingLong((Incident i) -> i.fault().at()).reversed());
+    return result;
   }
 
   public static List<Event> activeFaults(List<Event> input) {

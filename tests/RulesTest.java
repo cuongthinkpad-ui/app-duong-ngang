@@ -67,6 +67,38 @@ public class RulesTest {
         !Rules.needsNewBaseline(after, after + 60 * 1000, true),
         "same day short restart preserves state");
     check(Rules.needsNewBaseline(before, before + 25L * 60 * 60 * 1000, false), "long gap resets");
-    System.out.println("18 domain scenarios passed");
+    var incidentList = Rules.incidentHistory(faults);
+    check(incidentList.size() == 2, "incident history retains both faults");
+    check(
+        incidentList.stream().filter(i -> i.recovery() != null).count() == 1,
+        "only matching voltage fault restored");
+    check(
+        incidentList.stream()
+            .filter(i -> i.fault().text().contains("Cần chắn"))
+            .allMatch(i -> i.recovery() == null),
+        "system restoration does not mark barrier green");
+    var cycle =
+        Rules.incidentHistory(
+            List.of(
+                event(1, "328+325", "Điện áp cảm biến 6 < 5V", true),
+                event(2, "328+325", "Điện áp cảm biến 6 khôi phục tốt", false),
+                event(3, "328+325", "Điện áp cảm biến 6 < 5V", true)));
+    check(
+        cycle.size() == 2 && cycle.get(0).recovery() == null && cycle.get(1).recovery() != null,
+        "recurrence starts a separate unresolved incident");
+    check(Rules.inRange("Km 320+957", "320+445", "321+780"), "middle crossing included");
+    check(
+        Rules.inRange("320+445", "320+445", "321+780")
+            && Rules.inRange("321+780", "320+445", "321+780"),
+        "both endpoints included");
+    check(!Rules.inRange("328+325", "320+445", "321+780"), "outside crossing excluded");
+    check(!Rules.validRange("321+780", "320+445"), "reversed range rejected");
+    check(
+        Rules.routeSpan("314+550", "320+445").size() == 3,
+        "station included between selected boundaries");
+    check(
+        Rules.routeSpan("321+780", "321+780").equals(List.of("321+780")),
+        "single crossing range supported");
+    System.out.println("28 domain scenarios passed");
   }
 }
