@@ -13,6 +13,34 @@ public class MonitorService extends Service {
   private ScheduledExecutorService worker;
   private PowerManager.WakeLock wake;
   private Store store;
+  private final Handler dailyHandler = new Handler(Looper.getMainLooper());
+  private final Runnable dailyReset =
+      () -> {
+        resetDailyFaults();
+        scheduleDailyReset();
+      };
+
+  private void resetDailyFaults() {
+    store.resetDailyFaults(System.currentTimeMillis());
+    Set<Integer> open = new HashSet<>();
+    for (var fault : store.activeFaults()) open.add(notificationId(fault));
+    var manager = getSystemService(NotificationManager.class);
+    for (var notification : manager.getActiveNotifications())
+      if (notification.getId() != 1 && !open.contains(notification.getId()))
+        manager.cancel(notification.getId());
+    sendBroadcast(new Intent(UPDATE).setPackage(getPackageName()));
+  }
+
+  private void scheduleDailyReset() {
+    dailyHandler.removeCallbacks(dailyReset);
+    long midnight =
+        LocalDate.now(WebSource.ZONE)
+            .plusDays(1)
+            .atStartOfDay(WebSource.ZONE)
+            .toInstant()
+            .toEpochMilli();
+    dailyHandler.postDelayed(dailyReset, Math.max(1, midnight - System.currentTimeMillis()));
+  }
 
   @Override
   public void onCreate() {
@@ -73,6 +101,8 @@ public class MonitorService extends Service {
           this::poll, 0, store.prefs.getInt("interval", 30), TimeUnit.SECONDS);
     }
     store.prefs.edit().putBoolean("running", true).apply();
+    resetDailyFaults();
+    scheduleDailyReset();
     return START_STICKY;
   }
 
@@ -136,7 +166,7 @@ public class MonitorService extends Service {
         if (history && !incoming.isEmpty()) coverage = Math.max(coverage, incoming.get(0).at());
         if (reset && !data.connected()) coverage = now;
         long selfFrom = last == 0 || reset ? now : store.prefs.getLong("selfFrom", now);
-        if (reset) store.prefs.edit().putLong("baselineFrom", now).apply();
+        if (reset) store.prefs.edit().putLong("baselineFrom", newDay ? dayStart : now).apply();
         List<Rules.Event> cached = store.events(Math.max(previousStart, coverage), now + 1);
         List<Rules.Event> original = new ArrayList<>();
         for (var event : cached) if (!Rules.isSelfTrigger(event)) original.add(event);
@@ -165,7 +195,7 @@ public class MonitorService extends Service {
                 0,
                 Math.max(30000L, 1000L * store.prefs.getInt("interval", 30)));
         added.addAll(store.saveForAccount(account, new WebSource.DayData(confirmed, data.route())));
-        long baseline = store.prefs.getLong("baselineFrom", 0);
+        long baseline = Rules.faultBaseline(store.prefs.getLong("baselineFrom", 0), now);
         long replayFrom = incoming.stream().mapToLong(Rules.Event::at).min().orElse(now);
         for (var event : confirmed) replayFrom = Math.min(replayFrom, event.at());
         var active = store.updateActiveFaults(account, replayFrom, now, baseline, disproved);
@@ -241,6 +271,7 @@ public class MonitorService extends Service {
 
   @Override
   public void onDestroy() {
+    dailyHandler.removeCallbacks(dailyReset);
     if (worker != null) worker.shutdownNow();
     if (wake != null && wake.isHeld()) wake.release();
     store.prefs.edit().putBoolean("running", false).apply();

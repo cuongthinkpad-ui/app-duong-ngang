@@ -292,6 +292,17 @@ public final class Rules {
     return t;
   }
 
+  public static long faultBaseline(long previous, long now) {
+    long midnight =
+        java.time.Instant.ofEpochMilli(now)
+            .atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+            .toLocalDate()
+            .atStartOfDay(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+            .toInstant()
+            .toEpochMilli();
+    return Math.max(previous, midnight);
+  }
+
   public static boolean needsNewBaseline(long last, long now, boolean restarted) {
     if (last <= 0 || now <= last) return false;
     java.time.ZoneId zone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");

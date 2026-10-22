@@ -8,6 +8,7 @@ import java.util.List;
 /** No test dependencies. Uses a separate device-protected sandbox, never the app's normal data. */
 public final class RouteStoreChecks extends Instrumentation {
   private int checks;
+  private boolean uiMode;
 
   private void check(boolean result, String message) {
     checks++;
@@ -17,11 +18,23 @@ public final class RouteStoreChecks extends Instrumentation {
   @Override
   public void onCreate(Bundle arguments) {
     super.onCreate(arguments);
+    uiMode = arguments != null && "ui".equals(arguments.getString("mode"));
     start();
   }
 
   @Override
   public void onStart() {
+    if (uiMode) {
+      Bundle result = new Bundle();
+      try {
+        result.putString("stream", new UiRefreshChecks(this).run() + " UI refresh checks passed\n");
+        finish(-1, result);
+      } catch (Throwable error) {
+        result.putString("stream", "FAILED: " + error + "\n");
+        finish(0, result);
+      }
+      return;
+    }
     Context context = getTargetContext().createDeviceProtectedStorageContext();
     Store store = new Store(context);
     Bundle result = new Bundle();
@@ -122,12 +135,53 @@ public final class RouteStoreChecks extends Instrumentation {
       check(
           store.pendingSelf().get("case") == 500L,
           "pending confirmation timestamps survive restart");
+      long midnight = java.time.Instant.parse("2026-10-22T17:00:00Z").toEpochMilli();
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "yesterday-bell",
+                      midnight - 1000,
+                      "Km 500+000",
+                      "Chuông 2 hỏng",
+                      true,
+                      List.of()),
+                  new Rules.Event(
+                      "new-day-lamp", midnight + 1000, "Km 500+000", "Đèn 1 hỏng", true, List.of()),
+                  new Rules.Event(
+                      "overnight-train",
+                      midnight - 2000,
+                      "Km 502+200",
+                      "Tàu lẻ",
+                      false,
+                      List.of())),
+              routeB));
+      store.updateActiveFaults(store.account(), midnight - 3000, midnight - 1, 0, List.of());
+      store.resetDailyFaults(midnight + 2000);
+      check(
+          store.activeFaults().size() == 1
+              && store.activeFaults().get(0).id().equals("new-day-lamp"),
+          "daily reset removes yesterday fault and retains new-day fault");
+      check(
+          store.occupationEvents().size() == 1
+              && store.events(midnight - 3000, midnight).size() == 2,
+          "daily reset retains overnight train and yesterday archive");
+      check(
+          store.pendingSelf().isEmpty() && store.prefs.getLong("baselineFrom", 0) == midnight,
+          "daily reset clears pending inference and sets midnight boundary");
+      store.prefs.edit().putString("pendingSelf", "{\"new-case\":500}").commit();
+      store.resetDailyFaults(midnight + 3000);
+      check(
+          store.pendingSelf().containsKey("new-case"),
+          "same-day reset is idempotent and retains new pending inference");
       store.credentials("https://other.example.test/", "account-b", "test-only");
       check(
           store.route().points().isEmpty() && store.events(0, 2000).isEmpty(),
           "new URL isolates same ID");
       check(
-          !store.prefs.contains("activeFaults")
+          !store.prefs.contains("faultDay")
+              && !store.prefs.contains("activeFaults")
               && !store.prefs.contains("occupiedPoints")
               && !store.prefs.contains("pendingSelf")
               && !store.prefs.contains("lastFull"),

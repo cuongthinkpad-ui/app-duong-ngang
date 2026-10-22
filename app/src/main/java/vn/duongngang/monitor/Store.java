@@ -100,6 +100,10 @@ public final class Store {
       }
     } catch (JSONException ignored) {
     }
+    result.sort(
+        java.util.Comparator.comparingLong(Rules.Event::at)
+            .reversed()
+            .thenComparing(Rules.Event::id));
     return result;
   }
 
@@ -158,6 +162,22 @@ public final class Store {
     }
   }
 
+  /** Clear the current fault panel at Vietnamese midnight; retain archive and train occupation. */
+  public void resetDailyFaults(long now) {
+    synchronized (Store.class) {
+      long day = Rules.faultBaseline(0, now);
+      if (prefs.getLong("faultDay", 0) == day) return;
+      long baseline = Rules.faultBaseline(prefs.getLong("baselineFrom", 0), now);
+      updateActiveFaults(account(), baseline, now, baseline, List.of());
+      prefs
+          .edit()
+          .putLong("baselineFrom", baseline)
+          .putLong("faultDay", day)
+          .putString("pendingSelf", "{}")
+          .apply();
+    }
+  }
+
   public Map<String, Long> pendingSelf() {
     Map<String, Long> result = new HashMap<>();
     try {
@@ -205,6 +225,7 @@ public final class Store {
             .remove("lastSuccess")
             .remove("coverage")
             .remove("baselineFrom")
+            .remove("faultDay")
             .remove("selfFrom")
             .remove("pendingSelf")
             .remove("activeFaults")

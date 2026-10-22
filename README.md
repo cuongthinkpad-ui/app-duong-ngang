@@ -1,6 +1,15 @@
-# Đường Ngang — Android 0.6
+# Đường Ngang — Android 0.7
 
 Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt xanh dương. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
+
+## Thay đổi 0.7
+
+- Cập nhật định kỳ trong cửa sổ hiện tại: giữ khung sơ đồ, tàu gần nhất và sự cố; không thay toàn màn hình. Sơ đồ đổi trạng thái trên cùng vùng vẽ và giữ vị trí cuộn ngang. Dashboard có dữ liệu ngay khung hình đầu, không chờ callback để dựng lại.
+- Reset khối sự cố sau 00:00 giờ Việt Nam; không mang lỗi hôm trước sang Tổng quan. Lưu lịch sử ngày cũ và giữ chiếm dụng tàu qua nửa đêm.
+- Sự cố xếp theo thời điểm phát sinh, mới nhất trước, cả Tổng quan và tab Sự cố; dữ liệu lưu cũ cũng được sắp lại khi đọc.
+- Bỏ nút xem minh họa và đoạn giải thích cuối Cài đặt, mở theo dõi thực khi khởi động. Chữ ký vẫn chỉ ở Cài đặt.
+- Đơn vị dưới tiêu đề: “Công ty CP TTTH Đường sắt Vinh”.
+- Ô web điền sẵn `http://`, sửa/xóa hoặc thay bằng `https://` bình thường; địa chỉ đã lưu được giữ nguyên.
 
 ## Theo dõi
 
@@ -8,7 +17,7 @@
 - Chọn theo dõi từ đường ngang đến đường ngang. Phạm vi lọc danh sách, sự cố và thông báo; sơ đồ vẫn giữ đủ tuyến. Đổi URL/ID xóa trạng thái của tài khoản cũ.
 - Sơ đồ hiển thị những điểm được web báo có tàu, nhiều đoạn và hai hướng đồng thời. Tàu lẻ đi tăng km, tàu chẵn đi giảm km. Cần chắn nâng không xóa chiếm dụng; bản tin “Khôi phục hệ thống” đúng điểm mới xóa. Không nội suy GPS, danh tính hoặc số đoàn tàu từ số điểm xanh.
 - Mọi lỗi đỏ giữ nguyên chữ trên web, gồm tên/số thiết bị. Khôi phục chỉ xóa lỗi tương ứng; khôi phục hệ thống không xóa lỗi phần cứng. Sáu nhóm chi tiết: Chuông, Đèn, Cần chắn, Cảm biến, Kết nối, Điện áp.
-- Lưu lỗi chưa khôi phục và chiếm dụng qua các lần cập nhật/ngày. Sau gián đoạn qua ngày hoặc trên 24 giờ, mốc theo dõi lỗi có thể được đặt lại với “Chưa ghi nhận lỗi mới”; đây không phải bản tin thiết bị phục hồi.
+- Lưu lỗi chưa khôi phục trong ngày; khối hiện tại reset ở 00:00 giờ Việt Nam, lịch sử ngày cũ vẫn tra cứu được. Chiếm dụng tàu giữ qua nửa đêm tới bản tin khôi phục đúng điểm. Sau gián đoạn qua ngày hoặc trên 24 giờ, mốc theo dõi lỗi có thể được đặt lại với “Chưa ghi nhận lỗi mới”; đây không phải bản tin thiết bị phục hồi.
 - Suy luận “Nghi tự kích” từ lượt tàu mới thiếu lượt tương ứng ở đường ngang phía trước theo hướng chạy, có chờ ít nhất một chu kỳ (tối thiểu 30 giây). Không áp dụng qua ga hay đầu/cuối tuyến. Bản tin phía trước tới muộn sẽ bỏ suy luận; bản tin gốc được giữ. Đây là suy luận theo dữ liệu web, cần đối chiếu hiện trường.
 - CB1–CB6 ở bản tin khôi phục hệ thống được đối chiếu số trục theo số xuất hiện nhiều nhất. Ghi chú thừa/thiếu riêng từng CB; hòa chuẩn ghi “cảm biến đếm trục không đồng nhất, lỗi”. Không phát chuông từ ghi chú, không coi bản tin đo điện áp là số trục.
 
@@ -39,11 +48,10 @@ source scripts/env.sh
 ./scripts/build-cloud.sh --offline assembleDebug assembleDebugAndroidTest lintDebug
 # Với giả lập riêng đang chạy:
 ./scripts/test-android-route.sh
+./scripts/test-android-ui.sh
 python3 scripts/test-monitoring-e2e.py
 ```
 
 APK: `app/build/outputs/apk/debug/app-debug.apk`. Script kiểm tra service chỉ chấp nhận giả lập, sao lưu/khôi phục dữ liệu ứng dụng và proxy.
 
-![Tổng quan minh họa 0.6](docs/screenshots/overview-0.6.png)
-
-[Ảnh Cài đặt — dòng tên thiết kế](docs/screenshots/settings-0.6.png).
+[Kiểm tra giao diện 0.7](docs/UI_REVIEW_0.7.md).

@@ -415,6 +415,16 @@ public class RulesTest {
         Rules.activeFaults(namedLamps).size() == 1
             && Rules.activeFaults(namedLamps).get(0).text().equals("Đèn A hỏng"),
         "named lamp recovery does not clear a different lamp");
+    long midnight = java.time.Instant.parse("2026-10-22T17:00:00Z").toEpochMilli();
+    check(
+        Rules.faultBaseline(0, midnight - 1) == midnight - 86400000L,
+        "before Vietnamese midnight retains previous day");
+    check(
+        Rules.faultBaseline(0, midnight) == midnight,
+        "reset at Vietnamese midnight rather than UTC midnight");
+    check(
+        Rules.faultBaseline(midnight + 5000, midnight + 6000) == midnight + 5000,
+        "daily boundary does not rewind a later gap baseline");
     System.out.println(scenarios + " domain scenarios passed");
   }
 }

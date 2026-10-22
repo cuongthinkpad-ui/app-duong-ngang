@@ -25,12 +25,16 @@ public class MainActivity extends Activity {
       RED = 0xFFC64A55;
   private Store store;
   private LinearLayout screen, content;
-  private TextView status;
+  private TextView status, routeNote;
+  private LinearLayout routeWrapper;
+  private RouteView routeView;
+  private ScrollView pageScroll;
+  private List<String> renderedRoute = List.of();
   private String page = "overview",
       filter = "Tất cả",
       selectedCrossing = "312+111",
       incidentFilter = "Tất cả";
-  private boolean demo = false, expanded = false;
+  private boolean demo = false, expanded = false, followToday = true;
   private LocalDate selected = LocalDate.now(WebSource.ZONE);
   private final long demoClock = System.currentTimeMillis();
   private final ExecutorService io = Executors.newSingleThreadExecutor();
@@ -39,13 +43,15 @@ public class MainActivity extends Activity {
   private final Runnable refresh =
       new Runnable() {
         public void run() {
+          if (followToday) selected = LocalDate.now(WebSource.ZONE);
           String state =
               store.prefs.getString("status", "")
                   + store.prefs.getLong("lastSuccess", 0)
-                  + staleData();
+                  + staleData()
+                  + LocalDate.now(WebSource.ZONE);
           if (!state.equals(lastUiState)) {
             lastUiState = state;
-            if (!page.equals("settings")) render();
+            if (!page.equals("settings")) refreshContent();
           }
           handler.postDelayed(this, 2000);
         }
@@ -55,7 +61,9 @@ public class MainActivity extends Activity {
   public void onCreate(Bundle state) {
     super.onCreate(state);
     store = new Store(this);
-    demo = store.prefs.getBoolean("demoUi", store.prefs.getString("url", "").isEmpty());
+    // Older builds could reopen in preview mode. The app now always opens live monitoring.
+    store.prefs.edit().remove("demoUi").apply();
+    demo = false;
     getWindow().setStatusBarColor(0xFF102F52);
     getWindow().setNavigationBarColor(Color.WHITE);
     if (Build.VERSION.SDK_INT >= 26)
@@ -328,10 +336,14 @@ public class MainActivity extends Activity {
 
   private List<Rules.Event> activeFaults() {
     if (demo) return Rules.activeFaults(samples());
-    if (store.prefs.contains("activeFaults")) return store.activeFaults();
+    long baseline =
+        Rules.faultBaseline(store.prefs.getLong("baselineFrom", 0), System.currentTimeMillis());
     List<Rules.Event> current = new ArrayList<>();
-    long baseline = store.prefs.getLong("baselineFrom", 0);
-    for (var event : occupancyEvents()) if (event.at() >= baseline) current.add(event);
+    List<Rules.Event> records =
+        store.prefs.contains("activeFaults")
+            ? store.activeFaults()
+            : store.events(baseline, System.currentTimeMillis() + 1);
+    for (var event : records) if (event.at() >= baseline) current.add(event);
     return Rules.activeFaults(current);
   }
 
@@ -354,6 +366,9 @@ public class MainActivity extends Activity {
   }
 
   private void render() {
+    routeWrapper = null;
+    routeView = null;
+    pageScroll = null;
     screen = column();
     screen.setBackgroundColor(BG);
     setContentView(screen);
@@ -380,7 +395,7 @@ public class MainActivity extends Activity {
                         : page.equals("trains") ? "Các lượt tàu" : "Danh sách đường ngang";
     titles.addView(text(heading, page.equals("overview") ? 18 : 17, Color.WHITE, true));
     gap(titles, 5);
-    titles.addView(text("Công ty CP Đường sắt Vinh", 11, 0xFFCAD9EC, false));
+    titles.addView(text("Công ty CP TTTH Đường sắt Vinh", 11, 0xFFCAD9EC, false));
     titleRow.addView(titles, new LinearLayout.LayoutParams(0, -2, 1));
     titleRow.addView(
         iconButton(
@@ -401,21 +416,21 @@ public class MainActivity extends Activity {
     content.setPadding(dp(14), page.equals("overview") ? 0 : dp(8), dp(14), 0);
     if (page.equals("overview")) {
       LinearLayout map = routeCard();
-      LinearLayout mapWrapper = column();
-      mapWrapper.setPadding(dp(14), dp(8), dp(14), 0);
-      mapWrapper.addView(map);
-      screen.addView(mapWrapper);
+      routeWrapper = column();
+      routeWrapper.setPadding(dp(14), dp(8), dp(14), 0);
+      routeWrapper.addView(map);
+      screen.addView(routeWrapper);
     }
     if (page.equals("overview")) {
       content = new DashboardView();
       screen.addView(content, new LinearLayout.LayoutParams(-1, 0, 1));
     } else {
-      ScrollView scroll = new ScrollView(this);
-      scroll.setClipToPadding(false);
-      scroll.setFillViewport(true);
-      scroll.setVerticalScrollBarEnabled(false);
-      scroll.addView(content);
-      screen.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+      pageScroll = new ScrollView(this);
+      pageScroll.setClipToPadding(false);
+      pageScroll.setFillViewport(true);
+      pageScroll.setVerticalScrollBarEnabled(false);
+      pageScroll.addView(content);
+      screen.addView(pageScroll, new LinearLayout.LayoutParams(-1, 0, 1));
       if (page.equals("incidents")) incidents();
       else if (page.equals("crossings")) crossingList();
       else if (page.equals("detail")) crossingDetail();
@@ -425,11 +440,10 @@ public class MainActivity extends Activity {
     status = text("", 11, MUTED, false);
     status.setMaxLines(2);
     status.setEllipsize(android.text.TextUtils.TruncateAt.END);
-    if (!demo && !store.prefs.getString("status", "").isEmpty() && !page.equals("settings")) {
-      status.setText(store.prefs.getString("status", ""));
-      status.setPadding(dp(2), 0, 0, dp(12));
+    if (!page.equals("settings")) {
       if (page.equals("overview")) screen.addView(status);
       else content.addView(status);
+      updateStatusLine();
     }
     if (page.equals("settings")) {
       TextView credit = text("Designed by Cao Xuân Cường", 8, 0xFF627A98, true);
@@ -440,6 +454,71 @@ public class MainActivity extends Activity {
     navigation();
   }
 
+  private void updateStatusLine() {
+    String message = store.prefs.getString("status", "");
+    status.setText(message);
+    status.setVisibility(message.isEmpty() ? View.GONE : View.VISIBLE);
+    status.setPadding(dp(2), 0, 0, dp(12));
+  }
+
+  /** A poll changes data inside the existing window, never replaces its root/header/navigation. */
+  private void refreshContent() {
+    if (page.equals("settings")) return;
+    if (page.equals("overview")) {
+      if (!renderedRoute.equals(route().points())) {
+        routeWrapper.removeAllViews();
+        routeWrapper.addView(routeCard());
+      } else updateRoutePresentation();
+      updateStatusLine();
+      if (content.getHeight() > 0) fillDashboard(content, content.getHeight());
+    } else {
+      ScrollView currentScroll = pageScroll;
+      int x = currentScroll.getScrollX(), y = currentScroll.getScrollY();
+      content.removeAllViews();
+      if (page.equals("incidents")) incidents();
+      else if (page.equals("crossings")) crossingList();
+      else if (page.equals("detail")) crossingDetail();
+      else if (page.equals("trains")) trainList();
+      content.addView(status);
+      updateStatusLine();
+      // Restore after measuring the new rows, before the next frame is drawn.
+      currentScroll
+          .getViewTreeObserver()
+          .addOnPreDrawListener(
+              new android.view.ViewTreeObserver.OnPreDrawListener() {
+                public boolean onPreDraw() {
+                  currentScroll.getViewTreeObserver().removeOnPreDrawListener(this);
+                  currentScroll.scrollTo(x, y);
+                  return true;
+                }
+              });
+    }
+  }
+
+  private void updateRoutePresentation() {
+    List<String> points = route().points();
+    routeView.setContentDescription(
+        "Toàn tuyến, gồm "
+            + route().crossings().size()
+            + " đường ngang và "
+            + (points.size() - route().crossings().size())
+            + " ga, "
+            + Rules.occupancies(route(), occupancyEvents()).size()
+            + " điểm có bản tin chiếm dụng"
+            + (demo
+                ? " · Dữ liệu minh họa"
+                : staleData() ? " · Dữ liệu cũ hoặc chưa cập nhật" : " · Theo bản tin web"));
+    routeView.updateOccupancy();
+    long last = store.prefs.getLong("lastSuccess", 0);
+    routeNote.setText(
+        demo
+            ? "Minh họa"
+            : last == 0
+                ? "Chưa cập nhật từ web"
+                : (staleData() ? "Dữ liệu cũ · " : "Theo bản tin web · ") + time(last));
+    routeNote.setTextColor(!demo && staleData() ? 0xFFA16F1C : MUTED);
+  }
+
   private LinearLayout routeCard() {
     LinearLayout c = card(Color.WHITE);
     LinearLayout compass = row();
@@ -448,38 +527,22 @@ public class MainActivity extends Activity {
     compass.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
     compass.addView(text("NAM", 9, MUTED, true));
     c.addView(compass);
-    RouteView route = new RouteView();
+    routeView = new RouteView();
     List<String> points = route().points();
-    route.setContentDescription(
-        "Toàn tuyến, gồm "
-            + route().crossings().size()
-            + " đường ngang và "
-            + (points.size() - route().crossings().size())
-            + " ga"
-            + ", "
-            + Rules.occupancies(route(), occupancyEvents()).size()
-            + " điểm có bản tin chiếm dụng"
-            + (demo
-                ? " · Dữ liệu minh họa"
-                : staleData() ? " · Dữ liệu cũ hoặc chưa cập nhật" : " · Theo bản tin web"));
+    renderedRoute = List.copyOf(points);
     if (points.size() > 13) {
-      route.setMinimumWidth(dp(34 + 26 * (points.size() - 1)));
+      routeView.setMinimumWidth(dp(34 + 26 * (points.size() - 1)));
       HorizontalScrollView scroll = new HorizontalScrollView(this);
       scroll.setFillViewport(true);
       scroll.addView(
-          route, new HorizontalScrollView.LayoutParams(dp(34 + 26 * (points.size() - 1)), dp(101)));
+          routeView,
+          new HorizontalScrollView.LayoutParams(dp(34 + 26 * (points.size() - 1)), dp(101)));
       c.addView(scroll, new LinearLayout.LayoutParams(-1, dp(105)));
-    } else c.addView(route, new LinearLayout.LayoutParams(-1, dp(101)));
-    long last = store.prefs.getLong("lastSuccess", 0);
-    String mapNote =
-        demo
-            ? "Minh họa"
-            : last == 0
-                ? "Chưa cập nhật từ web"
-                : (staleData() ? "Dữ liệu cũ · " : "Theo bản tin web · ") + time(last);
-    TextView preview = text(mapNote, 8, !demo && staleData() ? 0xFFA16F1C : MUTED, false);
-    preview.setGravity(Gravity.END);
-    c.addView(preview);
+    } else c.addView(routeView, new LinearLayout.LayoutParams(-1, dp(101)));
+    routeNote = text("", 8, MUTED, false);
+    routeNote.setGravity(Gravity.END);
+    c.addView(routeNote);
+    updateRoutePresentation();
     return c;
   }
 
@@ -495,10 +558,6 @@ public class MainActivity extends Activity {
   /** The main dashboard owns the available viewport; it never adds a vertical scroller. */
   private class DashboardView extends LinearLayout {
     private int lastWidth = -1, lastHeight = -1;
-    private final Runnable rebuild =
-        () -> {
-          if (getHeight() > 0) fillDashboard(this, getHeight());
-        };
 
     DashboardView() {
       super(MainActivity.this);
@@ -507,26 +566,23 @@ public class MainActivity extends Activity {
     }
 
     @Override
-    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-      super.onLayout(changed, left, top, right, bottom);
-      int width = right - left, height = bottom - top;
+    protected void onMeasure(int widthSpec, int heightSpec) {
+      int width = MeasureSpec.getSize(widthSpec), height = MeasureSpec.getSize(heightSpec);
+      // Build before drawing the first frame, instead of posting an empty dashboard frame.
       if (height > 0 && (width != lastWidth || height != lastHeight || getChildCount() == 0)) {
         lastWidth = width;
         lastHeight = height;
-        removeCallbacks(rebuild);
-        post(rebuild);
+        fillDashboard(this, height);
       }
-    }
-
-    @Override
-    protected void onDetachedFromWindow() {
-      removeCallbacks(rebuild);
-      super.onDetachedFromWindow();
+      super.onMeasure(widthSpec, heightSpec);
     }
   }
 
   private void fillDashboard(LinearLayout panel, int height) {
-    panel.removeAllViews();
+    boolean reuseCards = panel.getChildCount() == 2;
+    LinearLayout previousTrain = reuseCards ? (LinearLayout) panel.getChildAt(0) : null;
+    LinearLayout previousFault = reuseCards ? (LinearLayout) panel.getChildAt(1) : null;
+    if (!reuseCards) panel.removeAllViews();
     List<Rules.Event> trains = new ArrayList<>();
     for (Rules.Event e : today()) if (Rules.direction(e.text()) != 0) trains.add(e);
     List<Rules.Event> faults = scopedFaults();
@@ -547,10 +603,12 @@ public class MainActivity extends Activity {
         faultActual = available - 8 - trainActual;
     boolean roomyTrain = (trainActual - 48) / Math.max(1, tn) > 46,
         roomyFault = (faultActual - 56) / Math.max(1, fn) > 68;
-    LinearLayout train = card(Color.WHITE);
+    LinearLayout train = reuseCards ? previousTrain : card(Color.WHITE);
+    train.removeAllViews();
     LinearLayout.LayoutParams trainParams = new LinearLayout.LayoutParams(-1, 0, trainNeed);
     trainParams.bottomMargin = dp(8);
-    panel.addView(train, trainParams);
+    if (reuseCards) train.setLayoutParams(trainParams);
+    else panel.addView(train, trainParams);
     LinearLayout th = row();
     th.addView(icon("direction", BLUE, 19));
     TextView tt = text("Tàu gần nhất", 14, INK, true);
@@ -589,8 +647,10 @@ public class MainActivity extends Activity {
       touch(more, () -> navigate("trains"));
       train.addView(more);
     }
-    LinearLayout fault = card(0xFFFFF0F1);
-    panel.addView(fault, new LinearLayout.LayoutParams(-1, 0, faultNeed));
+    LinearLayout fault = reuseCards ? previousFault : card(0xFFFFF0F1);
+    fault.removeAllViews();
+    if (reuseCards) fault.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, faultNeed));
+    else panel.addView(fault, new LinearLayout.LayoutParams(-1, 0, faultNeed));
     LinearLayout fh = row();
     fh.addView(icon("alert", RED, 19));
     TextView ft = text("Sự cố", 14, RED, true);
@@ -759,6 +819,7 @@ public class MainActivity extends Activity {
                     this,
                     (v, y, m, d) -> {
                       selected = LocalDate.of(y, m + 1, d);
+                      followToday = selected.equals(LocalDate.now(WebSource.ZONE));
                       render();
                     },
                     selected.getYear(),
@@ -845,6 +906,7 @@ public class MainActivity extends Activity {
     LocalDate day = selected;
     String account = store.account();
     status.setText("Đang tải dữ liệu sự cố…");
+    status.setVisibility(View.VISIBLE);
     io.execute(
         () -> {
           try {
@@ -859,7 +921,7 @@ public class MainActivity extends Activity {
             runOnUiThread(
                 () -> {
                   if (isFinishing()) return;
-                  render();
+                  refreshContent();
                   Toast.makeText(this, "Đã tải " + events.size() + " bản ghi", Toast.LENGTH_SHORT)
                       .show();
                 });
@@ -983,7 +1045,7 @@ public class MainActivity extends Activity {
             account,
             "ĐỊA CHỈ WEBSITE",
             "http://…",
-            store.prefs.getString("url", ""),
+            store.prefs.getString("url", "http://"),
             InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
     EditText user =
         field(
@@ -1127,29 +1189,6 @@ public class MainActivity extends Activity {
               store.prefs.edit().putString("status", "Đã dừng theo dõi").apply();
               Toast.makeText(this, "Đã dừng theo dõi", Toast.LENGTH_SHORT).show();
             }));
-    gap(content, 20);
-    LinearLayout preview = card(Color.WHITE);
-    Switch sample =
-        toggle("Xem giao diện minh họa", "Không sử dụng dữ liệu từ website", demo, preview);
-    sample.setOnCheckedChangeListener(
-        (b, on) -> {
-          demo = on;
-          store.prefs.edit().putBoolean("demoUi", on).apply();
-          if (on) stopService(new Intent(this, MonitorService.class));
-          navigate("overview");
-        });
-    content.addView(preview);
-    TextView note =
-        text(
-            "Bản 0.6 · Đồng bộ bản tin từ website.\n"
-                + "Nghi tự kích được đối chiếu lại sau một chu kỳ; lỗi gốc giữ nguyên nội dung web."
-                + " Theo dõi nền dùng thông báo thường trực. Website HTTP không mã hóa đường"
-                + " truyền.",
-            10,
-            MUTED,
-            false);
-    note.setPadding(dp(3), 0, dp(3), dp(18));
-    content.addView(note);
   }
 
   private void openCrossing(String km) {
@@ -1347,10 +1386,16 @@ public class MainActivity extends Activity {
 
     RouteView() {
       super(MainActivity.this);
+      updateOccupancy();
+    }
+
+    void updateOccupancy() {
+      Arrays.fill(occupied, 0);
       for (Rules.Occupancy report : Rules.occupancies(route(), occupancyEvents())) {
         int index = points.indexOf(report.crossing());
         if (index >= 0) occupied[index] = report.direction();
       }
+      invalidate();
     }
 
     @Override
