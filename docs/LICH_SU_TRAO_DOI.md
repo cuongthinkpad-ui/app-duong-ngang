@@ -108,3 +108,13 @@ Chủ dự án yêu cầu **chỉ cảnh báo tự kích khi chọn chu kỳ 30 
 Chủ dự án nói app có biểu tượng chuông, có thông báo nhưng **mở app, có lỗi vẫn không nghe tiếng chuông**. Bản 0.8 thêm player phát âm báo riêng thay vì chỉ phụ thuộc tiếng thông báo hệ thống: một chime 6 giây cho lỗi mới, và lỗi đang mở khi bắt đầu phiên theo dõi; không nhắc lại định kỳ. Tắt chuông chung dừng âm đang phát, giữ đỏ. Có “Thử chuông báo lỗi” trong Cài đặt, dùng mức âm lượng Báo thức. Kiểm tra player trên giả lập không chứng minh loa Xiaomi đã kêu; cần chủ dự án thử trên máy thật.
 
 Biên bản kiểm tra và ảnh chỉ dùng dữ liệu tổng hợp ở `docs/UI_REVIEW_0.8.md`. Không đăng ảnh vận hành hoặc tài khoản thử.
+
+## 13. Sửa sơ đồ và câu trống ở 0.9
+
+Chủ dự án yêu cầu đổi “Chưa có sự cố phù hợp” thành **“Không có sự cố”**, nhắc lại riêng để xác nhận câu chữ. Áp dụng tab Sự cố và khối trống đã có dữ liệu trên Tổng quan.
+
+Chủ dự án nói sơ đồ 0.8 chưa đúng, đưa chuỗi cụ thể: khi 312+111 báo tàu lẻ tiếp cận, sáng mép phía lẻ/Bắc của 312+111. Sau khi tàu qua, chỉ sáng khoảng từ phía Nam 312+111 tới phía Bắc 313+456, giữ dù 312+111 đã khôi phục. Khi 313+456 mới tiếp cận vẫn là đoạn đến đó; khi báo tàu đã qua thì chuyển sang 313+456–313+800. Các đường ngang/hướng chẵn làm tương tự. Chủ dự án chốt: **tàu còn đang chạy trên tuyến thì luôn có một khoảng sáng cho mỗi tàu, trừ khi trên tuyến không có tàu**; không mất giữa hai điểm và không sáng thêm đoạn phía sau cùng một lượt tàu.
+
+Riêng đoạn giáp ga, vẫn sáng từ đường ngang hướng vào ga tới khi đường ngang khôi phục, rồi tắt; khi đường ngang nhận tàu từ ga ra thì sáng đoạn ga–đường ngang, sau đó chuyển tiếp như bình thường. Không lấy tín hiệu ga để giữ tàu trên tuyến cả ngày hoặc nối xuyên qua ga.
+
+Nguyên nhân cách vẽ trước: chỉ tô chấm khi tiếp cận và đóng đoạn chuyển tiếp ngay khi điểm sau tiếp cận. Sửa 0.9 vẽ đoạn đến/đi theo từng giai đoạn, chuyển quyền hiển thị cho lượt ở điểm sau, bỏ đoạn tiếp cận cũ đã được nối sang điểm sau. Không thay nguyên lý khôi phục phần cứng hoặc cảnh báo lỗi. Chủ dự án đã xác nhận cách hiểu và yêu cầu sửa; không cần hỏi lại trước khi xuất APK.

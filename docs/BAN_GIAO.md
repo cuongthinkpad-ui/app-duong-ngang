@@ -5,14 +5,14 @@ Cập nhật: 23/10/2026, giờ Việt Nam. Tài liệu này ghi yêu cầu đã
 ## Bắt đầu ở phiên mới
 
 1. Kết nối cùng repository GitHub `cuongthinkpad-ui/app-duong-ngang`, lấy nhánh `main`; nếu không có công cụ GitHub, tải mã nguồn ZIP từ GitHub và cung cấp cho phiên mới.
-2. Đọc tài liệu này, `README.md`, `docs/LICH_SU_TRAO_DOI.md` và `docs/UI_REVIEW_0.8.md` trước khi thay đổi. Tài liệu 0.1–0.7 là lịch sử; các quyết định 0.8 và yêu cầu mới của chủ dự án được ưu tiên.
-3. Kiểm tra mã nguồn/commit thực tế. Bản ứng dụng mới nhất khi viết tài liệu là **0.8.0**, versionCode **8**; xem commit thay đổi phiên bản/APK trên main. Không nhầm commit chỉ sửa tài liệu với bản APK mới.
+2. Đọc tài liệu này, `README.md`, `docs/LICH_SU_TRAO_DOI.md` và `docs/UI_REVIEW_0.9.md` trước khi thay đổi. Tài liệu 0.1–0.8 là lịch sử; các quyết định 0.9 và yêu cầu mới của chủ dự án được ưu tiên.
+3. Kiểm tra mã nguồn/commit thực tế. Bản ứng dụng mới nhất khi viết tài liệu là **0.9.0**, versionCode **9**; xem commit thay đổi phiên bản/APK trên main. Không nhầm commit chỉ sửa tài liệu với bản APK mới.
 4. Tài khoản ChatGPT mới cần được cấp quyền truy cập GitHub riêng. Lịch sử chat, bộ nhớ ChatGPT, cache build và cấu hình cloud không tự chuyển theo repository.
 5. Tài khoản/mật khẩu website được chủ dự án nhập trực tiếp trong app hoặc cung cấp riêng khi cần kiểm thử. Không yêu cầu gửi lại toàn bộ cuộc trò chuyện và không chép mật khẩu vào mã nguồn.
 
 Tin nhắn chủ dự án có thể sao chép vào cuộc trò chuyện mới:
 
-> Tiếp tục app Android Đường Ngang tại https://github.com/cuongthinkpad-ui/app-duong-ngang, nhánh main. Hãy đọc AGENTS.md, docs/BAN_GIAO.md, docs/LICH_SU_TRAO_DOI.md, README.md và biên bản kiểm tra mới nhất trước. Điểm bàn giao hiện tại là bản 0.8. Giữ các yêu cầu đã chốt, kiểm tra mã nguồn hiện có và tiếp tục từ đó. Phân biệt rõ phần đã thử trên giả lập và phần chưa được xác minh trên Xiaomi thật. Yêu cầu tiếp theo của tôi là: [ghi việc muốn làm].
+> Tiếp tục app Android Đường Ngang tại https://github.com/cuongthinkpad-ui/app-duong-ngang, nhánh main. Hãy đọc AGENTS.md, docs/BAN_GIAO.md, docs/LICH_SU_TRAO_DOI.md, README.md và biên bản kiểm tra mới nhất trước. Điểm bàn giao hiện tại là bản 0.9. Giữ các yêu cầu đã chốt, kiểm tra mã nguồn hiện có và tiếp tục từ đó. Phân biệt rõ phần đã thử trên giả lập và phần chưa được xác minh trên Xiaomi thật. Yêu cầu tiếp theo của tôi là: [ghi việc muốn làm].
 
 ## Mục tiêu và trạng thái
 
@@ -20,7 +20,7 @@ Chủ dự án: Cao Xuân Cường, công tác theo dõi đường ngang cảnh 
 
 - Website đã thử: `http://visitec.vn:7447/`, trang báo cáo ASP.NET `Default.aspx`, cần đăng nhập. Không chỉ hỗ trợ một danh sách 13 điểm cố định.
 - Đây là bản thử có chức năng thật. Đã đăng nhập/đọc web thật, thử service và UI trên giả lập; chưa được chủ dự án xác nhận đủ độ tin cậy để dùng trực chính thức trên Xiaomi 14T Pro.
-- APK: `downloads/DuongNgang-0.8.apk`; checksum: `downloads/SHA256SUMS`. Đây là bản cài đầy đủ: cài mới trực tiếp hoặc cài đè cùng chữ ký để giữ cấu hình. Giao file qua GitHub, chọn **Download raw file**. Người dùng từng không tải được artifact trực tiếp từ workspace, kể cả ZIP.
+- APK: `downloads/DuongNgang-0.9.apk`; checksum: `downloads/SHA256SUMS`. Đây là bản cài đầy đủ: cài mới trực tiếp hoặc cài đè cùng chữ ký để giữ cấu hình. Giao file qua GitHub, chọn **Download raw file**. Người dùng từng không tải được artifact trực tiếp từ workspace, kể cả ZIP.
 - Play Protect từng chặn bản APK ban đầu; sau đó người dùng cài được. Không coi cảnh báo đã được xử lý cho mọi máy, không hướng dẫn vô hiệu hóa bảo vệ như mặc định.
 
 ## Nguyên lý thiết bị đã chốt
@@ -30,7 +30,9 @@ Lý trình tăng từ Bắc vào Nam. Bắc là phía lẻ, Nam là phía chẵn
 - CB1/CB2 ở phía Bắc, cách đường ngang hơn 1 km, hai cảm biến cách nhau khoảng 1 m. CB3/CB4 ở đường ngang. CB5/CB6 ở phía Nam, cũng cách hơn 1 km và cách nhau khoảng 1 m.
 - Tàu **lẻ**: CB1/2 → CB3/4 → CB5/6, Bắc → Nam, tăng km. Tàu **chẵn** đi ngược lại.
 - Đuôi tàu qua CB3/4 thì cần chắn nâng; đường ngang vẫn còn chiếm dụng. Khi tàu qua đủ cảm biến hai đầu, khoảng một phút sau web mới báo **“Khôi phục hệ thống”**. Trạng thái chiếm dụng thiết bị (`Rules.occupancies`) vẫn chỉ giải phóng bằng bản tin đó đúng điểm, không bằng cần chắn nâng hay đồng hồ.
-- **Yêu cầu 0.8 thay cách vẽ:** khi đã có “Tàu lẻ/chẵn đã qua đường ngang”, điểm trước chuyển sang tô riêng đoạn giữa nó và đường ngang kế tiếp theo hướng chạy. Điểm trước khôi phục vẫn giữ đoạn đó tới lượt báo tàu cùng hướng ở điểm sau. Không tô rìa ngoài hai mốc, không nối qua ga/đầu cuối tuyến; có thể có nhiều đoạn, hai hướng đồng thời. Bản tin điểm sau đã đến sớm trước lúc điểm trước đi qua/khôi phục phải được ghi nhận để không sáng lại đoạn đã hoàn tất. Khi thiếu bản tin đã qua, khôi phục chỉ nối tiếp nếu đã biết hướng từ lượt báo tàu; khôi phục đơn lẻ không tự tạo hướng.
+- **Yêu cầu sửa rõ ở 0.9:** mỗi lượt tàu chỉ sáng một đoạn. Trước bản tin đã qua, tô đoạn phía tàu đến: tàu lẻ vào 312+111 thì mép Bắc 312+111, tàu chẵn thì phía Nam. Khi có “Tàu lẻ/chẵn đã qua đường ngang”, chuyển sang đoạn phía tàu đi. Tàu lẻ qua 312+111 → sáng 312+111–313+456; qua 313+456 → sáng 313+456–313+800. Khôi phục điểm trước không làm mất đoạn; điểm sau mới báo tiếp cận cũng giữ nguyên đoạn đến, chỉ chuyển tiếp khi báo đã qua. Không tô thêm hai mép quanh điểm, không tắt rồi chỉ tô chấm như 0.8. Nếu có bản tin điểm sau sớm thì chỉ giữ một đoạn ở bước xa nhất đã ghi nhận, không sáng thêm đoạn cũ phía sau.
+- **Đoạn ga:** sau khi qua đường ngang hướng vào ga, sáng đoạn đường ngang–ga cho tới khôi phục của chính đường ngang đó rồi tắt. Khi đường ngang phía ra báo tàu từ ga, sáng đoạn ga–đường ngang, sau bản tin đã qua thì chuyển sang đoạn kế tiếp. Không nối xuyên ga; bản tin riêng trong ga không tạo hoặc giữ tàu cả ngày. Hai đầu tuyến có mép vào/ra ngắn chỉ trong giai đoạn tương ứng, không giữ sau khôi phục khi tàu đã ra ngoài vùng tài khoản.
+- Nhiều lượt/hai hướng được hiển thị đồng thời, mỗi lượt một đoạn (các lượt cùng đoạn/hướng dùng chung nét xanh). `Rules.trackSegments` là quy tắc hình vẽ; `Rules.occupancies` vẫn là trạng thái phần cứng. Thiếu bản tin đã qua thì khôi phục chỉ nối tiếp khi đã biết hướng từ lượt báo tàu; khôi phục đơn lẻ không tự tạo hướng.
 - Đây là biểu diễn liên tục từ bản tin, không phải GPS, danh tính hoặc số đoàn tàu. Đoạn chờ không tự mất theo thời gian; giữ qua nửa đêm/khởi động lại. Store có checkpoint và phát lại hai ngày gần nhất để tiếp nhận bản tin tới muộn. Không bảo đảm sửa đúng các bản tin bổ sung cũ hơn mốc checkpoint.
 - Mọi tên điểm có hậu tố trong ngoặc là **ga**, nhãn sơ đồ dùng đúng chữ trong ngoặc (Vi, YX, CS, MLy, QHa…). Ga không phải đường ngang và ngắt đối chiếu liền kề ở cả hai phía. Không lấy bản tin ga làm bằng chứng tàu vì tàu có thể nằm trong ga lâu hoặc được tàu khác vượt.
 
@@ -60,6 +62,7 @@ Tuyến tài khoản đầu tiên, từ Bắc xuống Nam: 312+111, 313+456, 313
 - Cập nhật 30 giây / 2 phút / 5 phút phải giữ root, sơ đồ, khung tàu và khung sự cố; không thay toàn bộ content view rồi chờ dựng lại gây chớp trắng. Cùng view sơ đồ phải cập nhật lại mảng chiếm dụng, tránh hết chớp nhưng tàu bị đứng.
 - Phạm vi “từ đường ngang đến đường ngang” chỉ lọc danh sách, sự cố và thông báo. **Không cắt ngắn sơ đồ** và không bỏ dữ liệu phía trước dùng suy luận.
 - Thanh dưới: Tổng quan / Đường ngang / Sự cố / Cài đặt. Không khối lịch sử riêng trên Tổng quan. Tab Sự cố có chọn ngày, Tất cả/Chưa khôi phục/Đã khôi phục; tick xanh khi có bản tin phục hồi tương ứng.
+- Chủ dự án chốt ở 0.9: trạng thái trống của Sự cố ghi **“Không có sự cố”**, bỏ câu “Chưa có sự cố phù hợp”. Khối Sự cố trên Tổng quan dùng cùng cách ghi khi đã có dữ liệu.
 - Cài đặt: URL/ID/mật khẩu, phạm vi, chu kỳ, bật/tắt chuông, chạy nền. URL mới điền sẵn `http://`, vẫn sửa/xóa/thay HTTPS được, giữ địa chỉ đã lưu.
 - Bỏ nút xem dữ liệu minh họa và đoạn chữ giải thích cuối Cài đặt. Khởi động vào theo dõi thực. Hàm samples còn trong nguồn phục vụ kiểm thử/lịch sử, không khôi phục lại công tắc preview cho người dùng.
 - **“Designed by Cao Xuân Cường” chỉ ở Cài đặt**, cỡ nhỏ nhưng đọc được, không ở các màn hình khác.
@@ -93,7 +96,7 @@ source scripts/env.sh
 python3 scripts/test-monitoring-e2e.py
 ```
 
-Tăng versionCode lớn hơn 8 khi xuất APK cập nhật mới. Giữ applicationId và chữ ký nếu muốn cài đè. Không đưa URL/ID/mật khẩu thử vào nguồn/APK, không đăng HTML đăng nhập hoặc ảnh dữ liệu vận hành vào repo.
+Tăng versionCode lớn hơn 9 khi xuất APK cập nhật mới. Giữ applicationId và chữ ký nếu muốn cài đè. Không đưa URL/ID/mật khẩu thử vào nguồn/APK, không đăng HTML đăng nhập hoặc ảnh dữ liệu vận hành vào repo.
 
 ## Khóa ký APK cần sao lưu riêng
 
@@ -106,6 +109,8 @@ APK hiện dùng **khóa debug của môi trường cloud này**; khóa riêng k
 
 ## Kiểm chứng và việc còn lại
 
+Bản 0.9: build/Lint đạt (0 lỗi, 15 cảnh báo), **133** kiểm tra quy tắc, **30** lưu trữ và **32** UI Android đạt. Sửa đoạn đến/đi liên tục, chuyển quyền hiển thị khi vùng cảm biến chồng nhau, đoạn vào/ra ga và câu “Không có sự cố”. Ảnh từng bước ở `docs/UI_REVIEW_0.9.md`. Không chạy lại web thật/service fixture trong thay đổi hình vẽ này; chưa có xác nhận hiện trường/Xiaomi.
+
 Bản 0.8: build/lint đạt (0 lỗi Lint, 15 cảnh báo), **113** kiểm tra quy tắc, **30** lưu trữ, **30** UI và **9** service fixture đạt. Ghi rõ kiểm tra player phát/dừng, lỗi đang mở khi bắt đầu theo dõi, tắt âm, 30 giây mới xét tự kích và đoạn tàu chuyển tiếp. Chi tiết/ảnh tổng hợp ở `docs/UI_REVIEW_0.8.md`; chưa xác nhận loa Xiaomi thật.
 
 Bản 0.7: build/lint thành công, 92 kiểm tra quy tắc, 26 kiểm tra lưu trữ, 21 kiểm tra UI, 7 kiểm tra service cục bộ đạt. Chi tiết ở `docs/UI_REVIEW_0.7.md`. Kiểm tra UI gọi cùng callback của các chu kỳ, không ngồi chờ cả 30/120/300 giây. Kiểm tra reset dùng mốc thời gian tổng hợp; không chứng minh điện thoại thật chạy liên tục qua đêm.
@@ -114,4 +119,4 @@ Bản 0.6 đã đăng nhập Visitec thật, đọc đủ ngày hiện tại/ng�
 
 Cần người dùng xác nhận trên **Xiaomi 14T Pro/HyperOS**: còn chớp trắng hay không, bố cục/cỡ chữ, chạy nền lâu khi khóa màn hình, độ trễ chuông, reset 00:00, sự cố/khôi phục và tự kích so với thực tế. Chưa có phản hồi xác nhận đầy đủ bản 0.7. Chưa tự chạy sau khởi động máy. Web không cung cấp ID sự kiện độc lập nên dòng hoàn toàn giống nhau cùng giây được gộp; không cam kết tương thích mọi cấu trúc website.
 
-Các yêu cầu mới nhất và kiểm tra 0.8 xem `docs/UI_REVIEW_0.8.md`. Chưa xác nhận ngoài điện thoại thật về giao diện mới, đoạn tàu giữa hai điểm và chuông; cần giữ rõ giới hạn này khi tiếp tục. Tình trạng sao lưu khóa ngoài cloud vẫn **chưa được chủ dự án xác nhận**.
+Các yêu cầu mới nhất và kiểm tra 0.9 xem `docs/UI_REVIEW_0.9.md`. Chưa xác nhận ngoài điện thoại thật về sơ đồ một đoạn mỗi lượt tàu; chuông và chạy nền Xiaomi vẫn cần đối chiếu. Tình trạng sao lưu khóa ngoài cloud vẫn **chưa được chủ dự án xác nhận**.

@@ -13,6 +13,19 @@ public class RulesTest {
     return new Rules.Event(km + t + text, t, km, text, red, List.of());
   }
 
+  static void oneSegment(
+      Rules.Route route,
+      Rules.TravelState state,
+      String from,
+      String to,
+      int direction,
+      String message) {
+    check(
+        Rules.trackSegments(route, state)
+            .equals(List.of(new Rules.TrackSegment(from, to, direction))),
+        message);
+  }
+
   public static void main(String[] args) {
     check(
         Rules.axleNote(List.of("46", "46", "48", "44", "46", "46"))
@@ -450,7 +463,7 @@ public class RulesTest {
     check(
         Rules.betweenCrossings(arrived).isEmpty()
             && Rules.approachingCrossings(arrived).get(0).crossing().equals("101+000"),
-        "destination arrival replaces leg with destination marker");
+        "destination approach consumes the source transfer and owns the incoming interval");
     var next =
         Rules.travelState(
             line, arrived, List.of(event(11000, "101+000", "Tàu lẻ đã qua đường ngang", false)));
@@ -495,7 +508,7 @@ public class RulesTest {
                         event(1, "103+000", "Tàu lẻ", false),
                         event(2, "103+000", "Tàu lẻ đã qua đường ngang", false))))
             .isEmpty(),
-        "route end does not project outside the last crossing");
+        "route end has no pending transfer to another crossing");
     var overlapping =
         Rules.travelState(
             line,
@@ -566,6 +579,179 @@ public class RulesTest {
     check(Rules.selfTriggerEnabled(30), "self-trigger inference enabled at 30 seconds");
     check(!Rules.selfTriggerEnabled(120), "self-trigger inference disabled at two minutes");
     check(!Rules.selfTriggerEnabled(300), "self-trigger inference disabled at five minutes");
+    var actual = Rules.DEMO_ROUTE;
+    var stage =
+        Rules.travelState(
+            actual, Rules.TravelState.empty(), List.of(event(1, "312+111", "Tàu lẻ", false)));
+    oneSegment(
+        actual, stage, null, "312+111", 1, "odd approach lights only the north edge of 312+111");
+    stage =
+        Rules.travelState(
+            actual, stage, List.of(event(2, "312+111", "Tàu lẻ đã qua đường ngang", false)));
+    oneSegment(
+        actual, stage, "312+111", "313+456", 1, "passage moves the one segment south of 312+111");
+    stage =
+        Rules.travelState(actual, stage, List.of(event(3, "312+111", "Khôi phục hệ thống", false)));
+    oneSegment(actual, stage, "312+111", "313+456", 1, "restoration keeps only 312+111 to 313+456");
+    stage = Rules.travelState(actual, stage, List.of(event(4, "313+456", "Tàu lẻ", false)));
+    oneSegment(
+        actual, stage, "312+111", "313+456", 1, "next approach keeps that same incoming segment");
+    stage =
+        Rules.travelState(
+            actual, stage, List.of(event(5, "313+456", "Tàu lẻ đã qua đường ngang", false)));
+    oneSegment(
+        actual,
+        stage,
+        "313+456",
+        "313+800",
+        1,
+        "313+456 passage transfers to 313+800 without lighting behind");
+    var early =
+        Rules.travelState(
+            actual,
+            Rules.TravelState.empty(),
+            List.of(event(1, "312+111", "Tàu lẻ", false), event(2, "313+456", "Tàu lẻ", false)));
+    oneSegment(
+        actual,
+        early,
+        "312+111",
+        "313+456",
+        1,
+        "overlapping approach zones still show only one interval");
+    check(
+        Rules.approachingCrossings(early).size() == 1,
+        "upstream session yields to the downstream report");
+    early =
+        Rules.travelState(
+            actual,
+            early,
+            List.of(
+                event(3, "313+456", "Tàu lẻ đã qua đường ngang", false),
+                event(4, "312+111", "Tàu lẻ đã qua đường ngang", false),
+                event(5, "312+111", "Khôi phục hệ thống", false)));
+    oneSegment(
+        actual,
+        early,
+        "313+456",
+        "313+800",
+        1,
+        "late upstream passage cannot draw a second interval behind the train");
+    var even =
+        Rules.travelState(
+            actual, Rules.TravelState.empty(), List.of(event(1, "334+830", "Tàu chẵn", false)));
+    oneSegment(actual, even, null, "334+830", -1, "even approach lights only the south edge");
+    even =
+        Rules.travelState(
+            actual,
+            even,
+            List.of(
+                event(2, "334+830", "Tàu chẵn đã qua đường ngang", false),
+                event(3, "334+830", "Khôi phục hệ thống", false),
+                event(4, "332+350", "Tàu chẵn", false)));
+    oneSegment(
+        actual,
+        even,
+        "334+830",
+        "332+350",
+        -1,
+        "even arrival keeps its single northbound interval");
+    even =
+        Rules.travelState(
+            actual, even, List.of(event(5, "332+350", "Tàu chẵn đã qua đường ngang", false)));
+    oneSegment(
+        actual,
+        even,
+        "332+350",
+        "330+00 (YX)",
+        -1,
+        "even passage towards station shows the station-side interval");
+    even =
+        Rules.travelState(actual, even, List.of(event(6, "332+350", "Khôi phục hệ thống", false)));
+    check(
+        Rules.trackSegments(actual, even).isEmpty(),
+        "station approach clears when the adjoining crossing restores");
+    var intoVinh =
+        Rules.travelState(
+            actual,
+            Rules.TravelState.empty(),
+            List.of(
+                event(1, "314+550", "Tàu lẻ", false),
+                event(2, "314+550", "Tàu lẻ đã qua đường ngang", false)));
+    oneSegment(
+        actual,
+        intoVinh,
+        "314+550",
+        "319+200 (Vi)",
+        1,
+        "odd train into Vinh remains on only the adjoining interval");
+    intoVinh =
+        Rules.travelState(
+            actual, intoVinh, List.of(event(3, "314+550", "Khôi phục hệ thống", false)));
+    check(
+        Rules.trackSegments(actual, intoVinh).isEmpty(),
+        "Vinh interval stops at restoration, without crossing the station");
+    var outVinh =
+        Rules.travelState(
+            actual, Rules.TravelState.empty(), List.of(event(1, "320+445", "Tàu lẻ", false)));
+    oneSegment(
+        actual,
+        outVinh,
+        "319+200 (Vi)",
+        "320+445",
+        1,
+        "odd train leaving Vinh lights station to first crossing");
+    outVinh =
+        Rules.travelState(
+            actual, outVinh, List.of(event(2, "320+445", "Tàu lẻ đã qua đường ngang", false)));
+    oneSegment(
+        actual,
+        outVinh,
+        "320+445",
+        "320+957",
+        1,
+        "leaving-station interval disappears after the crossing is passed");
+    var backIntoVinh =
+        Rules.travelState(
+            actual,
+            Rules.TravelState.empty(),
+            List.of(
+                event(1, "320+445", "Tàu chẵn", false),
+                event(2, "320+445", "Tàu chẵn đã qua đường ngang", false)));
+    oneSegment(
+        actual,
+        backIntoVinh,
+        "320+445",
+        "319+200 (Vi)",
+        -1,
+        "even train into Vinh lights only its station-side interval");
+    var backOutVinh =
+        Rules.travelState(
+            actual, Rules.TravelState.empty(), List.of(event(1, "314+550", "Tàu chẵn", false)));
+    oneSegment(
+        actual,
+        backOutVinh,
+        "319+200 (Vi)",
+        "314+550",
+        -1,
+        "even train leaving Vinh lights its incoming station-side interval");
+    var stationOnly =
+        Rules.travelState(
+            actual,
+            Rules.TravelState.empty(),
+            List.of(
+                event(1, "319+200 (Vi)", "Tàu lẻ", false),
+                event(2, "319+200 (Vi)", "Đóng chắn tín hiệu gửi", false)));
+    check(
+        Rules.trackSegments(actual, stationOnly).isEmpty(),
+        "station reports do not keep a train on the diagram all day");
+    var dual =
+        Rules.travelState(
+            actual,
+            Rules.TravelState.empty(),
+            List.of(event(1, "312+111", "Tàu lẻ", false), event(2, "334+830", "Tàu chẵn", false)));
+    check(
+        Rules.trackSegments(actual, dual).size() == 2,
+        "independent opposite trains each have one interval");
     System.out.println(scenarios + " domain scenarios passed");
   }
 }

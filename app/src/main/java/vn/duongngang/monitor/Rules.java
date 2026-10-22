@@ -103,11 +103,16 @@ public final class Rules {
       return new ArrayList<>(points.subList(points.indexOf(km(from)), points.indexOf(km(to)) + 1));
     }
 
+    /** Neighbor for drawing, including stations; null represents the edge of the account route. */
+    public String adjacent(String crossing, int step) {
+      if (step != 1 && step != -1 || !crossings.contains(km(crossing))) return null;
+      int neighbor = points.indexOf(km(crossing)) + step;
+      return neighbor < 0 || neighbor >= points.size() ? null : points.get(neighbor);
+    }
+
     public String upstream(String crossing, int direction) {
-      if (direction != 1 && direction != -1 || !crossings.contains(km(crossing))) return null;
-      int previous = points.indexOf(km(crossing)) - direction;
-      if (previous < 0 || previous >= points.size() || isStation(points.get(previous))) return null;
-      return points.get(previous);
+      String previous = adjacent(crossing, -direction);
+      return previous == null || isStation(previous) ? null : previous;
     }
   }
 
@@ -183,6 +188,26 @@ public final class Rules {
 
   public record Between(String from, String to, int direction, long at) {}
 
+  /** Exactly one incoming or outgoing interval per unmatched journey, with nullable route edges. */
+  public record TrackSegment(String from, String to, int direction) {}
+
+  public static List<TrackSegment> trackSegments(Route route, TravelState state) {
+    Set<TrackSegment> segments = new LinkedHashSet<>();
+    for (Journey j : state.journeys()) {
+      // The downstream report has taken ownership of this train's one visible interval.
+      if (j.reached() || !route.crossings().contains(j.from())) continue;
+      if (!j.passed() && !j.released())
+        segments.add(
+            new TrackSegment(route.adjacent(j.from(), -j.direction()), j.from(), j.direction()));
+      // Crossing-to-crossing continuity survives source restoration. Station/route-exit
+      // intervals last only until the adjoining crossing restores; station logs are ignored.
+      else if (j.passed() && (!j.released() || j.to() != null))
+        segments.add(
+            new TrackSegment(j.from(), route.adjacent(j.from(), j.direction()), j.direction()));
+    }
+    return new ArrayList<>(segments);
+  }
+
   public static List<Between> betweenCrossings(TravelState state) {
     Map<String, Between> result = new LinkedHashMap<>();
     for (Journey j : state.journeys())
@@ -196,7 +221,8 @@ public final class Rules {
   public static List<Occupancy> approachingCrossings(TravelState state) {
     List<Occupancy> result = new ArrayList<>();
     for (Journey j : state.journeys())
-      if (!j.passed() && !j.released()) result.add(new Occupancy(j.from(), j.direction(), j.at()));
+      if (!j.reached() && !j.passed() && !j.released())
+        result.add(new Occupancy(j.from(), j.direction(), j.at()));
     return result;
   }
 

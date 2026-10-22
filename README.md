@@ -1,10 +1,19 @@
-# Đường Ngang — Android 0.8
+# Đường Ngang — Android 0.9
 
 **Đổi phiên/tài khoản ChatGPT:** đọc [Bản bàn giao và cách tiếp tục](docs/BAN_GIAO.md) và [Nhật ký trao đổi, yêu cầu đã chốt](docs/LICH_SU_TRAO_DOI.md). [Sao lưu khóa ký APK](docs/SAO_LUU_KHOA_KY.md).
 
 Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt navy, xanh cyan và xanh lá. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
 
-## Thay đổi 0.8
+## Thay đổi 0.9
+
+- Đổi dòng trống ở Sự cố thành **“Không có sự cố”**.
+- Mỗi lượt tàu có một đoạn sáng: tiếp cận thì sáng đoạn phía tàu đến; báo tàu đã qua thì chuyển sang đoạn phía tàu đi. Điểm trước khôi phục và điểm sau bắt đầu báo tàu đều không làm đoạn giữa hai điểm mất đi; chỉ chuyển tiếp khi tàu qua điểm sau. Ví dụ tàu lẻ: mép Bắc 312+111 → 312+111–313+456 → 313+456–313+800.
+- Đoạn đường ngang–ga vẫn sáng lúc tàu vào ga tới khi đường ngang giáp ga khôi phục. Khi đường ngang báo tàu từ ga ra, sáng đoạn ga–đường ngang đó. Không nối xuyên qua ga hoặc giữ tàu theo bản tin ga cả ngày.
+- Giữ màu tối, cập nhật trong khung hiện có, chuông thực và điều kiện tự kích chỉ ở chu kỳ 30 giây của bản trước.
+
+[Kiểm tra bản 0.9 và ảnh từng giai đoạn tàu](docs/UI_REVIEW_0.9.md).
+
+## Thay đổi 0.8 (lịch sử)
 
 - Đổi Tổng quan, danh sách/chi tiết đường ngang, Sự cố và Cài đặt theo mẫu giao diện tối. Tổng quan tự chia chiều cao, cập nhật trong các khung hiện có. Thẻ tóm tắt ghi số điểm theo dõi hoặc lỗi chưa khôi phục; không kết luận thiết bị an toàn chỉ vì chưa thấy bản tin đỏ.
 - Giữ xanh đoạn **giữa hai đường ngang liền kề** khi tàu đã qua điểm trước, kể cả điểm đó đã khôi phục, cho tới khi điểm sau báo tàu cùng hướng. Không tô phần rìa ngoài hai mốc, không nối qua ga hoặc ngoài tuyến. Nhiều đoạn và hai hướng được hiển thị đồng thời; bản tin điểm sau đến trước lúc điểm trước khôi phục không làm đoạn cũ sáng trở lại.
@@ -26,7 +35,7 @@
 
 - Nhập website, ID, mật khẩu trong Cài đặt. Tuyến được lấy từ danh sách điểm của tài khoản, sắp xếp km từ Bắc xuống Nam. Điểm có ngoặc là ga, nhãn dùng đúng chữ trong ngoặc; ga ngắt đối chiếu đường ngang liền kề ở hai phía.
 - Chọn theo dõi từ đường ngang đến đường ngang. Phạm vi lọc danh sách, sự cố và thông báo; sơ đồ vẫn giữ đủ tuyến. Đổi URL/ID xóa trạng thái của tài khoản cũ.
-- Sơ đồ hiển thị điểm đang tiếp cận và đoạn chuyển tiếp sau bản tin tàu đã qua, nhiều đoạn và hai hướng đồng thời. Tàu lẻ đi tăng km, tàu chẵn đi giảm km. Trạng thái chiếm dụng thiết bị vẫn chỉ kết thúc theo “Khôi phục hệ thống”; riêng hình vẽ chuyển sang đoạn giữa hai điểm theo yêu cầu 0.8. Đoạn chuyển tiếp là suy luận từ bản tin, không phải vị trí GPS, danh tính hoặc số đoàn tàu.
+- Sơ đồ luôn giữ một đoạn sáng cho mỗi lượt tàu đang theo dõi: đoạn đến trước khi qua đường ngang, đoạn đi sau bản tin đã qua; nhiều đoạn/hai hướng đồng thời. Tàu lẻ đi tăng km, tàu chẵn đi giảm km. Đoạn giữa hai đường ngang không tắt khi điểm trước khôi phục hoặc điểm sau mới tiếp cận. Đoạn giáp ga tắt theo khôi phục của đường ngang đó. Trạng thái chiếm dụng thiết bị vẫn chỉ kết thúc theo “Khôi phục hệ thống”. Đây là biểu diễn từ bản tin, không phải vị trí GPS, danh tính hoặc số đoàn tàu.
 - Mọi lỗi đỏ giữ nguyên chữ trên web, gồm tên/số thiết bị. Khôi phục chỉ xóa lỗi tương ứng; khôi phục hệ thống không xóa lỗi phần cứng. Sáu nhóm chi tiết: Chuông, Đèn, Cần chắn, Cảm biến, Kết nối, Điện áp.
 - Lưu lỗi chưa khôi phục trong ngày; khối hiện tại reset ở 00:00 giờ Việt Nam, lịch sử ngày cũ vẫn tra cứu được. Chiếm dụng tàu giữ qua nửa đêm tới bản tin khôi phục đúng điểm. Sau gián đoạn qua ngày hoặc trên 24 giờ, mốc theo dõi lỗi có thể được đặt lại với “Chưa ghi nhận lỗi mới”; đây không phải bản tin thiết bị phục hồi.
 - Ở chu kỳ **30 giây**, suy luận “Nghi tự kích” từ lượt tàu mới thiếu lượt tương ứng ở đường ngang phía trước theo hướng chạy, có chờ ít nhất một chu kỳ. Không áp dụng qua ga hay đầu/cuối tuyến, không áp dụng chu kỳ 2 phút/5 phút. Bản tin phía trước tới muộn sẽ bỏ suy luận; bản tin gốc được giữ. Đây là suy luận theo dữ liệu web, cần đối chiếu hiện trường.

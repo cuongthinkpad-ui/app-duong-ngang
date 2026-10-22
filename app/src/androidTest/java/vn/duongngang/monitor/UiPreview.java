@@ -3,12 +3,17 @@ package vn.duongngang.monitor;
 import android.app.Instrumentation;
 import android.content.*;
 import android.graphics.Bitmap;
+import android.view.View;
+import android.widget.ScrollView;
 import java.io.FileOutputStream;
 import java.lang.reflect.*;
-import java.util.List;
+import java.util.*;
 
-/** Only synthetic screenshots, in isolated storage on a dedicated emulator. */
+/** Synthetic route-stage screenshots, in isolated storage on a dedicated emulator. */
 final class UiPreview {
+  private static int sequence;
+  private static long start;
+
   static void capture(Instrumentation runner) throws Exception {
     if (!android.os.Build.HARDWARE.contains("ranchu"))
       throw new IllegalStateException("Emulator only");
@@ -16,51 +21,83 @@ final class UiPreview {
     Store store = new Store(context);
     store.prefs.edit().clear().commit();
     context.deleteDatabase("events.db");
+    sequence = 0;
+    start = System.currentTimeMillis() - 600000;
+    report(store, "312+111", "Tàu lẻ");
+    MainActivity activity =
+        (MainActivity)
+            runner.startActivitySync(
+                new Intent(runner.getTargetContext(), MainActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+    try {
+      run(runner, activity, store, "overview");
+      shot(runner, "route-approach-0.9.png");
+      report(store, "312+111", "Tàu lẻ đã qua đường ngang");
+      report(store, "312+111", "Khôi phục hệ thống");
+      run(runner, activity, store, "overview");
+      shot(runner, "route-passed-0.9.png");
+      report(store, "313+456", "Tàu lẻ");
+      report(store, "313+456", "Tàu lẻ đã qua đường ngang");
+      run(runner, activity, store, "overview");
+      shot(runner, "route-next-0.9.png");
+      report(store, "313+456", "Khôi phục hệ thống");
+      report(store, "313+800", "Tàu lẻ");
+      report(store, "313+800", "Tàu lẻ đã qua đường ngang");
+      report(store, "313+800", "Khôi phục hệ thống");
+      report(store, "314+550", "Tàu lẻ");
+      report(store, "314+550", "Tàu lẻ đã qua đường ngang");
+      run(runner, activity, store, "overview");
+      shot(runner, "route-station-0.9.png");
+      report(store, "314+550", "Khôi phục hệ thống");
+      report(store, "320+445", "Tàu lẻ");
+      run(runner, activity, store, "overview");
+      shot(runner, "route-from-station-0.9.png");
+      report(store, "320+445", "Tàu lẻ đã qua đường ngang");
+      report(store, "320+445", "Khôi phục hệ thống");
+      report(store, "334+830", "Tàu chẵn");
+      report(store, "334+830", "Tàu chẵn đã qua đường ngang");
+      report(store, "334+830", "Khôi phục hệ thống");
+      run(runner, activity, store, "incidents");
+      shot(runner, "incidents-empty-0.9.png");
+      report(store, "328+325", "Chuông 2 hỏng");
+      report(store, "313+456", "Cần chắn 1 mất trạng thái");
+      run(runner, activity, store, "overview");
+      shot(runner, "overview-0.9.png");
+      run(runner, activity, store, "incidents");
+      shot(runner, "incidents-0.9.png");
+      run(runner, activity, store, "settings");
+      runner.runOnMainSync(
+          () -> {
+            try {
+              Field f = MainActivity.class.getDeclaredField("pageScroll");
+              f.setAccessible(true);
+              ((ScrollView) f.get(activity)).fullScroll(View.FOCUS_DOWN);
+            } catch (ReflectiveOperationException failure) {
+              throw new AssertionError(failure);
+            }
+          });
+      runner.waitForIdleSync();
+      shot(runner, "settings-alarm-0.9.png");
+    } finally {
+      runner.runOnMainSync(activity::finish);
+      store.prefs.edit().clear().commit();
+      context.deleteDatabase("events.db");
+    }
+  }
+
+  private static void report(Store store, String point, String text) {
     long now = System.currentTimeMillis();
+    int n = ++sequence;
     store.saveForAccount(
         store.account(),
         new WebSource.DayData(
             List.of(
                 new Rules.Event(
-                    "preview-arrival", now - 300000, "320+957", "Tàu lẻ", false, List.of()),
-                new Rules.Event(
-                    "preview-passage",
-                    now - 180000,
-                    "320+957",
-                    "Tàu lẻ đã qua đường ngang",
-                    false,
-                    List.of()),
-                new Rules.Event(
-                    "preview-restore",
-                    now - 120000,
-                    "320+957",
-                    "Khôi phục hệ thống",
-                    false,
-                    List.of()),
-                new Rules.Event(
-                    "preview-reverse", now - 360000, "313+800", "Tàu chẵn", false, List.of()),
-                new Rules.Event(
-                    "preview-reverse-pass",
-                    now - 240000,
-                    "313+800",
-                    "Tàu chẵn đã qua đường ngang",
-                    false,
-                    List.of()),
-                new Rules.Event(
-                    "preview-old-train", now - 500000, "320+445", "Tàu lẻ", false, List.of()),
-                new Rules.Event(
-                    "preview-old-pass",
-                    now - 400000,
-                    "320+445",
-                    "Tàu lẻ đã qua đường ngang",
-                    false,
-                    List.of()),
-                new Rules.Event(
-                    "preview-old-release",
-                    now - 350000,
-                    "320+445",
-                    "Khôi phục hệ thống",
-                    false,
+                    "preview-" + n,
+                    start + n * 2000L,
+                    point,
+                    text,
+                    text.contains("hỏng") || text.contains("mất trạng thái"),
                     List.of())),
             Rules.DEMO_ROUTE));
     store.updateActiveFaults(store.account(), 0, now, 0, List.of());
@@ -71,42 +108,6 @@ final class UiPreview {
         .putBoolean("running", true)
         .putString("status", "Đã cập nhật")
         .commit();
-    MainActivity activity =
-        (MainActivity)
-            runner.startActivitySync(
-                new Intent(runner.getTargetContext(), MainActivity.class)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-    try {
-      run(runner, activity, store, "overview");
-      shot(runner, "overview-clear-0.8.png");
-      store.saveForAccount(
-          store.account(),
-          new WebSource.DayData(
-              List.of(
-                  new Rules.Event(
-                      "preview-bell", now - 60000, "328+325", "Chuông 2 hỏng", true, List.of()),
-                  new Rules.Event(
-                      "preview-barrier",
-                      now - 90000,
-                      "313+456",
-                      "Cần chắn 1 mất trạng thái",
-                      true,
-                      List.of())),
-              Rules.DEMO_ROUTE));
-      store.updateActiveFaults(store.account(), 0, now, 0, List.of());
-      run(runner, activity, store, "overview");
-      shot(runner, "overview-0.8.png");
-      run(runner, activity, store, "incidents");
-      shot(runner, "incidents-0.8.png");
-      run(runner, activity, store, "crossings");
-      shot(runner, "crossings-0.8.png");
-      run(runner, activity, store, "settings");
-      shot(runner, "settings-0.8.png");
-    } finally {
-      runner.runOnMainSync(activity::finish);
-      store.prefs.edit().clear().commit();
-      context.deleteDatabase("events.db");
-    }
   }
 
   private static void run(Instrumentation r, MainActivity a, Store s, String page)

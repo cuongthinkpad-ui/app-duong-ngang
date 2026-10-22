@@ -187,6 +187,12 @@ final class UiRefreshChecks {
               check(
                   ((int[]) field(routeView, "occupied"))[0] == direction,
                   "same route view shows updated train direction/release at interval " + interval);
+              if (interval == 30) {
+                var visibleSegments = (java.util.List<?>) field(routeView, "segments");
+                check(
+                    visibleSegments.equals(List.of(new Rules.TrackSegment(null, points.get(0), 1))),
+                    "incoming odd train lights the north edge rather than only the crossing dot");
+              }
             });
       }
       ui(
@@ -227,7 +233,7 @@ final class UiRefreshChecks {
       ui(
           () -> {
             ((Runnable) field(activity, "refresh")).run();
-            var legs = (java.util.List<?>) field(routeView, "between");
+            var legs = (java.util.List<?>) field(routeView, "segments");
             check(
                 legs.size() == 1 && ((int[]) field(routeView, "occupied"))[0] == 0,
                 "restored source leaves interval green without outside source occupation");
@@ -249,9 +255,10 @@ final class UiRefreshChecks {
           () -> {
             ((Runnable) field(activity, "refresh")).run();
             check(
-                ((java.util.List<?>) field(routeView, "between")).isEmpty()
+                ((java.util.List<?>) field(routeView, "segments"))
+                        .equals(List.of(new Rules.TrackSegment(points.get(0), points.get(1), 1)))
                     && ((int[]) field(routeView, "occupied"))[1] == 1,
-                "destination arrival replaces the interval on the existing diagram");
+                "destination approach keeps the same incoming interval green without disappearing");
           });
       long passedAt = System.currentTimeMillis() + 20;
       store.saveForAccount(
@@ -271,11 +278,11 @@ final class UiRefreshChecks {
       ui(
           () -> {
             ((Runnable) field(activity, "refresh")).run();
-            var legs = (java.util.List<?>) field(routeView, "between");
+            var legs = (java.util.List<?>) field(routeView, "segments");
             check(
                 legs.size() == 1
-                    && ((Rules.Between) legs.get(0)).from().equals(points.get(1))
-                    && ((Rules.Between) legs.get(0)).to().equals(points.get(2)),
+                    && ((Rules.TrackSegment) legs.get(0)).from().equals(points.get(1))
+                    && ((Rules.TrackSegment) legs.get(0)).to().equals(points.get(2)),
                 "only the next bounded interval lights after destination passage");
           });
       ui(
@@ -343,6 +350,11 @@ final class UiRefreshChecks {
             check(
                 selected.get(activity).equals(today.minusDays(1)),
                 "explicit historical date is not reset by periodic refresh");
+            invoke("refreshContent");
+            String emptyPage = labels((View) field(activity, "content"));
+            check(
+                emptyPage.contains("Không có sự cố") && !emptyPage.contains("sự cố phù hợp"),
+                "empty incident page uses the owner's exact requested wording");
             follow.set(activity, true);
           });
       ui(() -> navigate("settings"));

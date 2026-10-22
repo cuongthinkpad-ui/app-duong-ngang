@@ -610,8 +610,8 @@ public class MainActivity extends Activity {
             + " ga, "
             + Rules.approachingCrossings(diagramState()).size()
             + " điểm tiếp cận, "
-            + Rules.betweenCrossings(diagramState()).size()
-            + " đoạn giữa đường ngang"
+            + Rules.trackSegments(route(), diagramState()).size()
+            + " đoạn tàu"
             + (demo
                 ? " · Dữ liệu minh họa"
                 : staleData() ? " · Dữ liệu cũ hoặc chưa cập nhật" : " · Theo bản tin web"));
@@ -638,12 +638,12 @@ public class MainActivity extends Activity {
     List<String> points = route().points();
     renderedRoute = List.copyOf(points);
     if (points.size() > 13) {
-      routeView.setMinimumWidth(dp(34 + 26 * (points.size() - 1)));
+      routeView.setMinimumWidth(dp(60 + 26 * (points.size() - 1)));
       HorizontalScrollView scroll = new HorizontalScrollView(this);
       scroll.setFillViewport(true);
       scroll.addView(
           routeView,
-          new HorizontalScrollView.LayoutParams(dp(34 + 26 * (points.size() - 1)), dp(101)));
+          new HorizontalScrollView.LayoutParams(dp(60 + 26 * (points.size() - 1)), dp(101)));
       c.addView(scroll, new LinearLayout.LayoutParams(-1, dp(105)));
     } else c.addView(routeView, new LinearLayout.LayoutParams(-1, dp(101)));
     routeNote = text("", 8, MUTED, false);
@@ -795,9 +795,7 @@ public class MainActivity extends Activity {
     if (fn == 0) {
       TextView empty =
           text(
-              store.prefs.getLong("lastSuccess", 0) > 0
-                  ? "Chưa ghi nhận lỗi mới"
-                  : "Đang chờ dữ liệu",
+              store.prefs.getLong("lastSuccess", 0) > 0 ? "Không có sự cố" : "Đang chờ dữ liệu",
               11,
               MUTED,
               false);
@@ -929,7 +927,7 @@ public class MainActivity extends Activity {
     words.setPadding(dp(12), 0, 0, 0);
     words.addView(text(title, 13, INK, true));
     gap(words, 5);
-    words.addView(text(description, 11, MUTED, false));
+    if (!description.isEmpty()) words.addView(text(description, 11, MUTED, false));
     r.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
     target.addView(r);
   }
@@ -1026,7 +1024,7 @@ public class MainActivity extends Activity {
     }
     if (shown == 0) {
       LinearLayout emptyCard = card(SURFACE);
-      empty(emptyCard, "Chưa có sự cố phù hợp", "Chọn ngày hoặc bộ lọc khác.", "shield");
+      empty(emptyCard, "Không có sự cố", "", "shield");
       content.addView(emptyCard);
     }
   }
@@ -1538,7 +1536,7 @@ public class MainActivity extends Activity {
     private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final List<String> points = route().points();
     private final int[] occupied = new int[points.size()];
-    private List<Rules.Between> between = List.of();
+    private List<Rules.TrackSegment> segments = List.of();
 
     RouteView() {
       super(MainActivity.this);
@@ -1548,7 +1546,7 @@ public class MainActivity extends Activity {
     void updateOccupancy() {
       Arrays.fill(occupied, 0);
       Rules.TravelState state = diagramState();
-      between = Rules.betweenCrossings(state);
+      segments = Rules.trackSegments(route(), state);
       for (Rules.Occupancy report : Rules.approachingCrossings(state)) {
         int index = points.indexOf(report.crossing());
         if (index >= 0) occupied[index] = report.direction();
@@ -1560,12 +1558,12 @@ public class MainActivity extends Activity {
     public boolean onTouchEvent(android.view.MotionEvent event) {
       if (event.getAction() == android.view.MotionEvent.ACTION_UP) {
         if (points.isEmpty()) return true;
-        float step = points.size() > 1 ? (getWidth() - dp(34)) / (float) (points.size() - 1) : 1;
+        float step = points.size() > 1 ? (getWidth() - dp(60)) / (float) (points.size() - 1) : 1;
         int index =
             points.size() == 1
                 ? 0
                 : Math.max(
-                    0, Math.min(points.size() - 1, Math.round((event.getX() - dp(7)) / step)));
+                    0, Math.min(points.size() - 1, Math.round((event.getX() - dp(25)) / step)));
         String point = points.get(index);
         if (Rules.isStation(point)) {
           Toast.makeText(MainActivity.this, "Ga " + Rules.stationCode(point), Toast.LENGTH_SHORT)
@@ -1592,36 +1590,33 @@ public class MainActivity extends Activity {
         c.drawText("Đang chờ danh sách tuyến từ web", dp(7), dp(38), p);
         return;
       }
-      float left = points.size() == 1 ? getWidth() / 2f : dp(7),
-          right = points.size() == 1 ? left : getWidth() - dp(27),
+      float left = points.size() == 1 ? getWidth() / 2f : dp(25),
+          right = points.size() == 1 ? left : getWidth() - dp(35),
           step = points.size() > 1 ? (right - left) / (points.size() - 1) : 0,
           y = dp(50);
       p.setStrokeCap(Paint.Cap.ROUND);
       p.setStrokeWidth(dp(3));
       p.setColor(LINE);
-      c.drawLine(left, y, right, y, p);
+      c.drawLine(left - dp(20), y, right + dp(20), y, p);
       int reportColor = staleData() ? WARNING : GREEN;
       List<float[]> labels = new ArrayList<>();
       p.setColor(reportColor);
       p.setStrokeWidth(dp(5));
       p.setStrokeCap(Paint.Cap.BUTT);
-      for (Rules.Between leg : between) {
-        int from = points.indexOf(leg.from()), to = points.indexOf(leg.to());
-        if (from < 0 || to < 0 || Math.abs(from - to) != 1) continue;
-        float x1 = left + step * from, x2 = left + step * to;
+      for (Rules.TrackSegment leg : segments) {
+        float[] ends = segmentEnds(leg, left, right, step);
+        if (ends == null) continue;
+        float x1 = ends[0], x2 = ends[1];
         p.setColor(reportColor);
         p.setStrokeWidth(dp(5));
         p.setStrokeCap(Paint.Cap.BUTT);
         c.drawLine(Math.min(x1, x2), y, Math.max(x1, x2), y, p);
       }
-      for (Rules.Between leg : between) {
-        int from = points.indexOf(leg.from()), to = points.indexOf(leg.to());
-        if (from >= 0 && to >= 0)
-          drawDirection(c, labels, left + step * (from + to) / 2f, y, leg.direction(), reportColor);
+      for (Rules.TrackSegment leg : segments) {
+        float[] ends = segmentEnds(leg, left, right, step);
+        if (ends != null)
+          drawDirection(c, labels, (ends[0] + ends[1]) / 2f, y, leg.direction(), reportColor);
       }
-      for (int i = 0; i < points.size(); i++)
-        if (occupied[i] != 0)
-          drawDirection(c, labels, left + step * i, y, occupied[i], reportColor);
       for (int i = 0; i < points.size(); i++) {
         float x = left + step * i;
         String km = points.get(i);
@@ -1647,6 +1642,22 @@ public class MainActivity extends Activity {
           c.restore();
         }
       }
+    }
+
+    private float[] segmentEnds(Rules.TrackSegment leg, float left, float right, float step) {
+      int from = points.indexOf(leg.from()), to = points.indexOf(leg.to());
+      if (leg.from() == null) {
+        if (to != 0 && to != points.size() - 1) return null;
+        float end = left + step * to;
+        return new float[] {end - leg.direction() * dp(20), end};
+      }
+      if (leg.to() == null) {
+        if (from != 0 && from != points.size() - 1) return null;
+        float start = left + step * from;
+        return new float[] {start, start + leg.direction() * dp(20)};
+      }
+      if (from < 0 || to < 0 || Math.abs(from - to) != 1) return null;
+      return new float[] {left + step * from, left + step * to};
     }
 
     private void drawDirection(
