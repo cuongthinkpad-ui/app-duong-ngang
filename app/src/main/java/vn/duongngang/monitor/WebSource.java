@@ -48,12 +48,25 @@ public final class WebSource {
     return r.parse();
   }
 
-  private Map<String, String> fields(Element form) {
+  private Map<String, String> fields(Element form) throws Exception {
     Map<String, String> data = new LinkedHashMap<>();
     for (Element e : form.select("input[name], select[name], textarea[name]")) {
       String type = e.attr("type");
       if (List.of("submit", "button", "image", "checkbox", "radio").contains(type)) continue;
       data.put(e.attr("name"), e.val());
+    }
+    // Fetch all managed points; the app's range filter must not hide upstream evidence.
+    for (Element select : form.select("select[name]")) {
+      boolean pointList = false;
+      Element all = null;
+      for (Element option : select.select("option")) {
+        if (Rules.isPoint(option.text())) pointList = true;
+        if (option.text().toLowerCase(Locale.ROOT).contains("tất cả")) all = option;
+      }
+      if (pointList) {
+        if (all == null) throw new Exception("Chưa chọn được toàn bộ tuyến trên web");
+        data.put(select.attr("name"), all.val());
+      }
     }
     return data;
   }
@@ -66,7 +79,18 @@ public final class WebSource {
     return execute(connection(action).method(Connection.Method.POST).data(data));
   }
 
-  public List<Rules.Event> readDay(LocalDate day) throws Exception {
+  public record DayData(List<Rules.Event> events, Rules.Route route) {
+    public DayData {
+      events = List.copyOf(events);
+      if (route.crossings().isEmpty())
+        throw new IllegalArgumentException("Danh sách tuyến chưa có đường ngang");
+      for (Rules.Event e : events)
+        if (!route.points().contains(Rules.km(e.crossing())))
+          throw new IllegalArgumentException("Bản ghi nằm ngoài danh sách tuyến; cần kiểm tra web");
+    }
+  }
+
+  public DayData readDay(LocalDate day) throws Exception {
     Document d = execute(connection(base));
     Element pass = d.selectFirst("input[type=password]");
     if (pass != null) {
@@ -103,9 +127,12 @@ public final class WebSource {
     data.put("__EVENTTARGET", date.attr("name"));
     data.put("__EVENTARGUMENT", "");
     d = submit(d, data);
+    Rules.Route route = parseRoute(d);
     List<Rules.Event> out = new ArrayList<>();
     Set<String> pages = new HashSet<>();
     for (int page = 1; page <= 200; page++) {
+      if (!route.points().equals(parseRoute(d).points()))
+        throw new Exception("Danh sách tuyến thay đổi khi đọc trang; cần đọc lại đầy đủ");
       var events = parse(d, day);
       if (events.isEmpty() && page == 1)
         throw new Exception("Chưa xác minh được bảng sự kiện hoặc ngày không có dữ liệu");
@@ -119,7 +146,7 @@ public final class WebSource {
           break;
         }
       }
-      if (next == null) return out;
+      if (next == null) return new DayData(List.copyOf(out), route);
       String href = next.attr("href");
       var matcher = Pattern.compile("__doPostBack\\('([^']*)','([^']*)'\\)").matcher(href);
       if (matcher.find()) {
@@ -132,6 +159,48 @@ public final class WebSource {
       } else throw new Exception("Chưa hỗ trợ kiểu phân trang của web");
     }
     throw new Exception("Vượt giới hạn đọc trang; chưa đủ dữ liệu");
+  }
+
+  /** Read the complete account inventory, never infer missing neighbours from event rows. */
+  public static Rules.Route parseRoute(Document d) throws Exception {
+    Rules.Route selected = null;
+    for (Element select : d.select("select")) {
+      List<String> labels = new ArrayList<>();
+      for (Element option : select.select("option")) {
+        String label = option.text().trim();
+        if (Rules.isPoint(label)) labels.add(label);
+        else if (label.matches("(?iu)^km\\s*\\d.*"))
+          throw new Exception("Chưa nhận diện được điểm trong danh sách tuyến");
+      }
+      if (labels.isEmpty()) continue;
+      Rules.Route candidate = new Rules.Route(labels);
+      if (selected != null && !selected.points().equals(candidate.points()))
+        throw new Exception("Có nhiều danh sách tuyến khác nhau; cần kiểm tra biểu mẫu web");
+      selected = candidate;
+    }
+    if (selected != null) return selected;
+    // The separate status table is also a full inventory on this web layout.
+    for (Element table : d.select("table")) {
+      boolean statusHeader = false;
+      List<String> labels = new ArrayList<>();
+      for (Element row : table.select("tr")) {
+        List<Element> cells = new ArrayList<>();
+        for (Element child : row.children())
+          if (child.tagName().equals("td") || child.tagName().equals("th")) cells.add(child);
+        if (cells.size() != 2) continue;
+        if (cells.get(0).text().equalsIgnoreCase("Km")
+            && cells.get(1).text().equalsIgnoreCase("Status")) statusHeader = true;
+        if (Rules.isPoint(cells.get(0).text())) labels.add(cells.get(0).text());
+      }
+      if (statusHeader && !labels.isEmpty()) {
+        Rules.Route candidate = new Rules.Route(labels);
+        if (selected != null && !selected.points().equals(candidate.points()))
+          throw new Exception("Danh sách trạng thái tuyến không đồng nhất");
+        selected = candidate;
+      }
+    }
+    if (selected == null) throw new Exception("Chưa đọc được danh sách đầy đủ đường ngang và ga");
+    return selected;
   }
 
   public static List<Rules.Event> parse(Document d, LocalDate day) throws Exception {

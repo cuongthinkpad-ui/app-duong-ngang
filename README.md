@@ -1,8 +1,19 @@
-# Đường Ngang — Android 0.4
+# Đường Ngang — Android 0.5
 
 Ứng dụng Android native, tiếng Việt, xanh dương; sơ đồ tuyến cố định phía trên, khối tàu riêng, sự cố nền đỏ nhạt, lịch sử chọn ngày và ghi chú đếm trục. Dòng sự kiện: **Giờ · Đường ngang · Nội dung**. Không chứa tài khoản thử nghiệm trong mã nguồn.
 
-## Giao diện 0.4
+## Bản 0.5: tuyến theo tài khoản, lỗi đúng thiết bị, sơ đồ chiếm dụng
+
+- Sau lượt đọc web hoàn tất, lấy toàn bộ danh sách điểm từ bộ chọn lý trình (hoặc bảng Km / Status), sắp xếp theo giá trị km từ Bắc vào Nam. Không dựng danh sách tuyến từ các dòng sự kiện vì có điểm chưa phát sinh bản tin.
+- Hậu tố trong ngoặc là ga, dùng nguyên chữ bên trong làm nhãn, ví dụ Vi, YX, CS, MLy, QHa. Mọi ga ngắt đối chiếu đường ngang liền kề ở cả hai phía. Ga và đầu/cuối tuyến không cần chứng cứ từ phía không có đường ngang liền kề.
+- Danh sách chọn phạm vi, danh sách đường ngang và lọc chuông dùng tuyến của tài khoản hiện tại. Đổi URL hoặc ID thì xóa dữ liệu/mốc/phạm vi tuyến cũ; kết quả tải muộn của tài khoản cũ bị từ chối. Phạm vi minh họa và phạm vi thực tách riêng.
+- Sơ đồ vẫn giữ toàn bộ tuyến khi thu hẹp phạm vi. Tuyến nhiều điểm có khung cuộn ngang để giữ khoảng cách mốc; trang Tổng quan vẫn không cuộn dọc.
+- Giữ nguyên nội dung bản tin lỗi, gồm số chuông/đèn/cần chắn. Chuông và đèn được ghép khôi phục theo số thiết bị; không gộp chuông 1 với chuông 2. Chạm lỗi ở Tổng quan để đọc trọn câu; màn hình chi tiết ưu tiên hiển thị các lỗi còn tồn tại trong nhóm thiết bị.
+- Sơ đồ dựng trạng thái từng đường ngang từ bản tin: “Tàu lẻ/chẵn” bật xanh, “Khôi phục hệ thống” của đúng điểm bỏ xanh. Tàu qua CB3/4 và cần chắn nâng không giải phóng toàn khu vực. Không tự dịch chuyển mũi tên theo đồng hồ, không xóa điểm trước khi điểm sau báo tàu. Hiển thị đồng thời nhiều đoạn và hướng; một đoàn tàu có thể chiếm dụng nhiều đường ngang nên không lấy số điểm xanh làm số tàu.
+- Khi có dữ liệu lưu từ lượt đọc thành công, sơ đồ dùng cả hôm nay và dữ liệu hôm qua đã lưu để nối qua ngày. Nếu chưa có bản tin thì không suy diễn trạng thái. Đang gián đoạn hoặc dữ liệu quá hai chu kỳ (ít nhất 60 giây): đổi màu đoạn giữ lại sang vàng nâu và ghi “Dữ liệu cũ” cùng giờ cập nhật cuối. Chu kỳ đọc không phải GPS liên tục.
+- **Chưa xác minh sơ đồ bằng Visitec thật.** Kiểm tra bằng dữ liệu mô phỏng và dữ liệu lưu trong giả lập. Chưa bảo đảm trạng thái qua nửa đêm khi khởi động mới mà chưa tải ngày trước; bản này không gán danh tính hay suy ra số đoàn tàu từ các điểm xanh.
+
+## Giao diện 0.4 (trước đây)
 
 - Đầu trang “Giám sát Đường ngang” / “Công ty CP Đường sắt Vinh”; biểu tượng đầu tàu trắng trên nền navy dùng thống nhất trong app và ngoài màn hình điện thoại.
 - Sơ đồ luôn giữ đủ 11 đường ngang và 2 ga, kể cả khi chọn phạm vi theo dõi hẹp. Bỏ “Lý trình tăng” và chú giải cố định; hướng “Tàu lẻ” / “Tàu chẵn” nằm ngay trên mũi tên. Đoạn tàu hiện vẫn là minh họa có nhãn.
@@ -48,8 +59,8 @@ Còn phải hoàn thiện trước khi bàn giao:
 - Xác minh adapter với HTML thật; nhận diện ID sự kiện để phân biệt bản ghi trùng nội dung/cùng giây, đọc chồng và kiểm tra trang đầu lần nữa khi dữ liệu dịch trang; hiện chưa bảo đảm không bỏ sót khi web đang đổi trang.
 - Đọc ngày trước khi khởi động để nối chu trình qua nửa đêm và dựng lỗi tồn tại từ trước hôm nay. Hiện khối sự cố chỉ dựa trên dữ liệu hôm nay đã tải.
 - Ghép nhiều lượt tàu, ngưỡng thời gian từng đoạn; thử dữ liệu tự kích và dữ liệu mất kết nối, rồi nối quy tắc vào cảnh báo.
-- **Sơ đồ hiện chỉ tô đoạn tàu trong chế độ minh họa**. Chưa vẽ tàu thật; cần bộ ghép lượt tàu và mốc vào/ra ga đáng tin cậy. Không hiển thị vị trí giả từ GPS.
-- Lấy danh sách điểm từ tài khoản thật; danh sách lọc/sơ đồ hiện là cấu hình 13 điểm của khu vực Vinh, không được coi đã hỗ trợ tự động mọi khu vực.
+- Xác minh sơ đồ chiếm dụng bằng dữ liệu thật, trạng thái vào/ra ga và nửa đêm. Sơ đồ hiện dựng theo các bản tin đã lưu, không phải vị trí GPS hoặc danh tính đoàn tàu. Kiểm chứng điều kiện khôi phục đúng theo mẫu web thực tế.
+- Kiểm chứng nhận diện danh sách tuyến theo tài khoản bằng web thật; hiện đã kiểm tra với HTML và luồng đăng nhập/phân trang mô phỏng. Chưa tuyên bố tương thích mọi cấu trúc web hoặc mọi khu vực.
 - Kiểm tra UI/chuông/permission và foreground service trên thiết bị Android; kiểm tra đọc toàn bộ lịch sử, không báo lại sự kiện đã khôi phục, phân loại khôi phục cần chắn không có số thứ tự.
 
 ## Build
@@ -59,7 +70,10 @@ JDK 21, Gradle 8.9, Android SDK platform 35, build-tools 35.0.0; Android tối t
 ```sh
 source scripts/env.sh
 ./scripts/test-rules.sh
-gradle --no-daemon --max-workers=2 assembleDebug lintDebug
+./scripts/test-parser.sh
+./scripts/build-cloud.sh assembleDebug assembleDebugAndroidTest lintDebug
+# Khi có giả lập hoặc thiết bị thử:
+./scripts/test-android-route.sh
 ```
 
 APK phát triển: `app/build/outputs/apk/debug/app-debug.apk`. Debug APK dùng để thử, bản phát hành cần khóa ký riêng để giữ được khả năng cập nhật.
@@ -68,16 +82,12 @@ APK phát triển: `app/build/outputs/apk/debug/app-debug.apk`. Debug APK dùng 
 
 Cài APK, mở Cài đặt → bật dữ liệu minh họa để xem bố cục. Muốn thử kết nối thật, nhập URL/ID/mật khẩu trên điện thoại, cấp quyền thông báo rồi Lưu & theo dõi. Dừng theo dõi bằng nút trong Cài đặt. Chưa có tự chạy lại sau khởi động máy; người dùng chủ động bật dịch vụ.
 
-Tuyến từ Bắc xuống Nam gồm 11 đường ngang và 2 điểm ga. Hai nhóm đối chiếu:
-- 312+111 → 313+456 → 313+800 → 314+550.
-- 320+445 → 320+957 → 321+780 → 327+327 → 328+325 → 332+350 → 334+830.
+Tuyến minh họa từ Bắc xuống Nam gồm 11 đường ngang và 2 điểm ga. Tuyến thực dùng danh sách điểm đọc từ tài khoản. Mỗi ga (hậu tố trong ngoặc) ngắt đối chiếu hai phía; ga không làm chứng cứ suy luận tự kích. Tàu lẻ đi tăng lý trình, tàu chẵn đi giảm lý trình. CB3/4 giải phóng đường ngang để nâng chắn; qua cặp cảm biến phía xa bên kia rồi một phút mới khôi phục toàn chu trình.
 
-Ga Vinh giữa 314+550 và 320+445; ga Yên Xuân giữa 328+325 và 332+350. Hai điểm ga không làm chứng cứ suy luận tự kích. Tàu lẻ đi tăng lý trình, tàu chẵn đi giảm lý trình. CB3/4 giải phóng đường ngang để nâng chắn; qua cặp cảm biến phía xa bên kia rồi một phút mới khôi phục toàn chu trình.
+## Kiểm tra bản 0.5
 
-## Ảnh chụp bản 0.4 trên Android giả lập
+[Chi tiết kiểm tra](docs/ROUTE_REVIEW_0.5.md). Build APK và Lint thành công; kiểm thử quy tắc, parser, web mô phỏng và lưu trữ khi đổi tài khoản. Không coi web mô phỏng là kiểm chứng Visitec thật.
 
-![Tổng quan](docs/screenshots/overview-0.4.png)
+![Tổng quan minh họa](docs/screenshots/overview-0.5.png)
 
-[Phạm vi hẹp, sơ đồ vẫn đầy đủ](docs/screenshots/selected-range-0.4.png) · [Màn hình thấp hơn](docs/screenshots/compact-height-0.4.png) · [Biểu tượng ứng dụng](docs/screenshots/app-icon-0.4.png)
-
-[Chi tiết kiểm tra bản 0.4](docs/UI_REVIEW_0.4.md)
+[Tuyến khác có CS / MLy / QHa](docs/screenshots/account-route-0.5.png) · [Chọn phạm vi tài khoản khác](docs/screenshots/account-range-0.5.png)

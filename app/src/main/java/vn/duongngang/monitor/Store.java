@@ -39,11 +39,44 @@ public final class Store {
     return prefs.getString("url", "") + "\n" + prefs.getString("user", "");
   }
 
-  public List<Rules.Event> saveForAccount(String expected, List<Rules.Event> events) {
+  public Rules.Route route() {
+    try {
+      var array = new JSONArray(prefs.getString("route", "[]"));
+      List<String> points = new ArrayList<>();
+      for (int i = 0; i < array.length(); i++) points.add(array.getString(i));
+      return new Rules.Route(points);
+    } catch (Exception invalid) {
+      return new Rules.Route(List.of());
+    }
+  }
+
+  public static String rangeKey(boolean demo, boolean from) {
+    return (demo ? "demoRange" : "range") + (from ? "From" : "To");
+  }
+
+  public String rangeFrom(Rules.Route route, boolean demo) {
+    return selectedRange(route, demo)[0];
+  }
+
+  public String rangeTo(Rules.Route route, boolean demo) {
+    return selectedRange(route, demo)[1];
+  }
+
+  private String[] selectedRange(Rules.Route route, boolean demo) {
+    String from = prefs.getString(rangeKey(demo, true), route.first());
+    String to = prefs.getString(rangeKey(demo, false), route.last());
+    return route.validRange(from, to)
+        ? new String[] {from, to}
+        : new String[] {route.first(), route.last()};
+  }
+
+  public List<Rules.Event> saveForAccount(String expected, WebSource.DayData data) {
     synchronized (Store.class) {
       if (!account().equals(expected))
         throw new IllegalStateException("Tài khoản đã thay đổi; bỏ kết quả cũ");
-      return save(events);
+      List<Rules.Event> added = save(data.events());
+      prefs.edit().putString("route", new JSONArray(data.route().points()).toString()).apply();
+      return added;
     }
   }
 
@@ -61,7 +94,16 @@ public final class Store {
           !url.equals(prefs.getString("url", "")) || !user.equals(prefs.getString("user", ""));
       if (changed) {
         context.deleteDatabase("events.db");
-        prefs.edit().remove("lastSuccess").remove("coverage").remove("baselineFrom").apply();
+        prefs
+            .edit()
+            .remove("lastSuccess")
+            .remove("coverage")
+            .remove("baselineFrom")
+            .remove("route")
+            .remove("rangeFrom")
+            .remove("rangeTo")
+            .putString("status", "Đang chờ danh sách tuyến từ web")
+            .apply();
       }
       prefs
           .edit()

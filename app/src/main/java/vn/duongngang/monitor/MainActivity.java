@@ -40,7 +40,9 @@ public class MainActivity extends Activity {
       new Runnable() {
         public void run() {
           String state =
-              store.prefs.getString("status", "") + store.prefs.getLong("lastSuccess", 0);
+              store.prefs.getString("status", "")
+                  + store.prefs.getLong("lastSuccess", 0)
+                  + staleData();
           if (!state.equals(lastUiState)) {
             lastUiState = state;
             if (!page.equals("settings")) render();
@@ -200,7 +202,7 @@ public class MainActivity extends Activity {
             List.of(
                 new Rules.Event("d6", demoClock - 365000, "Km 320+445", "Tàu lẻ", false, List.of()),
                 new Rules.Event(
-                    "d7", demoClock - 405000, "Km 313+800", "Tàu chẵn", false, List.of()),
+                    "d7", demoClock - 285000, "Km 313+800", "Tàu chẵn", false, List.of()),
                 new Rules.Event(
                     "d8",
                     demoClock - 420000,
@@ -219,7 +221,7 @@ public class MainActivity extends Activity {
                     "d10",
                     demoClock - 215000,
                     "Km 321+780",
-                    "Mất tín hiệu chuông",
+                    "Chuông 2 mất trạng thái",
                     true,
                     List.of()),
                 new Rules.Event("d1", demoClock - 45000, "Km 321+780", "Tàu lẻ", false, List.of()),
@@ -249,16 +251,20 @@ public class MainActivity extends Activity {
     return values;
   }
 
+  private Rules.Route route() {
+    return demo ? Rules.DEMO_ROUTE : store.route();
+  }
+
   private String rangeFrom() {
-    return store.prefs.getString("rangeFrom", "312+111");
+    return store.rangeFrom(route(), demo);
   }
 
   private String rangeTo() {
-    return store.prefs.getString("rangeTo", "334+830");
+    return store.rangeTo(route(), demo);
   }
 
   private boolean inScope(String crossing) {
-    return Rules.inRange(crossing, rangeFrom(), rangeTo());
+    return route().inRange(crossing, rangeFrom(), rangeTo());
   }
 
   private List<Rules.Event> allToday() {
@@ -269,6 +275,28 @@ public class MainActivity extends Activity {
             System.currentTimeMillis() + 1);
   }
 
+  private List<Rules.Event> occupancyEvents() {
+    return demo
+        ? samples()
+        : store.events(
+            LocalDate.now(WebSource.ZONE)
+                .minusDays(1)
+                .atStartOfDay(WebSource.ZONE)
+                .toInstant()
+                .toEpochMilli(),
+            System.currentTimeMillis() + 1);
+  }
+
+  private boolean staleData() {
+    if (demo) return false;
+    long last = store.prefs.getLong("lastSuccess", 0);
+    String message = store.prefs.getString("status", "");
+    return last == 0
+        || System.currentTimeMillis() - last
+            > Math.max(60000L, 2000L * store.prefs.getInt("interval", 30))
+        || !(message.equals("Đã cập nhật") || message.startsWith("Đã đặt lại theo dõi"));
+  }
+
   private List<Rules.Event> today() {
     List<Rules.Event> selected = new ArrayList<>();
     for (Rules.Event e : allToday()) if (inScope(e.crossing())) selected.add(e);
@@ -276,7 +304,7 @@ public class MainActivity extends Activity {
   }
 
   private boolean applyScope(String from, String to) {
-    if (!Rules.validRange(from, to)) {
+    if (!route().validRange(from, to)) {
       Toast.makeText(
               this,
               "Đường ngang bắt đầu phải ở phía Bắc hoặc trùng điểm kết thúc",
@@ -284,11 +312,17 @@ public class MainActivity extends Activity {
           .show();
       return false;
     }
-    store.prefs.edit().putString("rangeFrom", from).putString("rangeTo", to).apply();
-    for (Rules.Event e : store.events(0, System.currentTimeMillis() + 1))
-      if (!inScope(e.crossing()))
-        getSystemService(NotificationManager.class)
-            .cancel(100 + Math.floorMod(e.id().hashCode(), 1000000));
+    store
+        .prefs
+        .edit()
+        .putString(Store.rangeKey(demo, true), from)
+        .putString(Store.rangeKey(demo, false), to)
+        .apply();
+    if (!demo)
+      for (Rules.Event e : store.events(0, System.currentTimeMillis() + 1))
+        if (!inScope(e.crossing()))
+          getSystemService(NotificationManager.class)
+              .cancel(100 + Math.floorMod(e.id().hashCode(), 1000000));
     return true;
   }
 
@@ -399,15 +433,37 @@ public class MainActivity extends Activity {
     compass.addView(text("NAM", 9, MUTED, true));
     c.addView(compass);
     RouteView route = new RouteView();
+    List<String> points = route().points();
     route.setContentDescription(
-        "Toàn tuyến Km 312+111 đến Km 334+830, gồm 11 đường ngang và 2 ga"
-            + (demo ? " · Dữ liệu minh họa" : " · Chưa hiển thị vị trí tàu thật"));
-    c.addView(route, new LinearLayout.LayoutParams(-1, dp(84)));
-    if (demo) {
-      TextView preview = text("Minh họa", 8, MUTED, false);
-      preview.setGravity(Gravity.END);
-      c.addView(preview);
-    }
+        "Toàn tuyến, gồm "
+            + route().crossings().size()
+            + " đường ngang và "
+            + (points.size() - route().crossings().size())
+            + " ga"
+            + ", "
+            + Rules.occupancies(route(), occupancyEvents()).size()
+            + " điểm có bản tin chiếm dụng"
+            + (demo
+                ? " · Dữ liệu minh họa"
+                : staleData() ? " · Dữ liệu cũ hoặc chưa cập nhật" : " · Theo bản tin web"));
+    if (points.size() > 13) {
+      route.setMinimumWidth(dp(34 + 26 * (points.size() - 1)));
+      HorizontalScrollView scroll = new HorizontalScrollView(this);
+      scroll.setFillViewport(true);
+      scroll.addView(
+          route, new HorizontalScrollView.LayoutParams(dp(34 + 26 * (points.size() - 1)), dp(101)));
+      c.addView(scroll, new LinearLayout.LayoutParams(-1, dp(105)));
+    } else c.addView(route, new LinearLayout.LayoutParams(-1, dp(101)));
+    long last = store.prefs.getLong("lastSuccess", 0);
+    String mapNote =
+        demo
+            ? "Minh họa"
+            : last == 0
+                ? "Chưa cập nhật từ web"
+                : (staleData() ? "Dữ liệu cũ · " : "Theo bản tin web · ") + time(last);
+    TextView preview = text(mapNote, 8, !demo && staleData() ? 0xFFA16F1C : MUTED, false);
+    preview.setGravity(Gravity.END);
+    c.addView(preview);
     return c;
   }
 
@@ -601,6 +657,16 @@ public class MainActivity extends Activity {
     if (fault) {
       gap(box, 4);
       box.addView(text("Chưa khôi phục", 10, RED, false));
+      touch(
+          box,
+          () ->
+              new AlertDialog.Builder(this)
+                  .setTitle(time(e.at()) + " · " + e.crossing())
+                  .setMessage(e.text() + "\n\nChưa khôi phục")
+                  .setPositiveButton("Đóng", null)
+                  .setNeutralButton(
+                      "Chi tiết đường ngang", (dialog, which) -> openCrossing(e.crossing()))
+                  .show());
     }
     return box;
   }
@@ -761,8 +827,9 @@ public class MainActivity extends Activity {
                     store.prefs.getString("url", ""),
                     store.prefs.getString("user", ""),
                     store.password());
-            List<Rules.Event> events = source.readDay(day);
-            store.saveForAccount(account, events);
+            var data = source.readDay(day);
+            store.saveForAccount(account, data);
+            List<Rules.Event> events = data.events();
             runOnUiThread(
                 () -> {
                   if (isFinishing()) return;
@@ -838,19 +905,29 @@ public class MainActivity extends Activity {
       LinearLayout entry = row();
       entry.addView(
           text(rangeLabels[i], 11, MUTED, false), new LinearLayout.LayoutParams(0, -2, 1));
-      TextView choice = pill("Km " + range[i] + "  ▾", BLUE, 0xFFEDF4FF);
+      TextView choice =
+          pill(
+              range[i].isEmpty() ? "Chưa có danh sách" : "Km " + range[i] + "  ▾",
+              BLUE,
+              0xFFEDF4FF);
       touch(
           choice,
           () -> {
-            String[] names = new String[Rules.CROSSINGS.size()];
-            for (int j = 0; j < names.length; j++) names[j] = "Km " + Rules.CROSSINGS.get(j);
+            if (route().crossings().isEmpty()) {
+              Toast.makeText(
+                      this, "Kết nối tài khoản để đọc danh sách đường ngang", Toast.LENGTH_LONG)
+                  .show();
+              return;
+            }
+            String[] names = new String[route().crossings().size()];
+            for (int j = 0; j < names.length; j++) names[j] = "Km " + route().crossings().get(j);
             new AlertDialog.Builder(this)
                 .setTitle(rangeLabels[index])
                 .setSingleChoiceItems(
                     names,
-                    Rules.CROSSINGS.indexOf(range[index]),
+                    route().crossings().indexOf(range[index]),
                     (dialog, which) -> {
-                      range[index] = Rules.CROSSINGS.get(which);
+                      range[index] = route().crossings().get(which);
                       choice.setText("Km " + range[index] + "  ▾");
                       dialog.dismiss();
                     })
@@ -975,7 +1052,10 @@ public class MainActivity extends Activity {
                         || !login.equals(store.prefs.getString("user", ""));
                 if (secret.isEmpty() && !changed) secret = store.password();
                 if (secret.isEmpty()) throw new Exception("Cần nhập mật khẩu cho tài khoản này");
-                if (!applyScope(range[0], range[1])) return;
+                if (!changed
+                    && !demo
+                    && !route().crossings().isEmpty()
+                    && !applyScope(range[0], range[1])) return;
                 stopService(new Intent(this, MonitorService.class));
                 store.credentials(endpoint, login, secret);
                 store
@@ -1017,9 +1097,10 @@ public class MainActivity extends Activity {
     content.addView(preview);
     TextView note =
         text(
-            "Bản thử giao diện 0.4 · Chưa dùng trực vận hành.\n"
-                + "Tự kích và vị trí tàu thật chưa bật. Theo dõi nền sử dụng thông báo thường trực."
-                + " Website HTTP không mã hóa đường truyền.",
+            "Bản thử giao diện 0.5 · Chưa dùng trực vận hành.\n"
+                + "Tự kích chưa bật. Sơ đồ theo bản tin chiếm dụng, chưa xác minh bằng web thật."
+                + " Theo dõi nền dùng thông báo thường trực. Website HTTP không mã hóa đường"
+                + " truyền.",
             10,
             MUTED,
             false);
@@ -1042,7 +1123,7 @@ public class MainActivity extends Activity {
   private void crossingList() {
     LinearLayout introduction = row();
     int total = 0;
-    for (String point : Rules.CROSSINGS) if (inScope(point)) total++;
+    for (String point : route().crossings()) if (inScope(point)) total++;
     introduction.addView(
         text("KHU VỰC THEO DÕI", 10, MUTED, true), new LinearLayout.LayoutParams(0, -2, 1));
     introduction.addView(pill(total + " đường ngang", BLUE, 0xFFE8F0FC));
@@ -1050,8 +1131,8 @@ public class MainActivity extends Activity {
     gap(content, 14);
     LinearLayout list = card(Color.WHITE);
     int index = 0;
-    for (String point : Rules.ROUTE) {
-      if (point.contains("(") || !inScope(point)) continue;
+    for (String point : route().points()) {
+      if (Rules.isStation(point) || !inScope(point)) continue;
       if (index++ > 0) divider(list);
       List<Rules.Event> events = crossingEvents(point);
       boolean fault = !currentFaults(events).isEmpty();
@@ -1084,6 +1165,20 @@ public class MainActivity extends Activity {
         if (t.contains(keyword)) return e.text() + " · " + time(e.at());
     }
     return "Chưa có dữ liệu";
+  }
+
+  private String deviceReading(
+      List<Rules.Event> events, List<Rules.Event> faults, String... keywords) {
+    List<String> active = new ArrayList<>();
+    for (Rules.Event fault : faults) {
+      String lower = fault.text().toLowerCase(Locale.ROOT);
+      for (String keyword : keywords)
+        if (lower.contains(keyword)) {
+          active.add(fault.text() + " · " + time(fault.at()));
+          break;
+        }
+    }
+    return active.isEmpty() ? latestDevice(events, keywords) : String.join("\n", active);
   }
 
   private void deviceRow(
@@ -1125,13 +1220,9 @@ public class MainActivity extends Activity {
     gap(summary, 7);
     summary.addView(text("Thông tin ghi nhận gần nhất", 10, MUTED, false));
     divider(summary);
-    String bell = latestDevice(events, "chuông"), light = latestDevice(events, "đèn");
-    String barrier1 = latestDevice(events, "cần chắn 1"),
-        barrier2 = latestDevice(events, "cần chắn 2");
-    String barriers =
-        barrier1.equals("Chưa có dữ liệu") && barrier2.equals("Chưa có dữ liệu")
-            ? "Chưa có dữ liệu"
-            : barrier1 + "\n" + barrier2;
+    String bell = deviceReading(events, faults, "chuông"),
+        light = deviceReading(events, faults, "đèn");
+    String barriers = deviceReading(events, faults, "cần chắn");
     String sensors = "Chưa có dữ liệu";
     for (Rules.Event e : events) {
       String value = e.text().toLowerCase(Locale.ROOT);
@@ -1140,8 +1231,8 @@ public class MainActivity extends Activity {
         break;
       }
     }
-    String connection = latestDevice(events, "kết nối giám sát"),
-        voltage = latestDevice(events, "điện áp", "220vac");
+    String connection = deviceReading(events, faults, "kết nối giám sát"),
+        voltage = deviceReading(events, faults, "điện áp", "220vac");
     String[] labels = {"Chuông", "Đèn", "Cần chắn", "Cảm biến", "Kết nối", "Điện áp"};
     String[] values = {bell, light, barriers, sensors, connection, voltage};
     String[] icons = {"bell", "alert", "rail", "overview", "link", "voltage"};
@@ -1202,10 +1293,15 @@ public class MainActivity extends Activity {
 
   private class RouteView extends View {
     private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final List<String> points = Rules.ROUTE;
+    private final List<String> points = route().points();
+    private final int[] occupied = new int[points.size()];
 
     RouteView() {
       super(MainActivity.this);
+      for (Rules.Occupancy report : Rules.occupancies(route(), occupancyEvents())) {
+        int index = points.indexOf(report.crossing());
+        if (index >= 0) occupied[index] = report.direction();
+      }
     }
 
     @Override
@@ -1219,11 +1315,8 @@ public class MainActivity extends Activity {
                 : Math.max(
                     0, Math.min(points.size() - 1, Math.round((event.getX() - dp(7)) / step)));
         String point = points.get(index);
-        if (point.contains("(")) {
-          Toast.makeText(
-                  MainActivity.this,
-                  point.contains("Vi") ? "Ga Vinh" : "Ga Yên Xuân",
-                  Toast.LENGTH_SHORT)
+        if (Rules.isStation(point)) {
+          Toast.makeText(MainActivity.this, "Ga " + Rules.stationCode(point), Toast.LENGTH_SHORT)
               .show();
         } else openCrossing(point);
         performClick();
@@ -1241,58 +1334,71 @@ public class MainActivity extends Activity {
     @Override
     protected void onDraw(Canvas c) {
       super.onDraw(c);
-      if (points.isEmpty()) return;
+      if (points.isEmpty()) {
+        p.setColor(MUTED);
+        p.setTextSize(dp(11));
+        c.drawText("Đang chờ danh sách tuyến từ web", dp(7), dp(38), p);
+        return;
+      }
       float left = points.size() == 1 ? getWidth() / 2f : dp(7),
           right = points.size() == 1 ? left : getWidth() - dp(27),
           step = points.size() > 1 ? (right - left) / (points.size() - 1) : 0,
-          y = dp(33);
-      int trainIndex = -1, trainDirection = 1;
-      if (demo)
-        for (Rules.Event e : allToday())
-          if (Rules.direction(e.text()) != 0) {
-            trainIndex = points.indexOf(Rules.km(e.crossing()));
-            trainDirection = Rules.direction(e.text());
-            break;
-          }
-      int greenStart = Math.max(0, trainIndex - 1),
-          greenEnd = Math.min(points.size() - 1, trainIndex + 1);
+          y = dp(50);
       p.setStrokeCap(Paint.Cap.ROUND);
       p.setStrokeWidth(dp(3));
       p.setColor(0xFFD7E2EF);
       c.drawLine(left, y, right, y, p);
-      if (demo && trainIndex >= 0) {
+      int reportColor = staleData() ? 0xFFB8872D : GREEN;
+      List<float[]> labels = new ArrayList<>();
+      for (int index = 0; index < points.size(); index++) {
+        if (occupied[index] == 0) continue;
+        float x = left + step * index;
         p.setStrokeWidth(dp(5));
-        p.setColor(GREEN);
-        c.drawLine(left + step * greenStart, y, left + step * greenEnd, y, p);
+        p.setColor(reportColor);
+        float halfSegment = Math.min(dp(8), step * .3f);
+        c.drawLine(Math.max(left, x - halfSegment), y, Math.min(right, x + halfSegment), y, p);
+        if (index > 0 && occupied[index - 1] == occupied[index]) c.drawLine(x - step, y, x, y, p);
+        // One direction label for each contiguous run; every occupied point remains marked.
+        if (index + 1 < points.size() && occupied[index + 1] == occupied[index]) continue;
+        int start = index;
+        while (start > 0 && occupied[start - 1] == occupied[index]) start--;
+        float ax = left + step * (start + index) / 2f;
         p.setStrokeWidth(dp(1.7f));
-        float ax = left + step * trainIndex;
         p.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        p.setTextSize(dp(10));
-        String direction = trainDirection > 0 ? "Tàu lẻ" : "Tàu chẵn";
+        p.setTextSize(dp(9));
+        String direction = occupied[index] > 0 ? "Tàu lẻ" : "Tàu chẵn";
         float half = p.measureText(direction) / 2;
-        float labelCenter = Math.max(half + dp(1), Math.min(getWidth() - half - dp(1), ax));
-        c.drawText(direction, labelCenter - half, Math.max(dp(1) - p.ascent(), y - dp(25)), p);
-
+        float center = Math.max(half + dp(1), Math.min(getWidth() - half - dp(1), ax));
+        int lane = 0;
+        boolean collision;
+        do {
+          collision = false;
+          for (float[] label : labels)
+            if ((int) label[2] == lane && Math.abs(label[0] - center) < label[1] + half + dp(3)) {
+              lane++;
+              collision = true;
+              break;
+            }
+        } while (collision);
+        labels.add(new float[] {center, half, lane});
+        float arrowY = y - dp(14 + lane * 17);
+        c.drawText(direction, center - half, arrowY - dp(7), p);
         c.save();
-        c.translate(ax, y - dp(13));
-        c.scale(trainDirection, 1);
-        c.translate(-ax, -y + dp(13));
-        c.drawLine(ax - dp(6), y - dp(13), ax + dp(5), y - dp(13), p);
-        c.drawLine(ax + dp(1), y - dp(17), ax + dp(5), y - dp(13), p);
-        c.drawLine(ax + dp(1), y - dp(9), ax + dp(5), y - dp(13), p);
+        c.translate(center, arrowY);
+        c.scale(occupied[index], 1);
+        c.drawLine(-dp(6), 0, dp(5), 0, p);
+        c.drawLine(dp(1), -dp(4), dp(5), 0, p);
+        c.drawLine(dp(1), dp(4), dp(5), 0, p);
         c.restore();
       }
       for (int i = 0; i < points.size(); i++) {
         float x = left + step * i;
         String km = points.get(i);
-        boolean station = km.contains("(");
+        boolean station = Rules.isStation(km);
         p.setStyle(Paint.Style.FILL);
         p.setColor(Color.WHITE);
         c.drawCircle(x, y, dp(5.5f), p);
-        p.setColor(
-            station
-                ? BLUE
-                : demo && trainIndex >= 0 && i >= greenStart && i <= greenEnd ? GREEN : 0xFF93AAC4);
+        p.setColor(station ? BLUE : occupied[i] != 0 ? reportColor : 0xFF93AAC4);
         if (station) c.drawRoundRect(x - dp(4), y - dp(4), x + dp(4), y + dp(4), dp(2), dp(2), p);
         else c.drawCircle(x, y, dp(3.5f), p);
         p.setTypeface(
@@ -1300,8 +1406,8 @@ public class MainActivity extends Activity {
         p.setTextSize(dp(station ? 9 : 8.5f));
         p.setColor(station ? BLUE : MUTED);
         if (station) {
-          String name = km.contains("Vi") ? "Vinh" : "Yên Xuân";
-          c.drawText(name, x - p.measureText(name) / 2, y - dp(15), p);
+          String name = Rules.stationCode(km);
+          c.drawText(name, x - p.measureText(name) / 2, y + dp(17), p);
         } else {
           c.save();
           c.translate(x - dp(2), y + dp(14));

@@ -72,11 +72,15 @@ public class MonitorService extends Service {
   private void poll() {
     String account = store.account();
     try {
-      var source =
-          new WebSource(
-              store.prefs.getString("url", ""),
-              store.prefs.getString("user", ""),
-              store.password());
+      WebSource source;
+      synchronized (Store.class) {
+        if (!store.account().equals(account) || Thread.currentThread().isInterrupted()) return;
+        source =
+            new WebSource(
+                store.prefs.getString("url", ""),
+                store.prefs.getString("user", ""),
+                store.password());
+      }
       LocalDate today = LocalDate.now(WebSource.ZONE);
       long last = store.prefs.getLong("lastSuccess", 0);
       long pollStart = System.currentTimeMillis();
@@ -87,35 +91,42 @@ public class MonitorService extends Service {
         if (start.isBefore(today.minusDays(7)))
           throw new Exception("Gián đoạn quá 7 ngày; cần tải lại lịch sử trước khi theo dõi");
         for (LocalDate d = start; d.isBefore(today); d = d.plusDays(1))
-          events.addAll(source.readDay(d));
+          events.addAll(source.readDay(d).events());
       }
-      events.addAll(source.readDay(today));
+      var data = source.readDay(today);
+      events.addAll(data.events());
       events.sort(Comparator.comparingLong(Rules.Event::at));
-      List<Rules.Event> added = store.saveForAccount(account, events);
-      long now = System.currentTimeMillis();
-      // First successful sync builds the baseline silently. No speculative self-trigger alerts yet.
-      if (last > 0 && !reset)
-        for (var e : added)
-          if (e.red()
-              && e.at() >= store.prefs.getLong("baselineFrom", 0)
-              && Rules.inRange(
-                  e.crossing(),
-                  store.prefs.getString("rangeFrom", "312+111"),
-                  store.prefs.getString("rangeTo", "334+830"))) notifyFault(e);
-      if (reset) {
-        store.prefs.edit().putLong("baselineFrom", now).apply();
-        var notifications = getSystemService(NotificationManager.class);
-        for (var notification : notifications.getActiveNotifications())
-          if (notification.getId() != 1) notifications.cancel(notification.getId());
+      synchronized (Store.class) {
+        if (!store.account().equals(account) || Thread.currentThread().isInterrupted()) return;
+        List<Rules.Event> added =
+            store.saveForAccount(account, new WebSource.DayData(events, data.route()));
+        long now = System.currentTimeMillis();
+        // First successful sync builds the baseline silently. No speculative self-trigger alerts
+        // yet.
+        if (last > 0 && !reset)
+          for (var e : added)
+            if (e.red()
+                && e.at() >= store.prefs.getLong("baselineFrom", 0)
+                && data.route()
+                    .inRange(
+                        e.crossing(),
+                        store.rangeFrom(data.route(), false),
+                        store.rangeTo(data.route(), false))) notifyFault(e);
+        if (reset) {
+          store.prefs.edit().putLong("baselineFrom", now).apply();
+          var notifications = getSystemService(NotificationManager.class);
+          for (var notification : notifications.getActiveNotifications())
+            if (notification.getId() != 1) notifications.cancel(notification.getId());
+        }
+        firstPoll = false;
+        store
+            .prefs
+            .edit()
+            .putLong("lastSuccess", now)
+            .putString(
+                "status", reset ? "Đã đặt lại theo dõi · Chưa ghi nhận lỗi mới" : "Đã cập nhật")
+            .apply();
       }
-      firstPoll = false;
-      store
-          .prefs
-          .edit()
-          .putLong("lastSuccess", now)
-          .putString(
-              "status", reset ? "Đã đặt lại theo dõi · Chưa ghi nhận lỗi mới" : "Đã cập nhật")
-          .apply();
     } catch (Exception e) {
       if (!store.account().equals(account) || Thread.currentThread().isInterrupted()) return;
       store

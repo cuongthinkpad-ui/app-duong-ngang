@@ -4,55 +4,124 @@ import java.util.*;
 
 /** Domain rules independent of Android. All timestamps are epoch milliseconds. */
 public final class Rules {
-  public static final List<String> NORTH = List.of("312+111", "313+456", "313+800", "314+550");
-  public static final List<String> SOUTH =
-      List.of("320+445", "320+957", "321+780", "327+327", "328+325", "332+350", "334+830");
-  public static final List<String> ROUTE =
-      List.of(
-          "312+111",
-          "313+456",
-          "313+800",
-          "314+550",
-          "319+200 (Vi)",
-          "320+445",
-          "320+957",
-          "321+780",
-          "327+327",
-          "328+325",
-          "330+00 (YX)",
-          "332+350",
-          "334+830");
+  private static final java.util.regex.Pattern POINT =
+      java.util.regex.Pattern.compile(
+          "(?iu)^(?:km\\s*)?(\\d+)\\s*\\+\\s*(\\d{1,3})(?:\\s*\\(\\s*([^()]+?)\\s*\\))?$");
 
-  public static final List<String> CROSSINGS;
+  /** Fixture only: operational routes must come from the authenticated page's full point list. */
+  public static final Route DEMO_ROUTE =
+      new Route(
+          List.of(
+              "312+111",
+              "313+456",
+              "313+800",
+              "314+550",
+              "319+200 (Vi)",
+              "320+445",
+              "320+957",
+              "321+780",
+              "327+327",
+              "328+325",
+              "330+00 (YX)",
+              "332+350",
+              "334+830"));
 
-  static {
-    List<String> all = new ArrayList<>(NORTH);
-    all.addAll(SOUTH);
-    CROSSINGS = Collections.unmodifiableList(all);
+  public static boolean isPoint(String raw) {
+    return raw != null && POINT.matcher(raw.trim()).matches();
   }
 
-  public static boolean validRange(String from, String to) {
-    return CROSSINGS.contains(km(from))
-        && CROSSINGS.contains(km(to))
-        && CROSSINGS.indexOf(km(from)) <= CROSSINGS.indexOf(km(to));
+  public static String stationCode(String raw) {
+    if (raw == null) return "";
+    var match = POINT.matcher(raw.trim());
+    return match.matches() && match.group(3) != null ? match.group(3).trim() : "";
   }
 
-  public static boolean inRange(String crossing, String from, String to) {
-    if (!validRange(from, to)) return false;
-    int i = CROSSINGS.indexOf(km(crossing));
-    return i >= CROSSINGS.indexOf(km(from)) && i <= CROSSINGS.indexOf(km(to));
+  public static boolean isStation(String raw) {
+    return !stationCode(raw).isEmpty();
   }
 
-  public static List<String> routeSpan(String from, String to) {
-    if (!validRange(from, to)) return List.of();
-    return new ArrayList<>(ROUTE.subList(ROUTE.indexOf(km(from)), ROUTE.indexOf(km(to)) + 1));
+  private static long chainage(String raw) {
+    var match = POINT.matcher(raw);
+    if (!match.matches()) throw new IllegalArgumentException("Lý trình không hợp lệ: " + raw);
+    return Math.addExact(
+        Math.multiplyExact(Long.parseLong(match.group(1)), 1000), Integer.parseInt(match.group(2)));
+  }
+
+  /** Immutable account-specific topology. A station breaks adjacency in both directions. */
+  public static final class Route {
+    private final List<String> points, crossings;
+
+    public Route(Collection<String> raw) {
+      Set<String> unique = new LinkedHashSet<>();
+      Map<Long, String> locations = new HashMap<>();
+      for (String value : raw) {
+        if (!isPoint(value)) throw new IllegalArgumentException("Lý trình không hợp lệ: " + value);
+        String point = km(value);
+        String existing = locations.putIfAbsent(chainage(point), point);
+        if (existing != null && !existing.equals(point))
+          throw new IllegalArgumentException("Danh sách điểm mâu thuẫn tại Km " + point);
+        unique.add(point);
+      }
+      List<String> ordered = new ArrayList<>(unique);
+      ordered.sort(Comparator.comparingLong(Rules::chainage));
+      points = Collections.unmodifiableList(ordered);
+      List<String> road = new ArrayList<>();
+      for (String point : points) if (!isStation(point)) road.add(point);
+      crossings = Collections.unmodifiableList(road);
+    }
+
+    public List<String> points() {
+      return points;
+    }
+
+    public List<String> crossings() {
+      return crossings;
+    }
+
+    public String first() {
+      return crossings.isEmpty() ? "" : crossings.get(0);
+    }
+
+    public String last() {
+      return crossings.isEmpty() ? "" : crossings.get(crossings.size() - 1);
+    }
+
+    public boolean validRange(String from, String to) {
+      return crossings.contains(km(from))
+          && crossings.contains(km(to))
+          && crossings.indexOf(km(from)) <= crossings.indexOf(km(to));
+    }
+
+    public boolean inRange(String point, String from, String to) {
+      if (!validRange(from, to)) return false;
+      int i = crossings.indexOf(km(point));
+      return i >= crossings.indexOf(km(from)) && i <= crossings.indexOf(km(to));
+    }
+
+    public List<String> routeSpan(String from, String to) {
+      if (!validRange(from, to)) return List.of();
+      return new ArrayList<>(points.subList(points.indexOf(km(from)), points.indexOf(km(to)) + 1));
+    }
+
+    public String upstream(String crossing, int direction) {
+      if (direction != 1 && direction != -1 || !crossings.contains(km(crossing))) return null;
+      int previous = points.indexOf(km(crossing)) - direction;
+      if (previous < 0 || previous >= points.size() || isStation(points.get(previous))) return null;
+      return points.get(previous);
+    }
   }
 
   public record Event(
       String id, long at, String crossing, String text, boolean red, List<String> counts) {}
 
   public static String km(String raw) {
-    return raw.replaceFirst("(?i)^Km\\s*", "").trim();
+    if (raw == null) return "";
+    var match = POINT.matcher(raw.trim());
+    if (!match.matches()) return raw.replaceFirst("(?i)^Km\\s*", "").trim();
+    return match.group(1)
+        + "+"
+        + match.group(2)
+        + (match.group(3) == null ? "" : " (" + match.group(3).trim() + ")");
   }
 
   public static int direction(String text) {
@@ -60,15 +129,28 @@ public final class Rules {
     return t.equals("tàu lẻ") ? 1 : t.equals("tàu chẵn") ? -1 : 0;
   }
 
-  public static String upstream(String crossing, int direction) {
-    for (List<String> group : List.of(NORTH, SOUTH)) {
-      int i = group.indexOf(km(crossing));
-      if (i >= 0) {
-        int j = i - direction;
-        return j >= 0 && j < group.size() ? group.get(j) : null;
-      }
+  public record Occupancy(String crossing, int direction, long at) {}
+
+  /**
+   * Per-crossing occupation from reports, not inferred GPS positions or unique train identities.
+   */
+  public static List<Occupancy> occupancies(Route route, List<Event> input) {
+    List<Event> ordered = new ArrayList<>(input);
+    ordered.sort(Comparator.comparingLong(Event::at).thenComparing(Event::id));
+    Map<String, Occupancy> occupied = new HashMap<>();
+    Set<String> seen = new HashSet<>();
+    for (Event e : ordered) {
+      String point = km(e.crossing());
+      if (!seen.add(e.id()) || !route.crossings().contains(point)) continue;
+      int direction = direction(e.text());
+      if (direction != 0) occupied.put(point, new Occupancy(point, direction, e.at()));
+      else if (e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")) occupied.remove(point);
+      // Tail clearing CB3/CB4 and raised barriers do not release the full monitored area.
     }
-    return null;
+    List<Occupancy> result = new ArrayList<>();
+    for (String point : route.crossings())
+      if (occupied.containsKey(point)) result.add(occupied.get(point));
+    return result;
   }
 
   public static String axleNote(List<String> raw) {
@@ -106,9 +188,14 @@ public final class Rules {
 
   /** Missing upstream evidence is meaningful only with complete coverage of the whole window. */
   public static boolean suspect(
-      Event current, List<Event> history, long coverageStart, long travelWindow, boolean complete) {
+      Route route,
+      Event current,
+      List<Event> history,
+      long coverageStart,
+      long travelWindow,
+      boolean complete) {
     int d = direction(current.text());
-    String previous = upstream(current.crossing(), d);
+    String previous = route.upstream(current.crossing(), d);
     if (d == 0 || previous == null || !complete || coverageStart > current.at() - travelWindow)
       return false;
     for (Event e : history)
@@ -124,7 +211,10 @@ public final class Rules {
     String t = text.toLowerCase(Locale.ROOT);
     if (t.contains("220vac")) return "nguồn 220VAC";
     if (t.contains("kết nối giám sát")) return "kết nối giám sát";
-    var m = java.util.regex.Pattern.compile("(cảm biến|cần chắn)\\s*(\\d+)").matcher(t);
+    var m =
+        java.util.regex.Pattern.compile(
+                "(cảm biến|cần chắn|chuông|đèn)(?:\\s+(?:điện|cảnh báo|tín hiệu|đỏ|số))*\\s*(\\d+)")
+            .matcher(t);
     if (m.find()) return m.group(1) + " " + m.group(2);
     if (t.contains("chuông")) return "chuông";
     if (t.contains("đèn")) return "đèn";
