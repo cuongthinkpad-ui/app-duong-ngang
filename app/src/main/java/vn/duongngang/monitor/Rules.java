@@ -174,7 +174,21 @@ public final class Rules {
       long at,
       boolean passed,
       boolean released,
-      boolean reached) {}
+      boolean reached,
+      String successorId,
+      long lastAt) {
+    public Journey(
+        String id,
+        String from,
+        String to,
+        int direction,
+        long at,
+        boolean passed,
+        boolean released,
+        boolean reached) {
+      this(id, from, to, direction, at, passed, released, reached, null, at);
+    }
+  }
 
   public record TravelState(List<Journey> journeys) {
     public TravelState {
@@ -226,17 +240,120 @@ public final class Rules {
     return result;
   }
 
-  private static Journey replaceJourney(
-      Journey j, boolean passed, boolean released, boolean reached) {
-    return new Journey(j.id(), j.from(), j.to(), j.direction(), j.at(), passed, released, reached);
+  private static Journey progress(
+      Journey j, boolean passed, boolean released, boolean reached, String successor, long at) {
+    return new Journey(
+        j.id(),
+        j.from(),
+        j.to(),
+        j.direction(),
+        j.at(),
+        passed,
+        released,
+        reached,
+        successor,
+        Math.max(j.lastAt(), at));
   }
 
-  /**
-   * Carries a train between adjacent crossings after its passage, through source restoration. An
-   * early downstream approach consumes the corresponding transfer before source passage, so
-   * overlapping detection zones cannot reopen an already completed transfer. A station always
-   * breaks the link. This is event-based continuity, not GPS interpolation.
-   */
+  private static Journey latestJourney(
+      Map<String, Journey> journeys, String point, int direction, boolean unreleasedOnly) {
+    Journey result = null;
+    for (Journey j : journeys.values())
+      if (j.from().equals(point)
+          && (direction == 0 || j.direction() == direction)
+          && (!unreleasedOnly || !j.released())
+          && (result == null || j.at() >= result.at())) result = j;
+    return result;
+  }
+
+  private static boolean claimed(Map<String, Journey> journeys, String id) {
+    for (Journey j : journeys.values()) if (id.equals(j.successorId())) return true;
+    return false;
+  }
+
+  private static boolean freshUpstream(
+      Map<String, Journey> journeys, String point, int direction, long after, long before) {
+    for (Journey j : journeys.values())
+      if (!j.reached()
+          && point.equals(j.to())
+          && j.direction() == direction
+          && j.at() > after
+          && j.at() <= before) return true;
+    return false;
+  }
+
+  /** A passage is also evidence of arrival; do not require its separate approach message. */
+  private static void linkPredecessor(Map<String, Journey> journeys, Journey current) {
+    if (claimed(journeys, current.id())) return;
+    Journey previous = null;
+    for (Journey j : journeys.values())
+      if (current.from().equals(j.to())
+          && current.direction() == j.direction()
+          && !j.reached()
+          && j.at() <= current.at()
+          && (previous == null || j.at() < previous.at())) previous = j;
+    if (previous != null)
+      journeys.put(
+          previous.id(),
+          progress(
+              previous, previous.passed(), previous.released(), true, current.id(), current.at()));
+  }
+
+  /** Neighboring approach sensors can report in the reverse order while both zones overlap. */
+  private static void linkEarlierDownstream(Map<String, Journey> journeys, Journey current) {
+    if (current.to() == null || current.reached()) return;
+    Journey downstream = null;
+    for (Journey j : journeys.values())
+      if (current.to().equals(j.from())
+          && current.direction() == j.direction()
+          && !j.passed()
+          && !j.released()
+          && !j.reached()
+          && j.at() <= current.at()
+          // Only reconcile nearby detection timestamps; do not merge a later train into
+          // an old unfinished visit. This does not expire an existing pending interval.
+          && current.at() - j.at() <= 120000L
+          && !claimed(journeys, j.id())
+          && (downstream == null || j.at() > downstream.at())) downstream = j;
+    if (downstream != null)
+      journeys.put(
+          current.id(),
+          progress(
+              current, current.passed(), current.released(), true, downstream.id(), current.at()));
+  }
+
+  /** New directional evidence at a crossing supersedes older opposite intervals touching it. */
+  private static void retireContradictions(
+      Route route, Map<String, Journey> journeys, String point, int direction, long at) {
+    for (Journey j : new ArrayList<>(journeys.values())) {
+      if (j.reached() || j.direction() == direction || j.at() > at) continue;
+      String neighbor = route.adjacent(j.from(), j.passed() ? j.direction() : -j.direction());
+      if (point.equals(j.from()) || point.equals(neighbor))
+        journeys.put(j.id(), progress(j, j.passed(), true, true, null, at));
+    }
+  }
+
+  /** Keep pending trains and bounded completion records, so late passages cannot resurrect them. */
+  private static TravelState compactJourneys(Map<String, Journey> journeys) {
+    Map<String, Journey> latestClosed = new HashMap<>();
+    Set<String> live = new HashSet<>();
+    for (Journey j : journeys.values()) {
+      if (!j.reached()) live.add(j.id());
+      else {
+        String key = j.from() + "|" + j.direction();
+        Journey previous = latestClosed.get(key);
+        if (previous == null || j.at() >= previous.at()) latestClosed.put(key, j);
+      }
+    }
+    List<Journey> result = new ArrayList<>();
+    for (Journey j : journeys.values())
+      if (!j.reached()
+          || latestClosed.get(j.from() + "|" + j.direction()) == j
+          || (j.successorId() != null && live.contains(j.successorId()))) result.add(j);
+    return new TravelState(result);
+  }
+
+  /** Event-based continuity with explicit successor links and completion records, not GPS. */
   public static TravelState travelState(Route route, TravelState initial, List<Event> input) {
     List<Event> ordered = new ArrayList<>(input);
     ordered.sort(
@@ -251,46 +368,39 @@ public final class Rules {
             .thenComparing(Event::id));
     Map<String, Journey> journeys = new LinkedHashMap<>();
     for (Journey j : initial.journeys())
-      if (route.crossings().contains(j.from())
+      if ((j.direction() == 1 || j.direction() == -1)
+          && route.crossings().contains(j.from())
           && Objects.equals(j.to(), route.upstream(j.from(), -j.direction())))
         journeys.put(j.id(), j);
-    Set<String> seen = new HashSet<>();
+    Set<String> seen = new HashSet<>(journeys.keySet());
     for (Event e : ordered) {
       String point = km(e.crossing());
       if (e.red() || !seen.add(e.id()) || !route.crossings().contains(point)) continue;
       int d = direction(e.text()), passed = passedDirection(e.text());
       if (d != 0) {
-        Journey previous = null;
-        for (Journey j : journeys.values())
-          if (point.equals(j.to())
-              && j.direction() == d
-              && !j.reached()
-              && j.at() <= e.at()
-              && (previous == null || j.at() < previous.at())) previous = j;
-        if (previous != null) {
-          if (previous.released()) journeys.remove(previous.id());
-          else
-            journeys.put(previous.id(), replaceJourney(previous, previous.passed(), false, true));
-        }
-        // A new arrival supersedes the current source session, but a pending outgoing leg survives.
-        List<Journey> old = new ArrayList<>(journeys.values());
-        for (Journey j : old)
+        retireContradictions(route, journeys, point, d, e.at());
+        for (Journey j : new ArrayList<>(journeys.values()))
           if (j.from().equals(point) && !j.released()) {
-            if (j.reached() || !j.passed()) journeys.remove(j.id());
-            else journeys.put(j.id(), replaceJourney(j, true, true, false));
+            if (j.reached() || !j.passed() || j.direction() != d)
+              journeys.put(j.id(), progress(j, j.passed(), true, true, j.successorId(), e.at()));
+            else journeys.put(j.id(), progress(j, true, true, false, null, e.at()));
           }
-        journeys.put(
-            e.id(),
-            new Journey(e.id(), point, route.upstream(point, -d), d, e.at(), false, false, false));
+        Journey current =
+            new Journey(e.id(), point, route.upstream(point, -d), d, e.at(), false, false, false);
+        journeys.put(current.id(), current);
+        linkPredecessor(journeys, current);
+        linkEarlierDownstream(journeys, current);
       } else if (passed != 0 || e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")) {
-        Journey current = null;
-        for (Journey j : journeys.values())
-          if (j.from().equals(point)
-              && !j.released()
-              && j.at() <= e.at()
-              && (passed == 0 || j.direction() == passed)
-              && (current == null || j.at() > current.at())) current = j;
-        if (current == null && passed != 0)
+        Journey current = latestJourney(journeys, point, passed, passed == 0);
+        if (passed != 0
+            && current != null
+            && current.released()
+            && freshUpstream(journeys, point, passed, current.at(), e.at())) current = null;
+        if (current == null && passed != 0) {
+          Journey latest = latestJourney(journeys, point, 0, false);
+          if (latest != null
+              && latest.direction() != passed
+              && !freshUpstream(journeys, point, passed, latest.at(), e.at())) continue;
           current =
               new Journey(
                   e.id(),
@@ -301,14 +411,27 @@ public final class Rules {
                   true,
                   false,
                   false);
-        if (current == null) continue; // A restoration alone cannot establish a direction.
-        boolean released = passed == 0;
-        Journey next = replaceJourney(current, true, released, current.reached());
-        if (released && (next.reached() || next.to() == null)) journeys.remove(next.id());
-        else journeys.put(next.id(), next);
+          journeys.put(current.id(), current);
+        }
+        if (current == null) continue;
+        if (passed != 0 && !current.released() && !current.reached()) {
+          retireContradictions(route, journeys, point, passed, e.at());
+          linkPredecessor(journeys, current);
+          linkEarlierDownstream(journeys, current);
+          current = journeys.get(current.id());
+        }
+        boolean released = current.released() || passed == 0;
+        boolean closed = current.reached() || (released && current.to() == null);
+        journeys.put(
+            current.id(), progress(current, true, released, closed, current.successorId(), e.at()));
+      }
+      if (journeys.size() > route.crossings().size() * 4 + 16) {
+        List<Journey> retained = compactJourneys(journeys).journeys();
+        journeys.clear();
+        for (Journey j : retained) journeys.put(j.id(), j);
       }
     }
-    return new TravelState(new ArrayList<>(journeys.values()));
+    return compactJourneys(journeys);
   }
 
   public static String axleNote(Event event) {

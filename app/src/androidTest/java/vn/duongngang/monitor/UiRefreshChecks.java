@@ -285,6 +285,131 @@ final class UiRefreshChecks {
                     && ((Rules.TrackSegment) legs.get(0)).to().equals(points.get(2)),
                 "only the next bounded interval lights after destination passage");
           });
+      long switchedAt = System.currentTimeMillis() + 30;
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "ui-no-approach-pass",
+                      switchedAt,
+                      points.get(2),
+                      "Tàu lẻ đã qua đường ngang",
+                      false,
+                      List.of())),
+              route));
+      store.updateActiveFaults(store.account(), 0, switchedAt + 10, 0, List.of());
+      store.prefs.edit().putLong("lastSuccess", switchedAt + 10).commit();
+      ui(
+          () -> {
+            ((Runnable) field(activity, "refresh")).run();
+            check(
+                ((List<?>) field(routeView, "segments"))
+                        .equals(List.of(new Rules.TrackSegment(points.get(2), points.get(3), 1)))
+                    && field(activity, "routeView") == routeView,
+                "passage immediately turns off the previous interval even with missing approach");
+          });
+      long reverseAt = System.currentTimeMillis() + 40;
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "ui-new-reverse", reverseAt, points.get(3), "Tàu chẵn", false, List.of())),
+              route));
+      store.updateActiveFaults(store.account(), 0, reverseAt + 10, 0, List.of());
+      store.prefs.edit().putLong("lastSuccess", reverseAt + 10).commit();
+      ui(
+          () -> {
+            ((Runnable) field(activity, "refresh")).run();
+            check(
+                ((List<?>) field(routeView, "segments"))
+                    .equals(List.of(new Rules.TrackSegment(points.get(4), points.get(3), -1))),
+                "new even observation removes the old odd interval on the real canvas");
+          });
+      long delayedAt = System.currentTimeMillis() + 50;
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "ui-stale-pass",
+                      delayedAt,
+                      points.get(2),
+                      "Tàu lẻ đã qua đường ngang",
+                      false,
+                      List.of())),
+              route));
+      store.updateActiveFaults(store.account(), 0, delayedAt + 10, 0, List.of());
+      store.prefs.edit().putLong("lastSuccess", delayedAt + 10).commit();
+      ui(
+          () -> {
+            ((Runnable) field(activity, "refresh")).run();
+            check(
+                ((List<?>) field(routeView, "segments"))
+                    .equals(List.of(new Rules.TrackSegment(points.get(4), points.get(3), -1))),
+                "delayed old-direction phase does not relight a retired interval");
+            List<Rules.TrackSegment> dense = new ArrayList<>();
+            for (int i = 0; i < points.size() - 1; i++)
+              dense.add(new Rules.TrackSegment(points.get(i), points.get(i + 1), 1));
+            Field segmentField = routeView.getClass().getDeclaredField("segments");
+            segmentField.setAccessible(true);
+            Object originalSegments = segmentField.get(routeView);
+            segmentField.set(routeView, dense);
+            var bitmap =
+                android.graphics.Bitmap.createBitmap(
+                    routeView.getWidth(),
+                    routeView.getHeight(),
+                    android.graphics.Bitmap.Config.ARGB_8888);
+            try {
+              var canvas = new android.graphics.Canvas(bitmap);
+              Method draw =
+                  routeView
+                      .getClass()
+                      .getDeclaredMethod(
+                          "drawDirection",
+                          android.graphics.Canvas.class,
+                          List.class,
+                          float.class,
+                          float.class,
+                          int.class,
+                          int.class);
+              draw.setAccessible(true);
+              List<float[]> boxes = new ArrayList<>();
+              float density = activity.getResources().getDisplayMetrics().density;
+              float spacing = (routeView.getWidth() - 60 * density) / (points.size() - 1);
+              for (int i = 0; i < dense.size(); i++)
+                draw.invoke(
+                    routeView,
+                    canvas,
+                    boxes,
+                    25 * density + spacing * (i + 0.5f),
+                    50 * density,
+                    1,
+                    0xFF67D5AD);
+              boolean bounded = boxes.size() == dense.size();
+              for (int i = 0; i < boxes.size(); i++) {
+                float[] box = boxes.get(i);
+                bounded &=
+                    box[0] - box[1] >= 0
+                        && box[0] + box[1] <= routeView.getWidth()
+                        && box[3] >= 0
+                        && box[4] < 50 * density;
+                for (int j = 0; j < i; j++) {
+                  float[] previous = boxes.get(j);
+                  if (box[2] == previous[2])
+                    bounded &= Math.abs(box[0] - previous[0]) > box[1] + previous[1];
+                }
+              }
+              check(
+                  bounded,
+                  "dense direction labels stay inside the canvas without overlapping or orphan"
+                      + " arrows");
+            } finally {
+              bitmap.recycle();
+              segmentField.set(routeView, originalSegments);
+            }
+          });
       ui(
           () -> {
             AlarmSound sound = new AlarmSound();

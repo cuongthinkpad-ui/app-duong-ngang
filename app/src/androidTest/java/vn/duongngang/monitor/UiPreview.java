@@ -31,40 +31,54 @@ final class UiPreview {
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
     try {
       run(runner, activity, store, "overview");
-      shot(runner, "route-approach-0.9.png");
+      shot(runner, "route-approach-0.10.png");
       report(store, "312+111", "Tàu lẻ đã qua đường ngang");
       report(store, "312+111", "Khôi phục hệ thống");
       run(runner, activity, store, "overview");
-      shot(runner, "route-passed-0.9.png");
-      report(store, "313+456", "Tàu lẻ");
+      shot(runner, "route-passed-0.10.png");
+      // Deliberately omit the approach message: passage must still close the previous interval.
       report(store, "313+456", "Tàu lẻ đã qua đường ngang");
       run(runner, activity, store, "overview");
-      shot(runner, "route-next-0.9.png");
+      shot(runner, "route-missing-approach-0.10.png");
       report(store, "313+456", "Khôi phục hệ thống");
+      report(store, "313+456", "Tàu lẻ đã qua đường ngang");
+      run(runner, activity, store, "overview");
+      shot(runner, "route-late-phase-0.10.png");
       report(store, "313+800", "Tàu lẻ");
       report(store, "313+800", "Tàu lẻ đã qua đường ngang");
       report(store, "313+800", "Khôi phục hệ thống");
       report(store, "314+550", "Tàu lẻ");
       report(store, "314+550", "Tàu lẻ đã qua đường ngang");
       run(runner, activity, store, "overview");
-      shot(runner, "route-station-0.9.png");
+      shot(runner, "route-station-0.10.png");
       report(store, "314+550", "Khôi phục hệ thống");
       report(store, "320+445", "Tàu lẻ");
       run(runner, activity, store, "overview");
-      shot(runner, "route-from-station-0.9.png");
+      shot(runner, "route-from-station-0.10.png");
+      report(store, "320+445", "Tàu lẻ đã qua đường ngang");
+      report(store, "320+445", "Khôi phục hệ thống");
+      report(store, "320+957", "Tàu chẵn");
+      report(store, "320+957", "Tàu chẵn đã qua đường ngang");
+      report(store, "320+445", "Tàu lẻ đã qua đường ngang");
+      run(runner, activity, store, "overview");
+      shot(runner, "reverse-cleanup-0.10.png");
+      report(store, "320+445", "Tàu chẵn");
+      report(store, "320+445", "Tàu chẵn đã qua đường ngang");
+      report(store, "320+445", "Khôi phục hệ thống");
+      report(store, "320+445", "Tàu lẻ");
       report(store, "320+445", "Tàu lẻ đã qua đường ngang");
       report(store, "320+445", "Khôi phục hệ thống");
       report(store, "334+830", "Tàu chẵn");
       report(store, "334+830", "Tàu chẵn đã qua đường ngang");
       report(store, "334+830", "Khôi phục hệ thống");
       run(runner, activity, store, "incidents");
-      shot(runner, "incidents-empty-0.9.png");
+      shot(runner, "incidents-empty-0.10.png");
       report(store, "328+325", "Chuông 2 hỏng");
       report(store, "313+456", "Cần chắn 1 mất trạng thái");
       run(runner, activity, store, "overview");
-      shot(runner, "overview-0.9.png");
+      shot(runner, "overview-0.10.png");
       run(runner, activity, store, "incidents");
-      shot(runner, "incidents-0.9.png");
+      shot(runner, "incidents-0.10.png");
       run(runner, activity, store, "settings");
       runner.runOnMainSync(
           () -> {
@@ -77,7 +91,7 @@ final class UiPreview {
             }
           });
       runner.waitForIdleSync();
-      shot(runner, "settings-alarm-0.9.png");
+      shot(runner, "settings-alarm-0.10.png");
     } finally {
       runner.runOnMainSync(activity::finish);
       store.prefs.edit().clear().commit();

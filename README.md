@@ -1,10 +1,20 @@
-# Đường Ngang — Android 0.9
+# Đường Ngang — Android 0.10
 
 **Đổi phiên/tài khoản ChatGPT:** đọc [Bản bàn giao và cách tiếp tục](docs/BAN_GIAO.md) và [Nhật ký trao đổi, yêu cầu đã chốt](docs/LICH_SU_TRAO_DOI.md). [Sao lưu khóa ký APK](docs/SAO_LUU_KHOA_KY.md).
 
 Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt navy, xanh cyan và xanh lá. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
 
-## Thay đổi 0.9
+## Thay đổi 0.10
+
+- Sửa lỗi giữ các đoạn/hướng tàu cũ. Bản tin **tàu đã qua** đóng lượt ở đoạn trước và chuyển sang đoạn sau ngay khi app nhận được, kể cả khi thiếu bản tin tiếp cận ở điểm đó; không đợi khôi phục.
+- Lưu liên kết lượt giữa hai điểm và dấu kết thúc để bản tin muộn không tạo lại tàu cũ. Bằng chứng hướng ngược tại một điểm loại bỏ các đoạn cũ mâu thuẫn chạm điểm đó, giữ các tàu độc lập ở nơi khác.
+- Khi nâng cấp, tự dựng lại cache sơ đồ từ bản tin đã lưu, giữ tài khoản/cài đặt/lịch sử. Trong lúc chuyển cache chỉ ghi “Đang cập nhật sơ đồ”.
+- Gộp tên hướng và mũi tên trong một nhãn; nhiều đoạn thì rút gọn nhãn và bố trí hàng để không tách chữ/mũi tên hoặc bị cắt phía trên.
+- Đã đọc web thật và phát lại ở mốc ảnh chủ dự án gửi: thuật toán 0.9 cho 8 đoạn (5 lẻ/3 chẵn), bản sửa cho 1 đoạn chẵn. Chỉ lưu kết quả tổng hợp, không đăng dữ liệu vận hành hoặc thông tin đăng nhập.
+
+[Kiểm tra bản 0.10](docs/UI_REVIEW_0.10.md).
+
+## Thay đổi 0.9 (lịch sử)
 
 - Đổi dòng trống ở Sự cố thành **“Không có sự cố”**.
 - Mỗi lượt tàu có một đoạn sáng: tiếp cận thì sáng đoạn phía tàu đến; báo tàu đã qua thì chuyển sang đoạn phía tàu đi. Điểm trước khôi phục và điểm sau bắt đầu báo tàu đều không làm đoạn giữa hai điểm mất đi; chỉ chuyển tiếp khi tàu qua điểm sau. Ví dụ tàu lẻ: mép Bắc 312+111 → 312+111–313+456 → 313+456–313+800.

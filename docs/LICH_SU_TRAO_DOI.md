@@ -118,3 +118,13 @@ Chủ dự án nói sơ đồ 0.8 chưa đúng, đưa chuỗi cụ thể: khi 31
 Riêng đoạn giáp ga, vẫn sáng từ đường ngang hướng vào ga tới khi đường ngang khôi phục, rồi tắt; khi đường ngang nhận tàu từ ga ra thì sáng đoạn ga–đường ngang, sau đó chuyển tiếp như bình thường. Không lấy tín hiệu ga để giữ tàu trên tuyến cả ngày hoặc nối xuyên qua ga.
 
 Nguyên nhân cách vẽ trước: chỉ tô chấm khi tiếp cận và đóng đoạn chuyển tiếp ngay khi điểm sau tiếp cận. Sửa 0.9 vẽ đoạn đến/đi theo từng giai đoạn, chuyển quyền hiển thị cho lượt ở điểm sau, bỏ đoạn tiếp cận cũ đã được nối sang điểm sau. Không thay nguyên lý khôi phục phần cứng hoặc cảnh báo lỗi. Chủ dự án đã xác nhận cách hiểu và yêu cầu sửa; không cần hỏi lại trước khi xuất APK.
+
+## 14. Phản hồi ảnh thực và sửa giữ tàu cũ ở 0.10
+
+Chủ dự án gửi ảnh app lúc 04:47:01 có nhiều khoảng sáng/mũi tên hướng chồng nhau; nhật ký bên dưới là tàu chẵn nhưng sơ đồ vẫn giữ các hướng lẻ cũ. Đã thừa nhận lỗi ghép/giữ lượt tàu trong code. Chủ dự án nhấn mạnh: **khi nhận bản tin tàu đã qua đường ngang thì đoạn trước phải tắt liền và chuyển sang đoạn kế**, không chờ khôi phục.
+
+Đã tái hiện bằng kiểm tra lỗi: nếu thiếu bản tin tiếp cận ở điểm sau, code 0.9 có thể tạo đoạn mới từ bản tin đã qua mà không đóng đoạn phía trước. Ngoài ra, code xóa dấu lượt hoàn tất, nên bản tin đã qua đến muộn sau khôi phục có thể tạo lại tàu; lượt cũ trái hướng không được đóng bằng bằng chứng mới; các cảm biến kề nhau báo ngược thứ tự có thể bị coi thành hai lượt. Nhãn chữ/mũi tên vẽ riêng theo hàng không giới hạn bị chồng/cắt.
+
+Sửa 0.10 nối cả bản tin đã qua vào lượt phía trước, giữ liên kết kế tiếp/dấu hoàn tất, loại đoạn cũ mâu thuẫn khi có bằng chứng hướng ngược tại điểm liên quan và ghép báo đảo thứ tự gần nhau. Không áp dụng xóa tàu theo một đồng hồ hết hạn. Cache sơ đồ cũ được chuyển nền từ raw đã lưu, giữ tài khoản/cài đặt/lỗi. Tên hướng và mũi tên gộp chung một nhãn, rút gọn khi đông.
+
+Đã dùng tài khoản kiểm thử được cho phép để đọc web thật và so sánh phát lại cùng dữ liệu ở mốc ảnh: thuật toán 0.9 có 8 đoạn (5 lẻ/3 chẵn), thuật toán sửa còn 1 đoạn chẵn. Chỉ lưu kết quả tổng hợp vào repo; không lưu tài khoản, cookie, ảnh hoặc bản tin vận hành vào Git. Các ảnh kiểm tra 0.10 vẫn là dữ liệu tổng hợp. Xem `docs/UI_REVIEW_0.10.md` để phân biệt kiểm tra thật, mô phỏng và phần còn cần xác nhận trên Xiaomi.

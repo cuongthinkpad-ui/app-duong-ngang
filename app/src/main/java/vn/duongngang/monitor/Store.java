@@ -11,6 +11,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import org.json.*;
 
 public final class Store {
+  private static final int TRAVEL_VERSION = 2;
   private final Context context;
   public final android.content.SharedPreferences prefs;
 
@@ -178,7 +179,9 @@ public final class Store {
                 j.getLong(4),
                 j.getBoolean(5),
                 j.getBoolean(6),
-                j.getBoolean(7)));
+                j.getBoolean(7),
+                j.isNull(8) ? null : j.getString(8),
+                j.optLong(9, j.getLong(4))));
       }
     } catch (JSONException ignored) {
     }
@@ -197,12 +200,25 @@ public final class Store {
               .put(j.at())
               .put(j.passed())
               .put(j.released())
-              .put(j.reached()));
+              .put(j.reached())
+              .put(j.successorId() == null ? JSONObject.NULL : j.successorId())
+              .put(j.lastAt()));
     return list.toString();
   }
 
   public Rules.TravelState travelState() {
-    return readTravelState("travelState");
+    return travelReady() ? readTravelState("travelState") : Rules.TravelState.empty();
+  }
+
+  public boolean travelReady() {
+    return prefs.getInt("travelVersion", 0) == TRAVEL_VERSION && prefs.contains("travelState");
+  }
+
+  /** Rebuild obsolete diagram caches from raw reports, without touching credentials or faults. */
+  public void prepareTravelState(String expected, long now) {
+    synchronized (Store.class) {
+      if (account().equals(expected) && !travelReady()) updateTravelState(now);
+    }
   }
 
   /**
@@ -220,9 +236,11 @@ public final class Store {
     String topology = new JSONArray(route().points()).toString();
     long checkpointAt = prefs.getLong("travelCheckpointAt", boundary);
     Rules.TravelState checkpoint = readTravelState("travelCheckpoint");
-    if (!topology.equals(prefs.getString("travelRoute", "")) || checkpointAt > boundary) {
+    if (prefs.getInt("travelVersion", 0) != TRAVEL_VERSION
+        || !topology.equals(prefs.getString("travelRoute", ""))
+        || checkpointAt > boundary) {
       checkpointAt = boundary;
-      checkpoint = Rules.TravelState.empty();
+      checkpoint = Rules.travelState(route(), Rules.TravelState.empty(), events(0, boundary));
     }
     if (checkpointAt < boundary)
       checkpoint = Rules.travelState(route(), checkpoint, events(checkpointAt, boundary));
@@ -230,6 +248,7 @@ public final class Store {
     prefs
         .edit()
         .putString("travelRoute", topology)
+        .putInt("travelVersion", TRAVEL_VERSION)
         .putLong("travelCheckpointAt", boundary)
         .putString("travelCheckpoint", travelJson(checkpoint))
         .putString("travelState", travelJson(current))
@@ -308,6 +327,7 @@ public final class Store {
             .remove("travelCheckpoint")
             .remove("travelCheckpointAt")
             .remove("travelRoute")
+            .remove("travelVersion")
             .remove("lastFull")
             .remove("route")
             .remove("rangeFrom")

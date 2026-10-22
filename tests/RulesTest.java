@@ -752,6 +752,150 @@ public class RulesTest {
     check(
         Rules.trackSegments(actual, dual).size() == 2,
         "independent opposite trains each have one interval");
+    var missingArrival =
+        Rules.travelState(
+            line, trip, List.of(event(10000, "101+000", "Tàu lẻ đã qua đường ngang", false)));
+    oneSegment(
+        line,
+        missingArrival,
+        "101+000",
+        "102+000",
+        1,
+        "passage without destination approach still turns the previous interval off immediately");
+    var latePass =
+        Rules.travelState(
+            line,
+            Rules.TravelState.empty(),
+            List.of(
+                event(1, "100+000", "Tàu lẻ", false),
+                event(2, "101+000", "Tàu lẻ", false),
+                event(3, "100+000", "Khôi phục hệ thống", false),
+                event(4, "100+000", "Tàu lẻ đã qua đường ngang", false)));
+    oneSegment(
+        line,
+        latePass,
+        "100+000",
+        "101+000",
+        1,
+        "late passage after restoration cannot invent a second train");
+    var reverseProof =
+        Rules.travelState(line, trip, List.of(event(20000, "101+000", "Tàu chẵn", false)));
+    oneSegment(
+        line,
+        reverseProof,
+        "102+000",
+        "101+000",
+        -1,
+        "new opposite evidence retires an old contradictory interval at that crossing");
+    var inverted =
+        Rules.travelState(
+            line,
+            Rules.TravelState.empty(),
+            List.of(event(1, "101+000", "Tàu lẻ", false), event(2, "100+000", "Tàu lẻ", false)));
+    oneSegment(
+        line,
+        inverted,
+        "100+000",
+        "101+000",
+        1,
+        "reverse-ordered neighboring approaches form one train instead of two");
+    var protectedFollowing =
+        Rules.travelState(
+            line,
+            Rules.TravelState.empty(),
+            List.of(
+                event(1, "100+000", "Tàu lẻ", false),
+                event(2, "101+000", "Tàu lẻ", false),
+                event(3, "100+000", "Tàu lẻ đã qua đường ngang", false),
+                event(4, "100+000", "Khôi phục hệ thống", false),
+                event(5, "100+000", "Tàu lẻ", false)));
+    check(
+        Rules.trackSegments(line, protectedFollowing).size() == 2,
+        "explicit successor link prevents merging the following train into a claimed downstream"
+            + " visit");
+    var stalePass =
+        Rules.travelState(
+            line,
+            reverseProof,
+            List.of(event(21000, "100+000", "Tàu lẻ đã qua đường ngang", false)));
+    oneSegment(
+        line,
+        stalePass,
+        "102+000",
+        "101+000",
+        -1,
+        "delayed old-direction passage cannot resurrect a contradicted visit");
+    List<Rules.Event> replay = new ArrayList<>();
+    Rules.TravelState successive = Rules.TravelState.empty();
+    for (int run = 0; run < 24; run++) {
+      int dir = run % 2 == 0 ? 1 : -1;
+      String arrivalText = dir == 1 ? "Tàu lẻ" : "Tàu chẵn";
+      long clock = 1000000L + run * 3600000L;
+      List<String> way = new ArrayList<>(line.crossings());
+      if (dir == -1) Collections.reverse(way);
+      Rules.Event begin = event(clock, way.get(0), arrivalText, false);
+      replay.add(begin);
+      successive = Rules.travelState(line, successive, List.of(begin));
+      for (int stop = 0; stop < way.size(); stop++) {
+        clock += 30000;
+        if (stop + 1 < way.size() && run % 3 != 1) {
+          Rules.Event approaching = event(clock + 1000, way.get(stop + 1), arrivalText, false);
+          replay.add(approaching);
+          successive = Rules.travelState(line, successive, List.of(approaching));
+        }
+        Rules.Event passage =
+            event(clock + 5000, way.get(stop), arrivalText + " đã qua đường ngang", false);
+        replay.add(passage);
+        successive = Rules.travelState(line, successive, List.of(passage));
+        String target = stop + 1 < way.size() ? way.get(stop + 1) : null;
+        oneSegment(
+            line,
+            successive,
+            way.get(stop),
+            target,
+            dir,
+            "successive trip " + run + " switches only one interval at crossing " + stop);
+        List<Rules.Event> closure =
+            List.of(
+                event(clock + 10000, way.get(stop), "Khôi phục hệ thống", false),
+                event(clock + 15000, way.get(stop), arrivalText + " đã qua đường ngang", false));
+        replay.addAll(closure);
+        successive = Rules.travelState(line, successive, closure);
+        if (target == null)
+          check(
+              Rules.trackSegments(line, successive).isEmpty(),
+              "route exit stays cleared even if its passage arrives late, trip " + run);
+        else
+          oneSegment(
+              line,
+              successive,
+              way.get(stop),
+              target,
+              dir,
+              "closure and late phase cannot add a second interval, trip " + run);
+      }
+    }
+    check(
+        Rules.trackSegments(line, Rules.travelState(line, Rules.TravelState.empty(), replay))
+            .isEmpty(),
+        "two-day archive replay ends without ghost trains after 24 alternating trips");
+    Collections.reverse(replay);
+    check(
+        Rules.trackSegments(line, Rules.travelState(line, Rules.TravelState.empty(), replay))
+            .isEmpty(),
+        "shuffled archive produces the same cleared diagram");
+    check(
+        successive.journeys().size() <= line.crossings().size() * 3,
+        "completed visit records stay bounded across repeated trips");
+    var separatedVisits =
+        Rules.travelState(
+            line,
+            Rules.TravelState.empty(),
+            List.of(
+                event(1, "101+000", "Tàu lẻ", false), event(21600000, "100+000", "Tàu lẻ", false)));
+    check(
+        Rules.trackSegments(line, separatedVisits).size() == 2,
+        "out-of-order reconciliation does not merge an unrelated hours-old pending visit");
     System.out.println(scenarios + " domain scenarios passed");
   }
 }

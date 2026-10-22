@@ -84,6 +84,19 @@ public class MainActivity extends Activity {
         && !store.prefs.getString("url", "").isEmpty())
       startForegroundService(new Intent(this, MonitorService.class));
     render();
+    Store capturedStore = store;
+    String capturedAccount = capturedStore.account();
+    if (!capturedStore.travelReady())
+      io.execute(
+          () -> {
+            capturedStore.prepareTravelState(capturedAccount, System.currentTimeMillis());
+            runOnUiThread(
+                () -> {
+                  if (!isFinishing()
+                      && store == capturedStore
+                      && store.account().equals(capturedAccount)) refreshContent();
+                });
+          });
   }
 
   @Override
@@ -595,9 +608,8 @@ public class MainActivity extends Activity {
   }
 
   private Rules.TravelState diagramState() {
-    if (!demo && store.prefs.contains("travelState")) return store.travelState();
-    return Rules.travelState(
-        route(), Rules.TravelState.empty(), demo ? samples() : occupancyEvents());
+    if (!demo) return store.travelState();
+    return Rules.travelState(route(), Rules.TravelState.empty(), samples());
   }
 
   private void updateRoutePresentation() {
@@ -620,9 +632,11 @@ public class MainActivity extends Activity {
     routeNote.setText(
         demo
             ? "Minh họa"
-            : last == 0
-                ? "Chưa cập nhật từ web"
-                : (staleData() ? "Dữ liệu cũ · " : "Theo bản tin web · ") + time(last));
+            : !store.travelReady()
+                ? "Đang cập nhật sơ đồ"
+                : last == 0
+                    ? "Chưa cập nhật từ web"
+                    : (staleData() ? "Dữ liệu cũ · " : "Theo bản tin web · ") + time(last));
     routeNote.setTextColor(!demo && staleData() ? WARNING : MUTED);
   }
 
@@ -637,15 +651,14 @@ public class MainActivity extends Activity {
     routeView = new RouteView();
     List<String> points = route().points();
     renderedRoute = List.copyOf(points);
-    if (points.size() > 13) {
-      routeView.setMinimumWidth(dp(60 + 26 * (points.size() - 1)));
+    {
+      int routeWidth = dp(60 + (points.size() > 13 ? 26 : 22) * Math.max(0, points.size() - 1));
+      routeView.setMinimumWidth(routeWidth);
       HorizontalScrollView scroll = new HorizontalScrollView(this);
       scroll.setFillViewport(true);
-      scroll.addView(
-          routeView,
-          new HorizontalScrollView.LayoutParams(dp(60 + 26 * (points.size() - 1)), dp(101)));
+      scroll.addView(routeView, new HorizontalScrollView.LayoutParams(routeWidth, dp(101)));
       c.addView(scroll, new LinearLayout.LayoutParams(-1, dp(105)));
-    } else c.addView(routeView, new LinearLayout.LayoutParams(-1, dp(101)));
+    }
     routeNote = text("", 8, MUTED, false);
     routeNote.setGravity(Gravity.END);
     c.addView(routeNote);
@@ -1667,8 +1680,10 @@ public class MainActivity extends Activity {
       p.setStrokeWidth(dp(1.7f));
       p.setStrokeCap(Paint.Cap.ROUND);
       p.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-      p.setTextSize(dp(9));
-      String name = direction > 0 ? "Tàu lẻ" : "Tàu chẵn";
+      boolean compact = segments.size() > 4;
+      p.setTextSize(dp(compact ? 8 : 9));
+      String name =
+          (direction > 0 ? (compact ? "Lẻ →" : "Tàu lẻ →") : (compact ? "Chẵn ←" : "Tàu chẵn ←"));
       float half = p.measureText(name) / 2;
       float center = Math.max(half + dp(1), Math.min(getWidth() - half - dp(1), ax));
       int lane = 0;
@@ -1682,16 +1697,9 @@ public class MainActivity extends Activity {
             break;
           }
       } while (collision);
-      labels.add(new float[] {center, half, lane});
-      float arrowY = y - dp(14 + lane * 17);
-      c.drawText(name, center - half, arrowY - dp(7), p);
-      c.save();
-      c.translate(center, arrowY);
-      c.scale(direction, 1);
-      c.drawLine(-dp(6), 0, dp(5), 0, p);
-      c.drawLine(dp(1), -dp(4), dp(5), 0, p);
-      c.drawLine(dp(1), dp(4), dp(5), 0, p);
-      c.restore();
+      float baseline = y - dp(8 + lane * 11);
+      labels.add(new float[] {center, half, lane, baseline + p.ascent(), baseline + p.descent()});
+      c.drawText(name, center - half, baseline, p);
     }
   }
 

@@ -239,12 +239,83 @@ public final class RouteStoreChecks extends Instrumentation {
       check(
           Rules.betweenCrossings(store.travelState()).isEmpty(),
           "late downstream backfill consumes the checkpointed leg");
+      check(
+          store.travelState().journeys().stream()
+              .anyMatch(
+                  j ->
+                      "bridge-arrive".equals(j.id())
+                          && "bridge-late-destination".equals(j.successorId())),
+          "successor links persist across JSON and checkpoint replay");
+      // Complete the unrelated overnight fixture before the isolated migration scenario.
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "migration-old-exit",
+                      midnight - 1000,
+                      "502+200",
+                      "Khôi phục hệ thống",
+                      false,
+                      List.of())),
+              bridgeRoute));
+      int preservedEvents = store.events(0, later + 1).size();
+      String preservedFaults = store.prefs.getString("activeFaults", "[]");
+      store
+          .prefs
+          .edit()
+          .remove("travelVersion")
+          .putString("travelState", "[[\"old-ghost\",1,\"500+000\",\"501+500\",1,true,true,false]]")
+          .putString(
+              "travelCheckpoint", "[[\"old-ghost\",1,\"500+000\",\"501+500\",1,true,true,false]]")
+          .commit();
+      check(
+          !store.travelReady() && store.travelState().journeys().isEmpty(),
+          "obsolete diagram cache is not shown as current while migrating");
+      store.prepareTravelState(store.account(), later);
+      check(
+          store.travelReady()
+              && Rules.trackSegments(bridgeRoute, store.travelState())
+                  .equals(List.of(new Rules.TrackSegment("500+000", "501+500", 1)))
+              && store.events(0, later + 1).size() == preservedEvents
+              && store.prefs.getString("activeFaults", "[]").equals(preservedFaults),
+          "migration reconstructs from reports, removes old ghosts, and preserves raw/fault data");
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "migration-pass",
+                      later - 500,
+                      "501+500",
+                      "Tàu lẻ đã qua đường ngang",
+                      false,
+                      List.of())),
+              bridgeRoute));
+      store.updateActiveFaults(store.account(), later - 500, later, later - 20000, List.of());
+      check(
+          Rules.trackSegments(bridgeRoute, store.travelState())
+              .equals(List.of(new Rules.TrackSegment("501+500", "502+200", 1))),
+          "passage immediately switches a checkpointed interval after migration");
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "migration-reverse", later - 400, "502+200", "Tàu chẵn", false, List.of())),
+              bridgeRoute));
+      store.updateActiveFaults(store.account(), later - 500, later, later - 20000, List.of());
+      check(
+          Rules.trackSegments(bridgeRoute, new Store(context).travelState())
+              .equals(List.of(new Rules.TrackSegment(null, "502+200", -1))),
+          "opposite evidence removes stale cached direction across Store restart");
       store.credentials("https://other.example.test/", "account-b", "test-only");
       check(
           store.route().points().isEmpty() && store.events(0, 2000).isEmpty(),
           "new URL isolates same ID");
       check(
           !store.prefs.contains("travelState")
+              && !store.prefs.contains("travelVersion")
               && !store.prefs.contains("travelCheckpoint")
               && !store.prefs.contains("faultDay")
               && !store.prefs.contains("activeFaults")
