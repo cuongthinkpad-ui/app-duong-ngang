@@ -118,7 +118,7 @@ def main():
         ET.SubElement(root, 'string', name='user').text = 'local-fixture'
         for name, value in [('demoUi', 'false'), ('running', 'true'), ('sound', 'true')]:
             ET.SubElement(root, 'boolean', name=name, value=value)
-        ET.SubElement(root, 'int', name='interval', value='2')  # Test clock; the user UI still offers 30/120/300 only.
+        ET.SubElement(root, 'int', name='interval', value='30')  # Self-trigger detection intentionally runs only at the real 30-second setting.
         (folder/'fixture.xml').write_bytes(ET.tostring(root, encoding='utf-8'))
         def install(local, remote):
             adb('push', str(local), '/data/local/tmp/rail-e2e-file')
@@ -128,15 +128,17 @@ def main():
             adb('shell', 'run-as', PKG, 'rm', '-f', 'databases/events.db')
             adb('shell', 'settings', 'put', 'global', 'http_proxy', ':0')
             adb('shell', 'am', 'start', '-n', PKG+'/.MainActivity')
-            wait_for(lambda s: int(s.get('lastSuccess','0')) > 0, 'initial empty snapshot accepted silently')
+            empty = wait_for(lambda s: int(s.get('lastSuccess','0')) > 0, 'initial empty snapshot accepted silently')
+            assert int(empty.get('lastAlarm', '0')) == 0, 'Empty snapshot must not sound'
             phase.update(value=1, at=int(time.time())-3)
-            wait_for(lambda s: any(row[3]=='Chuông 2 hỏng' for row in faults(s)), 'original red bell message becomes active')
+            wait_for(lambda s: any(row[3]=='Chuông 2 hỏng' for row in faults(s)) and int(s.get('lastAlarm','0'))>0, 'original red bell message becomes active with app-owned audible playback')
             wait_for(lambda s: any(row[3]=='Nghi tự kích' for row in faults(s)), 'self-trigger confirmed after elapsed grace')
             notes=adb('shell','dumpsys','notification','--noredact')
             assert re.search(r'Notification\(channel=faults_sound', notes), 'Expected sound-channel notification'
             print('PASS: active alerts use sound channel', flush=True)
             phase['value']=2
             wait_for(lambda s: not faults(s) and json.loads(s.get('pendingSelf','{}'))=={}, 'late upstream evidence removes inference; explicit bell recovery clears bell')
+            last_audible = int(metadata().get('lastAlarm', '0'))
             # Change only the global sound preference; restart the same account to prove no replay.
             stop_service();adb('shell','am','force-stop',PKG)
             state_root=ET.fromstring(preferences_xml())
@@ -150,7 +152,23 @@ def main():
             wait_for(lambda s:any(row[3]=='Chuông 1 hỏng' for row in faults(s)), 'subsequent fault stays red with global sound disabled')
             notes=adb('shell','dumpsys','notification','--noredact')
             assert re.search(r'Notification\(channel=faults_silent',notes),'Expected silent-channel notification'
-            print('PASS: later fault uses silent channel; 7 monitoring checks passed',flush=True)
+            print('PASS: later fault uses silent channel', flush=True)
+            assert int(metadata().get('lastAlarm', '0')) == last_audible, 'Global mute must also suppress the app-owned player'
+            print('PASS: global mute suppresses app-owned audible playback', flush=True)
+            # Reopen with an already active fault: this was the reported silent-start bug.
+            stop_service()
+            state_root = ET.fromstring(preferences_xml())
+            for node in state_root:
+                if node.get('name') in ('sound', 'running'):
+                    node.set('value', 'true')
+                if node.get('name') == 'interval':
+                    node.set('value', '120')
+            (folder/'audible-start.xml').write_bytes(ET.tostring(state_root, encoding='utf-8'))
+            install(folder/'audible-start.xml', 'shared_prefs/monitor.xml')
+            adb('shell', 'am', 'start', '-n', PKG+'/.MainActivity')
+            wait_for(lambda s: any(row[3]=='Chuông 1 hỏng' for row in faults(s)) and int(s.get('lastAlarm','0')) > last_audible,
+                     'monitoring start sounds for an already active red fault, including at 2-minute polling')
+            print('9 monitoring checks passed', flush=True)
         finally:
             stop_service();adb('shell','am','force-stop',PKG)
             install(folder/'original.xml','shared_prefs/monitor.xml')

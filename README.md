@@ -1,8 +1,17 @@
-# Đường Ngang — Android 0.7
+# Đường Ngang — Android 0.8
 
 **Đổi phiên/tài khoản ChatGPT:** đọc [Bản bàn giao và cách tiếp tục](docs/BAN_GIAO.md) và [Nhật ký trao đổi, yêu cầu đã chốt](docs/LICH_SU_TRAO_DOI.md). [Sao lưu khóa ký APK](docs/SAO_LUU_KHOA_KY.md).
 
-Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt xanh dương. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
+Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt navy, xanh cyan và xanh lá. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
+
+## Thay đổi 0.8
+
+- Đổi Tổng quan, danh sách/chi tiết đường ngang, Sự cố và Cài đặt theo mẫu giao diện tối. Tổng quan tự chia chiều cao, cập nhật trong các khung hiện có. Thẻ tóm tắt ghi số điểm theo dõi hoặc lỗi chưa khôi phục; không kết luận thiết bị an toàn chỉ vì chưa thấy bản tin đỏ.
+- Giữ xanh đoạn **giữa hai đường ngang liền kề** khi tàu đã qua điểm trước, kể cả điểm đó đã khôi phục, cho tới khi điểm sau báo tàu cùng hướng. Không tô phần rìa ngoài hai mốc, không nối qua ga hoặc ngoài tuyến. Nhiều đoạn và hai hướng được hiển thị đồng thời; bản tin điểm sau đến trước lúc điểm trước khôi phục không làm đoạn cũ sáng trở lại.
+- **Nghi tự kích chỉ áp dụng chu kỳ 30 giây**. Chọn 2 phút/5 phút thì bỏ suy luận hiện tại và ngừng tạo suy luận mới; lỗi đỏ thật từ website vẫn được cảnh báo.
+- Thêm âm báo riêng của app cho lỗi mới và lỗi đang mở khi bắt đầu phiên theo dõi. Có nút **Thử chuông báo lỗi** trong Cài đặt; dùng âm lượng **Báo thức** của điện thoại. Tắt chuông chung giữ nguyên lỗi đỏ và dừng âm đang phát. Không có nhắc lại định kỳ.
+
+[Kiểm tra bản 0.8 và ảnh giao diện](docs/UI_REVIEW_0.8.md).
 
 ## Thay đổi 0.7
 
@@ -17,10 +26,10 @@
 
 - Nhập website, ID, mật khẩu trong Cài đặt. Tuyến được lấy từ danh sách điểm của tài khoản, sắp xếp km từ Bắc xuống Nam. Điểm có ngoặc là ga, nhãn dùng đúng chữ trong ngoặc; ga ngắt đối chiếu đường ngang liền kề ở hai phía.
 - Chọn theo dõi từ đường ngang đến đường ngang. Phạm vi lọc danh sách, sự cố và thông báo; sơ đồ vẫn giữ đủ tuyến. Đổi URL/ID xóa trạng thái của tài khoản cũ.
-- Sơ đồ hiển thị những điểm được web báo có tàu, nhiều đoạn và hai hướng đồng thời. Tàu lẻ đi tăng km, tàu chẵn đi giảm km. Cần chắn nâng không xóa chiếm dụng; bản tin “Khôi phục hệ thống” đúng điểm mới xóa. Không nội suy GPS, danh tính hoặc số đoàn tàu từ số điểm xanh.
+- Sơ đồ hiển thị điểm đang tiếp cận và đoạn chuyển tiếp sau bản tin tàu đã qua, nhiều đoạn và hai hướng đồng thời. Tàu lẻ đi tăng km, tàu chẵn đi giảm km. Trạng thái chiếm dụng thiết bị vẫn chỉ kết thúc theo “Khôi phục hệ thống”; riêng hình vẽ chuyển sang đoạn giữa hai điểm theo yêu cầu 0.8. Đoạn chuyển tiếp là suy luận từ bản tin, không phải vị trí GPS, danh tính hoặc số đoàn tàu.
 - Mọi lỗi đỏ giữ nguyên chữ trên web, gồm tên/số thiết bị. Khôi phục chỉ xóa lỗi tương ứng; khôi phục hệ thống không xóa lỗi phần cứng. Sáu nhóm chi tiết: Chuông, Đèn, Cần chắn, Cảm biến, Kết nối, Điện áp.
 - Lưu lỗi chưa khôi phục trong ngày; khối hiện tại reset ở 00:00 giờ Việt Nam, lịch sử ngày cũ vẫn tra cứu được. Chiếm dụng tàu giữ qua nửa đêm tới bản tin khôi phục đúng điểm. Sau gián đoạn qua ngày hoặc trên 24 giờ, mốc theo dõi lỗi có thể được đặt lại với “Chưa ghi nhận lỗi mới”; đây không phải bản tin thiết bị phục hồi.
-- Suy luận “Nghi tự kích” từ lượt tàu mới thiếu lượt tương ứng ở đường ngang phía trước theo hướng chạy, có chờ ít nhất một chu kỳ (tối thiểu 30 giây). Không áp dụng qua ga hay đầu/cuối tuyến. Bản tin phía trước tới muộn sẽ bỏ suy luận; bản tin gốc được giữ. Đây là suy luận theo dữ liệu web, cần đối chiếu hiện trường.
+- Ở chu kỳ **30 giây**, suy luận “Nghi tự kích” từ lượt tàu mới thiếu lượt tương ứng ở đường ngang phía trước theo hướng chạy, có chờ ít nhất một chu kỳ. Không áp dụng qua ga hay đầu/cuối tuyến, không áp dụng chu kỳ 2 phút/5 phút. Bản tin phía trước tới muộn sẽ bỏ suy luận; bản tin gốc được giữ. Đây là suy luận theo dữ liệu web, cần đối chiếu hiện trường.
 - CB1–CB6 ở bản tin khôi phục hệ thống được đối chiếu số trục theo số xuất hiện nhiều nhất. Ghi chú thừa/thiếu riêng từng CB; hòa chuẩn ghi “cảm biến đếm trục không đồng nhất, lỗi”. Không phát chuông từ ghi chú, không coi bản tin đo điện áp là số trục.
 
 ## Giao diện và thông báo
@@ -56,4 +65,4 @@ python3 scripts/test-monitoring-e2e.py
 
 APK: `app/build/outputs/apk/debug/app-debug.apk`. Script kiểm tra service chỉ chấp nhận giả lập, sao lưu/khôi phục dữ liệu ứng dụng và proxy.
 
-[Kiểm tra giao diện 0.7](docs/UI_REVIEW_0.7.md).
+[Kiểm tra giao diện 0.7](docs/UI_REVIEW_0.7.md) lưu các kiểm tra chống chớp và reset ngày trước khi đổi giao diện.

@@ -425,6 +425,147 @@ public class RulesTest {
     check(
         Rules.faultBaseline(midnight + 5000, midnight + 6000) == midnight + 5000,
         "daily boundary does not rewind a later gap baseline");
+    var line = new Rules.Route(List.of("100+000", "101+000", "102+000", "103+000"));
+    var firstTrip =
+        List.of(
+            event(1000, "100+000", "Tàu lẻ", false),
+            event(2000, "100+000", "Tàu lẻ đã qua đường ngang", false),
+            event(3000, "100+000", "Khôi phục hệ thống", false));
+    var trip = Rules.travelState(line, Rules.TravelState.empty(), firstTrip);
+    check(
+        Rules.occupancies(line, firstTrip).isEmpty() && Rules.betweenCrossings(trip).size() == 1,
+        "source restoration leaves the between-crossing leg visible");
+    check(
+        Rules.betweenCrossings(trip).get(0).from().equals("100+000")
+            && Rules.betweenCrossings(trip).get(0).to().equals("101+000"),
+        "green leg ends exactly at adjacent markers");
+    check(
+        Rules.approachingCrossings(trip).isEmpty(),
+        "passed source has no outside green approach stub");
+    var idle = Rules.travelState(line, trip, List.of());
+    check(
+        Rules.betweenCrossings(idle).size() == 1,
+        "long gap without destination report does not expire the leg");
+    var arrived = Rules.travelState(line, trip, List.of(event(10000, "101+000", "Tàu lẻ", false)));
+    check(
+        Rules.betweenCrossings(arrived).isEmpty()
+            && Rules.approachingCrossings(arrived).get(0).crossing().equals("101+000"),
+        "destination arrival replaces leg with destination marker");
+    var next =
+        Rules.travelState(
+            line, arrived, List.of(event(11000, "101+000", "Tàu lẻ đã qua đường ngang", false)));
+    check(
+        Rules.betweenCrossings(next).size() == 1
+            && Rules.betweenCrossings(next).get(0).from().equals("101+000")
+            && Rules.betweenCrossings(next).get(0).to().equals("102+000"),
+        "passing next crossing moves continuity only to its next interval");
+    var reverse =
+        Rules.travelState(
+            line,
+            Rules.TravelState.empty(),
+            List.of(
+                event(1, "103+000", "Tàu chẵn", false),
+                event(2, "103+000", "Tàu chẵn đã qua đường ngang", false),
+                event(3, "103+000", "Khôi phục hệ thống", false)));
+    check(
+        Rules.betweenCrossings(reverse).get(0).to().equals("102+000")
+            && Rules.betweenCrossings(reverse).get(0).direction() == -1,
+        "even train continues towards lower chainage");
+    var stationLine = new Rules.Route(List.of("100+000", "101+000 (Ga)", "102+000"));
+    check(
+        Rules.betweenCrossings(Rules.travelState(stationLine, Rules.TravelState.empty(), firstTrip))
+            .isEmpty(),
+        "station stops forward continuity");
+    check(
+        Rules.betweenCrossings(
+                Rules.travelState(
+                    stationLine,
+                    Rules.TravelState.empty(),
+                    List.of(
+                        event(1, "102+000", "Tàu chẵn", false),
+                        event(2, "102+000", "Tàu chẵn đã qua đường ngang", false))))
+            .isEmpty(),
+        "station stops reverse continuity");
+    check(
+        Rules.betweenCrossings(
+                Rules.travelState(
+                    line,
+                    Rules.TravelState.empty(),
+                    List.of(
+                        event(1, "103+000", "Tàu lẻ", false),
+                        event(2, "103+000", "Tàu lẻ đã qua đường ngang", false))))
+            .isEmpty(),
+        "route end does not project outside the last crossing");
+    var overlapping =
+        Rules.travelState(
+            line,
+            Rules.TravelState.empty(),
+            List.of(
+                event(1, "100+000", "Tàu lẻ", false), event(2, "101+000", "Tàu lẻ", false),
+                event(3, "100+000", "Tàu lẻ đã qua đường ngang", false),
+                    event(4, "100+000", "Khôi phục hệ thống", false)));
+    check(
+        Rules.betweenCrossings(overlapping).isEmpty(),
+        "early downstream approach prevents phantom reopening after source passage");
+    var both = new ArrayList<>(firstTrip);
+    both.add(event(1001, "103+000", "Tàu chẵn", false));
+    both.add(event(2001, "103+000", "Tàu chẵn đã qua đường ngang", false));
+    check(
+        Rules.betweenCrossings(Rules.travelState(line, Rules.TravelState.empty(), both)).size()
+            == 2,
+        "multiple trains on different intervals remain visible together");
+    var following = new ArrayList<>(firstTrip);
+    following.add(event(4000, "100+000", "Tàu lẻ", false));
+    following.add(event(5000, "100+000", "Tàu lẻ đã qua đường ngang", false));
+    following.add(event(6000, "100+000", "Khôi phục hệ thống", false));
+    var followingState = Rules.travelState(line, Rules.TravelState.empty(), following);
+    var once =
+        Rules.travelState(line, followingState, List.of(event(7000, "101+000", "Tàu lẻ", false)));
+    check(
+        Rules.betweenCrossings(once).size() == 1,
+        "one downstream arrival consumes only one of two pending trains");
+    check(
+        Rules.betweenCrossings(
+                Rules.travelState(line, once, List.of(event(8000, "101+000", "Tàu lẻ", false))))
+            .isEmpty(),
+        "second downstream arrival consumes the remaining pending train");
+    var shuffled = new ArrayList<>(both);
+    Collections.reverse(shuffled);
+    check(
+        Rules.travelState(line, Rules.TravelState.empty(), both)
+            .equals(Rules.travelState(line, Rules.TravelState.empty(), shuffled)),
+        "late and out-of-order records replay chronologically");
+    check(
+        Rules.betweenCrossings(
+                Rules.travelState(
+                    line,
+                    Rules.TravelState.empty(),
+                    List.of(event(1, "100+000", "Khôi phục hệ thống", false))))
+            .isEmpty(),
+        "restoration without a train direction never invents a leg");
+    check(
+        Rules.betweenCrossings(
+                    Rules.travelState(
+                        line,
+                        Rules.TravelState.empty(),
+                        List.of(
+                            event(1, "100+000", "Tàu lẻ", false),
+                            event(2, "100+000", "Khôi phục hệ thống", false))))
+                .size()
+            == 1,
+        "known arrival plus restoration maintains continuity if passage message is missing");
+    check(
+        Rules.betweenCrossings(
+                    Rules.travelState(
+                        line,
+                        Rules.TravelState.empty(),
+                        List.of(event(1, "100+000", "Tàu lẻ đã qua đường ngang", false))))
+                .size()
+            == 1,
+        "explicit directional passage can seed continuity without an earlier arrival");
+    check(Rules.selfTriggerEnabled(30), "self-trigger inference enabled at 30 seconds");
+    check(!Rules.selfTriggerEnabled(120), "self-trigger inference disabled at two minutes");
+    check(!Rules.selfTriggerEnabled(300), "self-trigger inference disabled at five minutes");
     System.out.println(scenarios + " domain scenarios passed");
   }
 }

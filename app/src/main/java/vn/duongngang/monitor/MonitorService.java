@@ -13,6 +13,8 @@ public class MonitorService extends Service {
   private ScheduledExecutorService worker;
   private PowerManager.WakeLock wake;
   private Store store;
+  private final AlarmSound alarm = new AlarmSound();
+  private final Set<String> ringingFaults = ConcurrentHashMap.newKeySet();
   private final Handler dailyHandler = new Handler(Looper.getMainLooper());
   private final Runnable dailyReset =
       () -> {
@@ -28,6 +30,10 @@ public class MonitorService extends Service {
     for (var notification : manager.getActiveNotifications())
       if (notification.getId() != 1 && !open.contains(notification.getId()))
         manager.cancel(notification.getId());
+    Set<String> current = new HashSet<>();
+    for (var fault : store.activeFaults()) current.add(fault.id());
+    ringingFaults.retainAll(current);
+    if (ringingFaults.isEmpty()) alarm.stop();
     sendBroadcast(new Intent(UPDATE).setPackage(getPackageName()));
   }
 
@@ -70,6 +76,12 @@ public class MonitorService extends Service {
 
   @Override
   public int onStartCommand(Intent intent, int flags, int id) {
+    if (intent != null && "MUTE_ALARM".equals(intent.getAction())) {
+      alarm.stop();
+      ringingFaults.clear();
+      if (worker == null) stopSelf();
+      return worker == null ? START_NOT_STICKY : START_STICKY;
+    }
     if ((intent == null && !store.prefs.getBoolean("running", false))
         || (intent != null && "STOP".equals(intent.getAction()))) {
       stopSelf();
@@ -170,20 +182,24 @@ public class MonitorService extends Service {
         List<Rules.Event> cached = store.events(Math.max(previousStart, coverage), now + 1);
         List<Rules.Event> original = new ArrayList<>();
         for (var event : cached) if (!Rules.isSelfTrigger(event)) original.add(event);
-        var candidates = Rules.suspectedSelfTriggers(data.route(), original, coverage);
+        boolean detectSelf = Rules.selfTriggerEnabled(store.prefs.getInt("interval", 30));
+        List<Rules.Event> candidates =
+            detectSelf ? Rules.suspectedSelfTriggers(data.route(), original, coverage) : List.of();
         Set<String> candidateIds = new HashSet<>();
         for (var event : candidates) candidateIds.add(event.id());
         List<String> disproved = new ArrayList<>();
         for (var event : cached)
-          if (Rules.isSelfTrigger(event) && !candidateIds.contains(event.id().substring(5)))
-            disproved.add(event.id());
+          if (Rules.isSelfTrigger(event)
+              && !candidateIds.contains(event.id().substring(5))
+              && (detectSelf || event.at() >= dayStart)) disproved.add(event.id());
         store.discardInferences(account, disproved);
-        Map<String, Long> pending = last == 0 || reset ? new HashMap<>() : store.pendingSelf();
+        Map<String, Long> pending =
+            last == 0 || reset || !detectSelf ? new HashMap<>() : store.pendingSelf();
         Set<String> freshArrivals = new HashSet<>();
         for (var event : added)
           if (Rules.direction(event.text()) != 0) freshArrivals.add(event.id());
         List<Rules.Event> eligible = new ArrayList<>();
-        if (last > 0 && !reset)
+        if (detectSelf && last > 0 && !reset)
           for (var candidate : candidates)
             if (freshArrivals.contains(candidate.id()) || pending.containsKey(candidate.id()))
               eligible.add(candidate);
@@ -213,11 +229,30 @@ public class MonitorService extends Service {
         for (var notification : manager.getActiveNotifications())
           if (notification.getId() != 1 && !notificationIds.contains(notification.getId()))
             manager.cancel(notification.getId());
+        ringingFaults.retainAll(open);
+        if (ringingFaults.isEmpty() || !store.prefs.getBoolean("sound", true)) alarm.stop();
+        boolean audibleNew = false;
         if (last > 0 && !reset)
           for (var event : added)
             if (event.red()
                 && open.contains(event.id())
-                && notificationIds.contains(notificationId(event))) notifyFault(event);
+                && (detectSelf || !Rules.isSelfTrigger(event))
+                && notificationIds.contains(notificationId(event))) {
+              notifyFault(event);
+              ringingFaults.add(event.id());
+              audibleNew = true;
+            }
+        // A newly started monitoring session must also sound for current, unresolved faults.
+        // Merely returning to an already-running Activity does not replay old alerts.
+        if (firstPoll)
+          for (var event : active)
+            if (notificationIds.contains(notificationId(event))
+                && (detectSelf || !Rules.isSelfTrigger(event))) {
+              ringingFaults.add(event.id());
+              audibleNew = true;
+            }
+        if (audibleNew && store.prefs.getBoolean("sound", true) && alarm.play(this))
+          store.prefs.edit().putLong("lastAlarm", now).apply();
         firstPoll = false;
         var preferences =
             store
@@ -272,6 +307,8 @@ public class MonitorService extends Service {
   @Override
   public void onDestroy() {
     dailyHandler.removeCallbacks(dailyReset);
+    alarm.stop();
+    ringingFaults.clear();
     if (worker != null) worker.shutdownNow();
     if (wake != null && wake.isHeld()) wake.release();
     store.prefs.edit().putBoolean("running", false).apply();

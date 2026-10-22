@@ -8,7 +8,7 @@ import java.util.List;
 /** No test dependencies. Uses a separate device-protected sandbox, never the app's normal data. */
 public final class RouteStoreChecks extends Instrumentation {
   private int checks;
-  private boolean uiMode;
+  private boolean uiMode, previewMode;
 
   private void check(boolean result, String message) {
     checks++;
@@ -18,12 +18,25 @@ public final class RouteStoreChecks extends Instrumentation {
   @Override
   public void onCreate(Bundle arguments) {
     super.onCreate(arguments);
+    previewMode = arguments != null && "preview".equals(arguments.getString("mode"));
     uiMode = arguments != null && "ui".equals(arguments.getString("mode"));
     start();
   }
 
   @Override
   public void onStart() {
+    if (previewMode) {
+      Bundle result = new Bundle();
+      try {
+        UiPreview.capture(this);
+        result.putString("stream", "Synthetic UI previews captured\n");
+        finish(-1, result);
+      } catch (Throwable failure) {
+        result.putString("stream", "FAILED: " + failure + "\n");
+        finish(0, result);
+      }
+      return;
+    }
     if (uiMode) {
       Bundle result = new Bundle();
       try {
@@ -175,12 +188,65 @@ public final class RouteStoreChecks extends Instrumentation {
       check(
           store.pendingSelf().containsKey("new-case"),
           "same-day reset is idempotent and retains new pending inference");
+      var bridgeRoute = new Rules.Route(List.of("500+000", "501+500", "502+200"));
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "bridge-arrive", midnight + 10000, "500+000", "Tàu lẻ", false, List.of()),
+                  new Rules.Event(
+                      "bridge-pass",
+                      midnight + 11000,
+                      "500+000",
+                      "Tàu lẻ đã qua đường ngang",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "bridge-restore",
+                      midnight + 12000,
+                      "500+000",
+                      "Khôi phục hệ thống",
+                      false,
+                      List.of())),
+              bridgeRoute));
+      store.updateActiveFaults(store.account(), midnight, midnight + 20000, midnight, List.of());
+      check(
+          Rules.betweenCrossings(store.travelState()).size() == 1,
+          "travel cache survives source restoration");
+      long later = midnight + 3 * 86400000L + 20000;
+      store.updateActiveFaults(store.account(), later, later, later - 20000, List.of());
+      check(
+          Rules.betweenCrossings(new Store(context).travelState()).size() == 1,
+          "checkpoint preserves travel beyond two-day replay and across Store restart");
+      store.resetDailyFaults(later);
+      check(
+          Rules.betweenCrossings(store.travelState()).size() == 1,
+          "fault midnight reset does not erase between-crossing travel");
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "bridge-late-destination",
+                      midnight + 2 * 86400000L + 5000,
+                      "501+500",
+                      "Tàu lẻ",
+                      false,
+                      List.of())),
+              bridgeRoute));
+      store.updateActiveFaults(store.account(), later, later, later - 20000, List.of());
+      check(
+          Rules.betweenCrossings(store.travelState()).isEmpty(),
+          "late downstream backfill consumes the checkpointed leg");
       store.credentials("https://other.example.test/", "account-b", "test-only");
       check(
           store.route().points().isEmpty() && store.events(0, 2000).isEmpty(),
           "new URL isolates same ID");
       check(
-          !store.prefs.contains("faultDay")
+          !store.prefs.contains("travelState")
+              && !store.prefs.contains("travelCheckpoint")
+              && !store.prefs.contains("faultDay")
               && !store.prefs.contains("activeFaults")
               && !store.prefs.contains("occupiedPoints")
               && !store.prefs.contains("pendingSelf")

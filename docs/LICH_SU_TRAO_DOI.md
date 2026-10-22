@@ -94,3 +94,17 @@ Khóa riêng dùng ký APK cũng cần sao lưu riêng ngoài cloud để tài k
 ## 11. Chuẩn bị sao lưu khóa ký
 
 Chủ dự án hỏi ý nghĩa khóa ký và cần làm gì để giữ khả năng cập nhật khi đổi tài khoản/môi trường. Đã giải thích: app đã cài vẫn dùng được; khóa cũ cần cho bản APK mới cài đè. Sau đó đã chuẩn bị bản sao mã hóa, mật khẩu ngẫu nhiên riêng, công cụ/hướng dẫn khôi phục và kiểm chứng khôi phục đúng khóa/chứng chỉ, từ chối mật khẩu sai/nội dung bị sửa. Tệp khóa, bản mã và mật khẩu ở ngoài Git, giao riêng cho chủ dự án để tải về; chỉ công cụ và hướng dẫn vào repo. Chưa xác nhận chủ dự án đã lưu ra máy/ổ riêng. Xem `docs/SAO_LUU_KHOA_KY.md`.
+
+## 12. Các yêu cầu đưa vào 0.8
+
+Chủ dự án gửi năm ảnh giao diện phòng điều độ tối, muốn đổi màu và bố trí tương tự nhưng giữ bố cục gọn đã chốt. Dùng nền navy, thẻ xanh xám, điều khiển cyan, tàu xanh mint, lỗi đỏ trầm ở Tổng quan, danh sách/chi tiết, Sự cố, Cài đặt. Thẻ tổng hợp không được suy ra “an toàn” chỉ từ việc chưa ghi nhận lỗi.
+
+Về sơ đồ, chủ dự án phản hồi hai đường ngang cách xa: điểm trước đã khôi phục mà điểm sau chưa có tàu làm tàu biến mất. Yêu cầu mới là giữ sáng **khoảng giữa hai đường ngang liền kề**, không tính qua ga. Khi có bản tin tàu đã qua điểm trước, chỉ sáng khoảng giữa hai điểm, bỏ phần rìa ngoài hai phía. Bản 0.8 lưu lượt chuyển tiếp, chỉ đóng khi điểm sau báo tàu cùng hướng; giữ sau khôi phục điểm trước và qua nửa đêm/khởi động lại. Nếu điểm sau đã báo trước lúc điểm trước khôi phục thì không làm đoạn cũ sáng lại. Đây là suy luận theo sự kiện web, không phải định vị GPS. Trạng thái chiếm dụng thiết bị vẫn là quy tắc cũ, cách biểu diễn trên sơ đồ là yêu cầu mới.
+
+Chủ dự án hỏi cài bản mới có cần app gốc: mỗi APK là bộ cài đầy đủ, cài mới trực tiếp được; cùng chữ ký và applicationId thì cài đè giữ cấu hình. Tiếp tục dùng khóa cũ cho 0.8.
+
+Chủ dự án yêu cầu **chỉ cảnh báo tự kích khi chọn chu kỳ 30 giây** vì các chu kỳ dài khiến suy luận báo sai nhiều. Chọn 2 phút/5 phút thì ngừng suy luận, bỏ pending/suy luận hiện tại trong ngày, không xóa dòng đỏ gốc hoặc lịch sử ngày cũ. Những lỗi đỏ từ web vẫn phát cảnh báo theo lựa chọn âm thanh.
+
+Chủ dự án nói app có biểu tượng chuông, có thông báo nhưng **mở app, có lỗi vẫn không nghe tiếng chuông**. Bản 0.8 thêm player phát âm báo riêng thay vì chỉ phụ thuộc tiếng thông báo hệ thống: một chime 6 giây cho lỗi mới, và lỗi đang mở khi bắt đầu phiên theo dõi; không nhắc lại định kỳ. Tắt chuông chung dừng âm đang phát, giữ đỏ. Có “Thử chuông báo lỗi” trong Cài đặt, dùng mức âm lượng Báo thức. Kiểm tra player trên giả lập không chứng minh loa Xiaomi đã kêu; cần chủ dự án thử trên máy thật.
+
+Biên bản kiểm tra và ảnh chỉ dùng dữ liệu tổng hợp ở `docs/UI_REVIEW_0.8.md`. Không đăng ảnh vận hành hoặc tài khoản thử.

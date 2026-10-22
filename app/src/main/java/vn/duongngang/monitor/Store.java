@@ -158,8 +158,82 @@ public final class Store {
           .putString("activeFaults", list.toString())
           .putString("occupiedPoints", points.toString())
           .apply();
+      updateTravelState(now);
       return active;
     }
+  }
+
+  private Rules.TravelState readTravelState(String key) {
+    List<Rules.Journey> result = new ArrayList<>();
+    try {
+      JSONArray list = new JSONArray(prefs.getString(key, "[]"));
+      for (int i = 0; i < list.length(); i++) {
+        JSONArray j = list.getJSONArray(i);
+        result.add(
+            new Rules.Journey(
+                j.getString(0),
+                j.getString(1),
+                j.isNull(2) ? null : j.getString(2),
+                j.getInt(3),
+                j.getLong(4),
+                j.getBoolean(5),
+                j.getBoolean(6),
+                j.getBoolean(7)));
+      }
+    } catch (JSONException ignored) {
+    }
+    return new Rules.TravelState(result);
+  }
+
+  private String travelJson(Rules.TravelState state) {
+    JSONArray list = new JSONArray();
+    for (Rules.Journey j : state.journeys())
+      list.put(
+          new JSONArray()
+              .put(j.id())
+              .put(j.from())
+              .put(j.to() == null ? JSONObject.NULL : j.to())
+              .put(j.direction())
+              .put(j.at())
+              .put(j.passed())
+              .put(j.released())
+              .put(j.reached()));
+    return list.toString();
+  }
+
+  public Rules.TravelState travelState() {
+    return readTravelState("travelState");
+  }
+
+  /**
+   * A rolling checkpoint preserves long intervals and permits backfills within the last two days.
+   */
+  private void updateTravelState(long now) {
+    long boundary =
+        java.time.Instant.ofEpochMilli(now)
+            .atZone(WebSource.ZONE)
+            .toLocalDate()
+            .minusDays(1)
+            .atStartOfDay(WebSource.ZONE)
+            .toInstant()
+            .toEpochMilli();
+    String topology = new JSONArray(route().points()).toString();
+    long checkpointAt = prefs.getLong("travelCheckpointAt", boundary);
+    Rules.TravelState checkpoint = readTravelState("travelCheckpoint");
+    if (!topology.equals(prefs.getString("travelRoute", "")) || checkpointAt > boundary) {
+      checkpointAt = boundary;
+      checkpoint = Rules.TravelState.empty();
+    }
+    if (checkpointAt < boundary)
+      checkpoint = Rules.travelState(route(), checkpoint, events(checkpointAt, boundary));
+    Rules.TravelState current = Rules.travelState(route(), checkpoint, events(boundary, now + 1));
+    prefs
+        .edit()
+        .putString("travelRoute", topology)
+        .putLong("travelCheckpointAt", boundary)
+        .putString("travelCheckpoint", travelJson(checkpoint))
+        .putString("travelState", travelJson(current))
+        .apply();
   }
 
   /** Clear the current fault panel at Vietnamese midnight; retain archive and train occupation. */
@@ -230,6 +304,10 @@ public final class Store {
             .remove("pendingSelf")
             .remove("activeFaults")
             .remove("occupiedPoints")
+            .remove("travelState")
+            .remove("travelCheckpoint")
+            .remove("travelCheckpointAt")
+            .remove("travelRoute")
             .remove("lastFull")
             .remove("route")
             .remove("rangeFrom")

@@ -189,6 +189,133 @@ final class UiRefreshChecks {
                   "same route view shows updated train direction/release at interval " + interval);
             });
       }
+      ui(
+          () -> {
+            android.graphics.drawable.ColorDrawable background =
+                (android.graphics.drawable.ColorDrawable) root.getBackground();
+            check(
+                background.getColor() == 0xFF0C1220,
+                "overview uses requested dark navy background");
+            check(
+                field(activity, "summaryCard") != null && !labels(root).contains("AN TOÀN"),
+                "summary presents monitored data without asserting physical safety");
+          });
+      long transitAt = System.currentTimeMillis();
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "ui-leg-arrival", transitAt, points.get(0), "Tàu lẻ", false, List.of()),
+                  new Rules.Event(
+                      "ui-leg-passed",
+                      transitAt + 1,
+                      points.get(0),
+                      "Tàu lẻ đã qua đường ngang",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "ui-leg-restored",
+                      transitAt + 2,
+                      points.get(0),
+                      "Khôi phục hệ thống",
+                      false,
+                      List.of())),
+              route));
+      store.updateActiveFaults(store.account(), 0, transitAt + 10, 0, List.of());
+      store.prefs.edit().putLong("lastSuccess", transitAt + 10).commit();
+      ui(
+          () -> {
+            ((Runnable) field(activity, "refresh")).run();
+            var legs = (java.util.List<?>) field(routeView, "between");
+            check(
+                legs.size() == 1 && ((int[]) field(routeView, "occupied"))[0] == 0,
+                "restored source leaves interval green without outside source occupation");
+            check(
+                field(activity, "routeView") == routeView && field(activity, "screen") == root,
+                "between-crossing update retains the same canvas and window");
+          });
+      long arrivedAt = System.currentTimeMillis() + 10;
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "ui-leg-destination", arrivedAt, points.get(1), "Tàu lẻ", false, List.of())),
+              route));
+      store.updateActiveFaults(store.account(), 0, arrivedAt + 10, 0, List.of());
+      store.prefs.edit().putLong("lastSuccess", arrivedAt + 10).commit();
+      ui(
+          () -> {
+            ((Runnable) field(activity, "refresh")).run();
+            check(
+                ((java.util.List<?>) field(routeView, "between")).isEmpty()
+                    && ((int[]) field(routeView, "occupied"))[1] == 1,
+                "destination arrival replaces the interval on the existing diagram");
+          });
+      long passedAt = System.currentTimeMillis() + 20;
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "ui-next-leg",
+                      passedAt,
+                      points.get(1),
+                      "Tàu lẻ đã qua đường ngang",
+                      false,
+                      List.of())),
+              route));
+      store.updateActiveFaults(store.account(), 0, passedAt + 10, 0, List.of());
+      store.prefs.edit().putLong("lastSuccess", passedAt + 10).commit();
+      ui(
+          () -> {
+            ((Runnable) field(activity, "refresh")).run();
+            var legs = (java.util.List<?>) field(routeView, "between");
+            check(
+                legs.size() == 1
+                    && ((Rules.Between) legs.get(0)).from().equals(points.get(1))
+                    && ((Rules.Between) legs.get(0)).to().equals(points.get(2)),
+                "only the next bounded interval lights after destination passage");
+          });
+      ui(
+          () -> {
+            AlarmSound sound = new AlarmSound();
+            try {
+              check(
+                  sound.play(activity) && sound.isPlaying(),
+                  "app alarm starts an actual audio player");
+            } finally {
+              sound.stop();
+            }
+            check(!sound.isPlaying(), "alarm can be stopped and released");
+          });
+      store.prefs.edit().putInt("interval", 120).commit();
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "self:ui-disabled",
+                      System.currentTimeMillis(),
+                      points.get(0),
+                      "Nghi tự kích",
+                      true,
+                      List.of())),
+              route));
+      store.updateActiveFaults(store.account(), 0, System.currentTimeMillis() + 10, 0, List.of());
+      ui(
+          () -> {
+            Method active = MainActivity.class.getDeclaredMethod("activeFaults");
+            active.setAccessible(true);
+            var faultsShown = (java.util.List<?>) active.invoke(activity);
+            check(
+                faultsShown.stream().noneMatch(e -> Rules.isSelfTrigger((Rules.Event) e)),
+                "slower polling hides self-trigger inference while retaining actual website"
+                    + " faults");
+          });
+      store.discardInferences(store.account(), List.of("self:ui-disabled"));
+      store.prefs.edit().putInt("interval", 30).commit();
       ui(() -> navigate("incidents"));
       ui(
           () -> {

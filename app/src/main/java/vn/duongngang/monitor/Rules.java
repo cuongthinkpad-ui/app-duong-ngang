@@ -153,6 +153,138 @@ public final class Rules {
     return result;
   }
 
+  public static int passedDirection(String text) {
+    String t = text.toLowerCase(Locale.ROOT).trim().replaceAll("\\s+", " ");
+    if (t.equals("tàu lẻ đã qua đường ngang")) return 1;
+    if (t.equals("tàu chẵn đã qua đường ngang")) return -1;
+    return 0;
+  }
+
+  /** One source arrival, kept until both source release and downstream arrival are known. */
+  public record Journey(
+      String id,
+      String from,
+      String to,
+      int direction,
+      long at,
+      boolean passed,
+      boolean released,
+      boolean reached) {}
+
+  public record TravelState(List<Journey> journeys) {
+    public TravelState {
+      journeys = List.copyOf(journeys);
+    }
+
+    public static TravelState empty() {
+      return new TravelState(List.of());
+    }
+  }
+
+  public record Between(String from, String to, int direction, long at) {}
+
+  public static List<Between> betweenCrossings(TravelState state) {
+    Map<String, Between> result = new LinkedHashMap<>();
+    for (Journey j : state.journeys())
+      if (j.passed() && !j.reached() && j.to() != null) {
+        String key = j.from() + "|" + j.to() + "|" + j.direction();
+        result.put(key, new Between(j.from(), j.to(), j.direction(), j.at()));
+      }
+    return new ArrayList<>(result.values());
+  }
+
+  public static List<Occupancy> approachingCrossings(TravelState state) {
+    List<Occupancy> result = new ArrayList<>();
+    for (Journey j : state.journeys())
+      if (!j.passed() && !j.released()) result.add(new Occupancy(j.from(), j.direction(), j.at()));
+    return result;
+  }
+
+  private static Journey replaceJourney(
+      Journey j, boolean passed, boolean released, boolean reached) {
+    return new Journey(j.id(), j.from(), j.to(), j.direction(), j.at(), passed, released, reached);
+  }
+
+  /**
+   * Carries a train between adjacent crossings after its passage, through source restoration. An
+   * early downstream approach consumes the corresponding transfer before source passage, so
+   * overlapping detection zones cannot reopen an already completed transfer. A station always
+   * breaks the link. This is event-based continuity, not GPS interpolation.
+   */
+  public static TravelState travelState(Route route, TravelState initial, List<Event> input) {
+    List<Event> ordered = new ArrayList<>(input);
+    ordered.sort(
+        Comparator.comparingLong(Event::at)
+            .thenComparingInt(
+                e -> direction(e.text()) != 0 ? 0 : passedDirection(e.text()) != 0 ? 1 : 2)
+            .thenComparingLong(
+                e ->
+                    isPoint(e.crossing())
+                        ? chainage(km(e.crossing())) * (direction(e.text()) == -1 ? -1 : 1)
+                        : 0)
+            .thenComparing(Event::id));
+    Map<String, Journey> journeys = new LinkedHashMap<>();
+    for (Journey j : initial.journeys())
+      if (route.crossings().contains(j.from())
+          && Objects.equals(j.to(), route.upstream(j.from(), -j.direction())))
+        journeys.put(j.id(), j);
+    Set<String> seen = new HashSet<>();
+    for (Event e : ordered) {
+      String point = km(e.crossing());
+      if (e.red() || !seen.add(e.id()) || !route.crossings().contains(point)) continue;
+      int d = direction(e.text()), passed = passedDirection(e.text());
+      if (d != 0) {
+        Journey previous = null;
+        for (Journey j : journeys.values())
+          if (point.equals(j.to())
+              && j.direction() == d
+              && !j.reached()
+              && j.at() <= e.at()
+              && (previous == null || j.at() < previous.at())) previous = j;
+        if (previous != null) {
+          if (previous.released()) journeys.remove(previous.id());
+          else
+            journeys.put(previous.id(), replaceJourney(previous, previous.passed(), false, true));
+        }
+        // A new arrival supersedes the current source session, but a pending outgoing leg survives.
+        List<Journey> old = new ArrayList<>(journeys.values());
+        for (Journey j : old)
+          if (j.from().equals(point) && !j.released()) {
+            if (j.reached() || !j.passed()) journeys.remove(j.id());
+            else journeys.put(j.id(), replaceJourney(j, true, true, false));
+          }
+        journeys.put(
+            e.id(),
+            new Journey(e.id(), point, route.upstream(point, -d), d, e.at(), false, false, false));
+      } else if (passed != 0 || e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")) {
+        Journey current = null;
+        for (Journey j : journeys.values())
+          if (j.from().equals(point)
+              && !j.released()
+              && j.at() <= e.at()
+              && (passed == 0 || j.direction() == passed)
+              && (current == null || j.at() > current.at())) current = j;
+        if (current == null && passed != 0)
+          current =
+              new Journey(
+                  e.id(),
+                  point,
+                  route.upstream(point, -passed),
+                  passed,
+                  e.at(),
+                  true,
+                  false,
+                  false);
+        if (current == null) continue; // A restoration alone cannot establish a direction.
+        boolean released = passed == 0;
+        Journey next = replaceJourney(current, true, released, current.reached());
+        if (released && (next.reached() || next.to() == null)) journeys.remove(next.id());
+        else journeys.put(next.id(), next);
+      }
+    }
+    return new TravelState(new ArrayList<>(journeys.values()));
+  }
+
   public static String axleNote(Event event) {
     return event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
         ? axleNote(event.counts())
@@ -210,6 +342,10 @@ public final class Rules {
           && e.at() <= current.at()
           && e.at() >= current.at() - travelWindow) return false;
     return true;
+  }
+
+  public static boolean selfTriggerEnabled(int intervalSeconds) {
+    return intervalSeconds == 30;
   }
 
   public static boolean isSelfTrigger(Event event) {
