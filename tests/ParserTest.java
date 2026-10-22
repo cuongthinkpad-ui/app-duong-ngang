@@ -76,7 +76,7 @@ public class ParserTest {
     var eventRoute = new Rules.Route(List.of("328+325", "330+00 (YX)"));
     var snapshot = new WebSource.DayData(parsed, eventRoute);
     if (snapshot.events().size() != 1) throw new AssertionError("valid route snapshot");
-    String original = "Chuông cảnh báo số 2 mất trạng thái";
+    String original = "Chuông cảnh báo số 2 hỏng";
     var bell =
         WebSource.parse(
             Jsoup.parse(html.replace("Điện áp cảm biến 6 &lt; 5V", original)),

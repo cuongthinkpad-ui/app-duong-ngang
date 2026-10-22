@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""Exercise the real Android service against a local fixture, only on an emulator.
+
+Preserves/restores the emulator app's data and proxy. Never contacts the company web,
+never prints credentials. Build/install the debug APK and start an emulator first.
+"""
+import json, os, pathlib, re, subprocess, tempfile, threading, time
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs
+
+ADB = os.environ.get('ADB', '/workspace/toolchains/android-sdk/platform-tools/adb')
+PKG = 'vn.duongngang.monitor'
+
+def adb(*args, binary=False):
+    result = subprocess.run([ADB, *args], check=True, capture_output=True, timeout=45)
+    return result.stdout if binary else result.stdout.decode(errors='replace')
+
+def stop_service():
+    # Shell cannot stop the non-exported service directly on every Android image.
+    # This helper runs only after the emulator guard, and stops the whole test app.
+    adb('shell', 'am', 'force-stop', PKG)
+
+def preferences_xml():
+    for attempt in range(8):
+        raw = adb('exec-out', 'run-as', PKG, 'cat', 'shared_prefs/monitor.xml', binary=True)
+        try:
+            ET.fromstring(raw)
+            return raw
+        except ET.ParseError:
+            # Retry an empty ADB read or an atomic settings-file replacement.
+            if attempt == 7:
+                raise
+            time.sleep(0.3)
+
+def metadata():
+    root = ET.fromstring(preferences_xml())
+    return {e.get('name'): e.get('value', e.text or '') for e in root}
+
+def wait_for(predicate, label, timeout=110):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        state = metadata()
+        if predicate(state):
+            print('PASS:', label, flush=True)
+            return state
+        time.sleep(1)
+    raise AssertionError(label + ' (status=' + metadata().get('status', '') + ')')
+
+def faults(state):
+    return json.loads(state.get('activeFaults', '[]'))
+
+phase = {'value': 0, 'at': int(time.time())}
+
+class Fixture(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        self.respond((datetime.fromtimestamp(time.time(), timezone.utc).replace(tzinfo=None) + timedelta(hours=7)).date())
+
+    def do_POST(self):
+        fields = parse_qs(self.rfile.read(int(self.headers.get('Content-Length', '0'))).decode())
+        self.respond(datetime.strptime(fields['date'][0], '%d/%m/%Y').date())
+
+    def respond(self, selected):
+        # The emulator uses Asia/Ho_Chi_Minh timestamps, independent of the host timezone.
+        now = datetime.fromtimestamp(time.time(), timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
+        point_options = "<select name='route'><option value='all' selected>-- Tất cả --</option><option>Km 100+000</option><option>Km 101+000</option></select>"
+        rows = []
+        current = dict(phase)
+        if selected == now.date() and current['value']:
+            t1 = datetime.fromtimestamp(current['at'], timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
+            rows = [('101+000', 'Tàu lẻ', t1, False), ('100+000', 'Chuông 2 hỏng', t1, True)]
+            if current['value'] >= 2:
+                rows += [('100+000', 'Tàu lẻ', t1-timedelta(seconds=1), False),
+                         ('100+000', 'Chuông 2 khôi phục tốt', t1+timedelta(seconds=1), False)]
+            if current['value'] >= 3:
+                rows += [('100+000', 'Chuông 1 hỏng', t1+timedelta(seconds=2), True)]
+        table = "<table id='FixtureGdata'>"
+        for point, text, at, red in reversed(rows):
+            table += f"<tr><td>Km {point}</td><td><font color={'red' if red else 'blue'}>{text}</font></td><td>{selected:%d/%m}</td><td>{at:%H:%M:%S}</td></tr>"
+        body = (f"<form method='post' action='/'><h1>BÁO CÁO ĐƯỜNG NGANG CBTĐ</h1><input name='date' value='{selected:%d/%m/%Y}'>"
+                + point_options + table + '</table></form>').encode()
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html; charset=UTF-8')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def main():
+    assert adb('shell', 'getprop', 'ro.kernel.qemu').strip() == '1', 'Emulator required; physical phones are refused'
+    assert adb('get-serialno').strip().startswith('emulator-'), 'Use a dedicated emulator'
+    previous = metadata()
+    previous_running = previous.get('running') == 'true'
+    old_proxy = adb('shell', 'settings', 'get', 'global', 'http_proxy').strip()
+    stop_service()
+    adb('shell', 'am', 'force-stop', PKG)
+    server = ThreadingHTTPServer(('127.0.0.1', 8888), Fixture)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    with tempfile.TemporaryDirectory(prefix='rail-monitor-test-') as temp:
+        folder = pathlib.Path(temp)
+        os.chmod(folder, 0o700)
+        original_prefs = preferences_xml()
+        pref_root = ET.fromstring(original_prefs)
+        for node in pref_root:
+            if node.get('name') == 'running':
+                node.set('value', 'true' if previous_running else 'false')
+        (folder/'original.xml').write_bytes(ET.tostring(pref_root, encoding='utf-8'))
+        original_db = subprocess.run([ADB, 'exec-out', 'run-as', PKG, 'cat', 'databases/events.db'], capture_output=True, timeout=30)
+        if original_db.returncode == 0:
+            (folder/'original.db').write_bytes(original_db.stdout)
+        root = ET.Element('map')
+        ET.SubElement(root, 'string', name='url').text = 'http://10.0.2.2:8888/'
+        ET.SubElement(root, 'string', name='user').text = 'local-fixture'
+        for name, value in [('demoUi', 'false'), ('running', 'true'), ('sound', 'true')]:
+            ET.SubElement(root, 'boolean', name=name, value=value)
+        ET.SubElement(root, 'int', name='interval', value='2')  # Test clock; the user UI still offers 30/120/300 only.
+        (folder/'fixture.xml').write_bytes(ET.tostring(root, encoding='utf-8'))
+        def install(local, remote):
+            adb('push', str(local), '/data/local/tmp/rail-e2e-file')
+            adb('shell', 'run-as', PKG, 'cp', '/data/local/tmp/rail-e2e-file', remote)
+        try:
+            install(folder/'fixture.xml', 'shared_prefs/monitor.xml')
+            adb('shell', 'run-as', PKG, 'rm', '-f', 'databases/events.db')
+            adb('shell', 'settings', 'put', 'global', 'http_proxy', ':0')
+            adb('shell', 'am', 'start', '-n', PKG+'/.MainActivity')
+            wait_for(lambda s: int(s.get('lastSuccess','0')) > 0, 'initial empty snapshot accepted silently')
+            phase.update(value=1, at=int(time.time())-3)
+            wait_for(lambda s: any(row[3]=='Chuông 2 hỏng' for row in faults(s)), 'original red bell message becomes active')
+            wait_for(lambda s: any(row[3]=='Nghi tự kích' for row in faults(s)), 'self-trigger confirmed after elapsed grace')
+            notes=adb('shell','dumpsys','notification','--noredact')
+            assert re.search(r'Notification\(channel=faults_sound', notes), 'Expected sound-channel notification'
+            print('PASS: active alerts use sound channel', flush=True)
+            phase['value']=2
+            wait_for(lambda s: not faults(s) and json.loads(s.get('pendingSelf','{}'))=={}, 'late upstream evidence removes inference; explicit bell recovery clears bell')
+            # Change only the global sound preference; restart the same account to prove no replay.
+            stop_service();adb('shell','am','force-stop',PKG)
+            state_root=ET.fromstring(preferences_xml())
+            for node in state_root:
+                if node.get('name')=='sound':node.set('value','false')
+                if node.get('name')=='running':node.set('value','true')
+            (folder/'silent.xml').write_bytes(ET.tostring(state_root,encoding='utf-8'))
+            install(folder/'silent.xml','shared_prefs/monitor.xml')
+            adb('shell','am','start','-n',PKG+'/.MainActivity')
+            phase['value']=3
+            wait_for(lambda s:any(row[3]=='Chuông 1 hỏng' for row in faults(s)), 'subsequent fault stays red with global sound disabled')
+            notes=adb('shell','dumpsys','notification','--noredact')
+            assert re.search(r'Notification\(channel=faults_silent',notes),'Expected silent-channel notification'
+            print('PASS: later fault uses silent channel; 7 monitoring checks passed',flush=True)
+        finally:
+            stop_service();adb('shell','am','force-stop',PKG)
+            install(folder/'original.xml','shared_prefs/monitor.xml')
+            if original_db.returncode==0:install(folder/'original.db','databases/events.db')
+            else:adb('shell','run-as',PKG,'rm','-f','databases/events.db')
+            adb('shell','settings','put','global','http_proxy',old_proxy if old_proxy not in ('null','') else ':0')
+            server.shutdown();server.server_close()
+            adb('shell','am','start','-n',PKG+'/.MainActivity')
+
+if __name__ == '__main__':
+    main()

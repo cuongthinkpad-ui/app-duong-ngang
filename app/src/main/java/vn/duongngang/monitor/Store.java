@@ -80,6 +80,109 @@ public final class Store {
     }
   }
 
+  public List<Rules.Event> activeFaults() {
+    List<Rules.Event> result = new ArrayList<>();
+    try {
+      JSONArray list = new JSONArray(prefs.getString("activeFaults", "[]"));
+      for (int i = 0; i < list.length(); i++) {
+        JSONArray row = list.getJSONArray(i);
+        List<String> counts = new ArrayList<>();
+        for (int j = 0; j < row.getJSONArray(4).length(); j++)
+          counts.add(row.getJSONArray(4).getString(j));
+        result.add(
+            new Rules.Event(
+                row.getString(0),
+                row.getLong(1),
+                row.getString(2),
+                row.getString(3),
+                true,
+                counts));
+      }
+    } catch (JSONException ignored) {
+    }
+    return result;
+  }
+
+  public List<Rules.Event> occupationEvents() {
+    List<Rules.Event> result = new ArrayList<>();
+    try {
+      JSONArray list = new JSONArray(prefs.getString("occupiedPoints", "[]"));
+      for (int i = 0; i < list.length(); i++) {
+        JSONArray row = list.getJSONArray(i);
+        result.add(
+            new Rules.Event(
+                "occupied:" + row.getString(0),
+                row.getLong(2),
+                row.getString(0),
+                row.getInt(1) > 0 ? "Tàu lẻ" : "Tàu chẵn",
+                false,
+                List.of()));
+      }
+    } catch (JSONException ignored) {
+    }
+    return result;
+  }
+
+  /**
+   * Carry unresolved faults across midnight without scanning the whole archive on the UI thread.
+   */
+  public List<Rules.Event> updateActiveFaults(
+      String expected, long replayFrom, long now, long baseline, List<String> disproved) {
+    synchronized (Store.class) {
+      if (!account().equals(expected)) throw new IllegalStateException("Tài khoản đã thay đổi");
+      List<Rules.Event> input = activeFaults();
+      input.removeIf(e -> e.at() < baseline || disproved.contains(e.id()));
+      List<Rules.Event> recent = events(replayFrom, now + 1);
+      for (var e : recent) if (e.at() >= baseline) input.add(e);
+      List<Rules.Event> active = Rules.activeFaults(input);
+      JSONArray list = new JSONArray();
+      for (var e : active)
+        list.put(
+            new JSONArray()
+                .put(e.id())
+                .put(e.at())
+                .put(e.crossing())
+                .put(e.text())
+                .put(new JSONArray(e.counts())));
+      List<Rules.Event> occupied = occupationEvents();
+      occupied.addAll(recent);
+      JSONArray points = new JSONArray();
+      for (var point : Rules.occupancies(route(), occupied))
+        points.put(new JSONArray().put(point.crossing()).put(point.direction()).put(point.at()));
+      prefs
+          .edit()
+          .putString("activeFaults", list.toString())
+          .putString("occupiedPoints", points.toString())
+          .apply();
+      return active;
+    }
+  }
+
+  public Map<String, Long> pendingSelf() {
+    Map<String, Long> result = new HashMap<>();
+    try {
+      JSONObject data = new JSONObject(prefs.getString("pendingSelf", "{}"));
+      for (Iterator<String> keys = data.keys(); keys.hasNext(); ) {
+        String key = keys.next();
+        result.put(key, data.getLong(key));
+      }
+    } catch (JSONException ignored) {
+    }
+    return result;
+  }
+
+  public void discardInferences(String expected, List<String> ids) {
+    synchronized (Store.class) {
+      if (!account().equals(expected)) throw new IllegalStateException("Tài khoản đã thay đổi");
+      for (String id : ids)
+        if (!id.startsWith("self:"))
+          throw new IllegalArgumentException("Không được xóa bản tin gốc của web");
+      try (var db = db()) {
+        for (String id : ids) db.delete("events", "id=?", new String[] {id});
+      }
+    }
+  }
+
   public void credentials(String url, String user, String password) throws Exception {
     synchronized (Store.class) {
       Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
@@ -94,11 +197,19 @@ public final class Store {
           !url.equals(prefs.getString("url", "")) || !user.equals(prefs.getString("user", ""));
       if (changed) {
         context.deleteDatabase("events.db");
+        var notifications = context.getSystemService(android.app.NotificationManager.class);
+        for (var n : notifications.getActiveNotifications())
+          if (n.getId() != 1) notifications.cancel(n.getId());
         prefs
             .edit()
             .remove("lastSuccess")
             .remove("coverage")
             .remove("baselineFrom")
+            .remove("selfFrom")
+            .remove("pendingSelf")
+            .remove("activeFaults")
+            .remove("occupiedPoints")
+            .remove("lastFull")
             .remove("route")
             .remove("rangeFrom")
             .remove("rangeTo")
@@ -131,6 +242,8 @@ public final class Store {
     db.execSQL(
         "CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, at INTEGER NOT NULL, km TEXT NOT"
             + " NULL, text TEXT NOT NULL, red INTEGER NOT NULL, counts TEXT NOT NULL)");
+    db.execSQL("CREATE INDEX IF NOT EXISTS events_at ON events(at)");
+    db.execSQL("CREATE INDEX IF NOT EXISTS events_km_at ON events(km,at)");
     return db;
   }
 
@@ -166,23 +279,55 @@ public final class Store {
             db.rawQuery(
                 "SELECT * FROM events WHERE at>=? AND at<? ORDER BY at DESC",
                 new String[] {"" + from, "" + to})) {
-      while (c.moveToNext()) {
-        var counts = new ArrayList<String>();
-        try {
-          var a = new JSONArray(c.getString(5));
-          for (int i = 0; i < a.length(); i++) counts.add(a.getString(i));
-        } catch (JSONException ignored) {
-        }
-        out.add(
-            new Rules.Event(
-                c.getString(0),
-                c.getLong(1),
-                c.getString(2),
-                c.getString(3),
-                c.getInt(4) == 1,
-                counts));
-      }
+      appendRows(c, out);
     }
+    return out;
+  }
+
+  private void appendRows(android.database.Cursor c, List<Rules.Event> out) {
+    while (c.moveToNext()) {
+      var counts = new ArrayList<String>();
+      try {
+        var a = new JSONArray(c.getString(5));
+        for (int i = 0; i < a.length(); i++) counts.add(a.getString(i));
+      } catch (JSONException ignored) {
+      }
+      out.add(
+          new Rules.Event(
+              c.getString(0),
+              c.getLong(1),
+              c.getString(2),
+              c.getString(3),
+              c.getInt(4) == 1,
+              counts));
+    }
+  }
+
+  /**
+   * Read one day's incident starts, later device restorations and the next release of each self
+   * trigger.
+   */
+  public synchronized List<Rules.Event> incidentEvents(long from, long to) {
+    List<Rules.Event> out = events(from, to);
+    Set<String> inferredPoints = new HashSet<>();
+    for (var event : out) if (Rules.isSelfTrigger(event)) inferredPoints.add(event.crossing());
+    try (var db = db()) {
+      try (var cursor =
+          db.rawQuery(
+              "SELECT * FROM events WHERE at>=? AND red=0 AND text LIKE ? ORDER BY at DESC",
+              new String[] {"" + to, "%khôi phục tốt%"})) {
+        appendRows(cursor, out);
+      }
+      for (String point : inferredPoints)
+        try (var cursor =
+            db.rawQuery(
+                "SELECT * FROM events WHERE km=? AND at>=? AND red=0 AND text=? COLLATE NOCASE"
+                    + " ORDER BY at LIMIT 1",
+                new String[] {point, "" + to, "Khôi phục hệ thống"})) {
+          appendRows(cursor, out);
+        }
+    }
+    out.sort(Comparator.comparingLong(Rules.Event::at).reversed());
     return out;
   }
 }

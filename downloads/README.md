@@ -1,14 +1,12 @@
-# Đường Ngang — bản thử 0.5
+# Đường Ngang — bản thử 0.6
 
-**[Tải APK 0.5](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.5.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
+**[Tải APK 0.6](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.6.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
 
-- Nhận danh sách điểm theo tài khoản sau khi đọc web hoàn tất; sắp km từ Bắc vào Nam. Điểm có hậu tố trong ngoặc là ga, nhãn dùng đúng chữ trong ngoặc.
-- Phạm vi theo dõi dùng danh sách mới; đổi ID hoặc URL không mang dữ liệu tuyến cũ sang. Sơ đồ giữ đủ tuyến, hỗ trợ cuộn ngang khi nhiều điểm.
-- Nội dung lỗi giữ nguyên câu từ web, gồm số thiết bị. Ghép khôi phục riêng chuông 1 / 2, đèn 1 / 2. Chạm sự cố trên Tổng quan để đọc đầy đủ.
-- Sơ đồ theo các bản tin chiếm dụng đã đọc, hiển thị nhiều đoạn và hướng đồng thời. Cần chắn nâng không bỏ xanh; khôi phục hệ thống đúng điểm mới bỏ xanh. Dữ liệu cũ được ghi rõ, đổi sang vàng nâu. Giữ một nút tắt chuông chung, Tổng quan vừa màn hình.
+- Kết nối Visitec, chọn ngày, đọc phân trang và cập nhật nền đã được thử bằng dữ liệu thật trên giả lập Android.
+- Giữ nguyên câu lỗi đỏ và đúng thiết bị; suy luận “Nghi tự kích” có đối chiếu đường ngang liền kề và chờ bản tin tới muộn.
+- Sơ đồ đủ tuyến theo tài khoản, hiển thị đồng thời nhiều đoạn/hướng. Lưu chiếm dụng tới khi có khôi phục hệ thống đúng điểm.
+- Dòng “Designed by Cao Xuân Cường” chỉ còn trong Cài đặt.
 
-Cài cập nhật lên bản 0.4 bằng cùng chữ ký thử nghiệm. Danh sách trong chế độ minh họa vẫn là khu vực Vinh; danh sách thực được lưu sau lượt đọc web thành công. Khi đổi tài khoản, phạm vi mặc định là toàn tuyến mới rồi có thể chọn lại trong Cài đặt.
+Cài cập nhật bằng cùng chữ ký thử nghiệm của các bản trước. Mở Cài đặt, nhập web/ID/mật khẩu rồi Lưu & theo dõi; chu kỳ 30 giây / 2 phút / 5 phút. Lượt đồng bộ đầu cần đọc hai ngày nên lâu hơn những lượt sau. Bật dữ liệu minh họa nếu chỉ muốn xem giao diện.
 
-[Ảnh Tổng quan minh họa](../docs/screenshots/overview-0.5.png) · [Ảnh tuyến khác](../docs/screenshots/account-route-0.5.png)
-
-**Chưa phải bản trực vận hành.** Kiểm thử tuyến động và phân trang dùng dữ liệu mô phỏng; chưa xác minh đăng nhập/phân trang bằng Visitec thật. Sơ đồ chiếm dụng chưa được kiểm chứng với dữ liệu thực tế; phát cảnh báo tự kích chưa bật. Không nhúng tài khoản hay mật khẩu thử nghiệm của người dùng vào APK.
+Cần kiểm tra chạy nền và thông báo khi khóa màn hình lâu trên điện thoại thật, nhất là chế độ tiết kiệm pin Xiaomi. Bản thử không thay thế quy trình trực hiện có. Không nhúng tài khoản thử nghiệm vào APK. [Chi tiết kiểm tra](../docs/LIVE_REVIEW_0.6.md).

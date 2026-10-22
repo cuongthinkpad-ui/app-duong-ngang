@@ -208,27 +208,27 @@ public class RulesTest {
         "no fallback to demo on empty operational route");
     var bells =
         List.of(
-            event(1, "276+351", "Chuông 1 mất trạng thái", true),
-            event(2, "276+351", "Chuông 2 mất trạng thái", true),
+            event(1, "276+351", "Chuông 1 hỏng", true),
+            event(2, "276+351", "Chuông 2 hỏng", true),
             event(3, "276+351", "Chuông 2 khôi phục tốt", false));
     check(
         Rules.activeFaults(bells).size() == 1
-            && Rules.activeFaults(bells).get(0).text().equals("Chuông 1 mất trạng thái"),
+            && Rules.activeFaults(bells).get(0).text().equals("Chuông 1 hỏng"),
         "bell restoration cannot clear another numbered bell");
     check(
         Rules.incidentHistory(bells).stream().filter(i -> i.recovery() != null).count() == 1,
         "numbered bell incident pairing");
     var lamps =
         List.of(
-            event(1, "276+351", "Đèn cảnh báo 1 mất trạng thái", true),
-            event(2, "276+351", "Đèn cảnh báo 2 mất trạng thái", true),
+            event(1, "276+351", "Đèn cảnh báo 1 hỏng", true),
+            event(2, "276+351", "Đèn cảnh báo 2 hỏng", true),
             event(3, "276+351", "Đèn cảnh báo 1 khôi phục tốt", false));
     check(
         Rules.activeFaults(lamps).size() == 1
-            && Rules.activeFaults(lamps).get(0).text().equals("Đèn cảnh báo 2 mất trạng thái"),
+            && Rules.activeFaults(lamps).get(0).text().equals("Đèn cảnh báo 2 hỏng"),
         "numbered lamps remain distinct");
     check(
-        Rules.faultKey("Chuông cảnh báo số 2 mất trạng thái").equals("chuông 2"),
+        Rules.faultKey("Chuông cảnh báo số 2 hỏng").equals("chuông 2"),
         "number after device qualifiers");
     var reports =
         List.of(
@@ -285,6 +285,136 @@ public class RulesTest {
                 event(1, "320+445", "Tàu lẻ", false),
                 event(2, "320+445", "Chuông 1 khôi phục tốt", false)));
     check(bellOnly.size() == 1, "device recovery does not clear train occupation");
+    var separate =
+        List.of(
+            event(1, "320+445", "Cảm biến 4 hỏng", true),
+            event(2, "320+445", "Điện áp cảm biến 4 < 5V", true),
+            event(3, "320+445", "Điện áp cảm biến 4 khôi phục tốt", false));
+    check(
+        Rules.activeFaults(separate).size() == 1
+            && Rules.activeFaults(separate).get(0).text().equals("Cảm biến 4 hỏng"),
+        "voltage restoration cannot clear failed sensor");
+    check(
+        Rules.incidentHistory(separate).stream().filter(i -> i.recovery() != null).count() == 1,
+        "separate sensor incident groups");
+    var measurement =
+        new Rules.Event(
+            "measurement",
+            1,
+            "320+445",
+            "Đo điện áp cảm biến",
+            false,
+            List.of("58", "58", "57", "58", "58", "59"));
+    check(
+        Rules.axleNote(measurement).isEmpty(),
+        "measurement text is never interpreted as axle counts");
+    var axle =
+        new Rules.Event(
+            "axle",
+            1,
+            "320+445",
+            "Khôi phục hệ thống",
+            false,
+            List.of("46", "46", "48", "44", "46", "46"));
+    check(
+        Rules.axleNote(axle).contains("CB3 thừa 2 trục"),
+        "axle notes require system restoration record");
+    var normalSequence =
+        List.of(
+            event(1, "320+445", "Tàu lẻ", false),
+            event(2, "320+957", "Tàu lẻ", false),
+            event(3, "321+780", "Tàu lẻ", false));
+    check(
+        Rules.suspectedSelfTriggers(Rules.DEMO_ROUTE, normalSequence, 0).isEmpty(),
+        "whole normal chain has upstream evidence");
+    var falseArrival = event(10, "321+780", "Tàu lẻ", false);
+    check(
+        Rules.suspectedSelfTriggers(Rules.DEMO_ROUTE, List.of(falseArrival), 0).size() == 1,
+        "isolated internal arrival is suspected");
+    check(
+        Rules.suspectedSelfTriggers(
+                Rules.DEMO_ROUTE, List.of(event(1, "320+445", "Tàu lẻ", false)), 0)
+            .isEmpty(),
+        "boundary entrance exempt");
+    check(
+        Rules.suspectedSelfTriggers(
+                Rules.DEMO_ROUTE, List.of(event(1, "332+350", "Tàu lẻ", false)), 0)
+            .isEmpty(),
+        "station-side entrance exempt");
+    check(
+        Rules.suspectedSelfTriggers(
+                Rules.DEMO_ROUTE, List.of(event(1, "319+200 (Vi)", "Tàu lẻ", false)), 0)
+            .isEmpty(),
+        "station events excluded");
+    check(
+        Rules.suspectedSelfTriggers(
+                    Rules.DEMO_ROUTE,
+                    List.of(event(1, "320+957", "Tàu chẵn", false), falseArrival),
+                    0)
+                .size()
+            == 2,
+        "opposite direction does not justify arrival");
+    var repeated =
+        List.of(
+            event(1, "320+445", "Tàu lẻ", false),
+            event(2, "320+957", "Tàu lẻ", false),
+            event(3, "320+957", "Tàu lẻ", false));
+    check(
+        Rules.suspectedSelfTriggers(Rules.DEMO_ROUTE, repeated, 0).size() == 1,
+        "one upstream passage cannot justify two arrivals");
+    check(
+        Rules.suspectedSelfTriggers(Rules.DEMO_ROUTE, List.of(falseArrival), 11).isEmpty(),
+        "events outside known coverage excluded");
+    var pending = new HashMap<String, Long>();
+    check(
+        Rules.confirmedSelfTriggers(List.of(falseArrival), pending, 1000, 0, 30000).isEmpty(),
+        "first observation waits for next complete poll");
+    check(
+        Rules.confirmedSelfTriggers(List.of(falseArrival), pending, 30999, 0, 30000).isEmpty(),
+        "confirmation grace respected");
+    var confirmed = Rules.confirmedSelfTriggers(List.of(falseArrival), pending, 31000, 0, 30000);
+    check(
+        confirmed.size() == 1
+            && confirmed.get(0).text().equals("Nghi tự kích")
+            && confirmed.get(0).red(),
+        "confirmed suspicion becomes red inferred event");
+    Rules.confirmedSelfTriggers(List.of(), pending, 32000, 0, 30000);
+    check(pending.isEmpty(), "late upstream evidence removes pending suspicion");
+    check(
+        Rules.confirmedSelfTriggers(List.of(falseArrival), new HashMap<>(), 1000, 11, 0).isEmpty(),
+        "initial baseline does not replay old self triggers");
+    var inferredRecovery =
+        List.of(
+            confirmed.get(0),
+            event(11, "321+780", "Khôi phục hệ thống", false),
+            event(1, "321+780", "Chuông 1 hỏng", true));
+    check(
+        Rules.activeFaults(inferredRecovery).size() == 1
+            && !Rules.isSelfTrigger(Rules.activeFaults(inferredRecovery).get(0)),
+        "system restores self trigger but keeps actual bell fault");
+    check(
+        Rules.incidentHistory(inferredRecovery).stream()
+            .filter(i -> Rules.isSelfTrigger(i.fault()))
+            .allMatch(i -> i.recovery() != null),
+        "self trigger history shows real system recovery");
+    var namedBells =
+        List.of(
+            event(1, "320+445", "Chuông phía lẻ hỏng", true),
+            event(2, "320+445", "Chuông phía chẵn hỏng", true),
+            event(3, "320+445", "Chuông phía lẻ khôi phục tốt", false));
+    check(
+        Rules.activeFaults(namedBells).size() == 1
+            && Rules.activeFaults(namedBells).get(0).text().equals("Chuông phía chẵn hỏng"),
+        "named bells remain distinct without assuming numeric identifiers");
+    var namedLamps =
+        List.of(
+            event(1, "320+445", "Đèn A hỏng", true),
+            event(2, "320+445", "Đèn B hỏng", true),
+            event(3, "320+445", "Đèn B khôi phục tốt", false));
+    check(
+        Rules.activeFaults(namedLamps).size() == 1
+            && Rules.activeFaults(namedLamps).get(0).text().equals("Đèn A hỏng"),
+        "named lamp recovery does not clear a different lamp");
     System.out.println(scenarios + " domain scenarios passed");
   }
 }

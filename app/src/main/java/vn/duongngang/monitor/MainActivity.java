@@ -62,6 +62,10 @@ public class MainActivity extends Activity {
       getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
     if (Build.VERSION.SDK_INT >= 33)
       requestPermissions(new String[] {"android.permission.POST_NOTIFICATIONS"}, 10);
+    if (!demo
+        && store.prefs.getBoolean("running", false)
+        && !store.prefs.getString("url", "").isEmpty())
+      startForegroundService(new Intent(this, MonitorService.class));
     render();
   }
 
@@ -218,12 +222,7 @@ public class MainActivity extends Activity {
                     false,
                     List.of()),
                 new Rules.Event(
-                    "d10",
-                    demoClock - 215000,
-                    "Km 321+780",
-                    "Chuông 2 mất trạng thái",
-                    true,
-                    List.of()),
+                    "d10", demoClock - 215000, "Km 321+780", "Chuông 2 hỏng", true, List.of()),
                 new Rules.Event("d1", demoClock - 45000, "Km 321+780", "Tàu lẻ", false, List.of()),
                 new Rules.Event(
                     "d2",
@@ -276,6 +275,7 @@ public class MainActivity extends Activity {
   }
 
   private List<Rules.Event> occupancyEvents() {
+    if (!demo && store.prefs.contains("occupiedPoints")) return store.occupationEvents();
     return demo
         ? samples()
         : store.events(
@@ -319,19 +319,33 @@ public class MainActivity extends Activity {
         .putString(Store.rangeKey(demo, false), to)
         .apply();
     if (!demo)
-      for (Rules.Event e : store.events(0, System.currentTimeMillis() + 1))
+      for (Rules.Event e : activeFaults())
         if (!inScope(e.crossing()))
           getSystemService(NotificationManager.class)
               .cancel(100 + Math.floorMod(e.id().hashCode(), 1000000));
     return true;
   }
 
-  private List<Rules.Event> currentFaults(List<Rules.Event> events) {
-    if (demo) return Rules.activeFaults(events);
-    long baseline = store.prefs.getLong("baselineFrom", 0);
+  private List<Rules.Event> activeFaults() {
+    if (demo) return Rules.activeFaults(samples());
+    if (store.prefs.contains("activeFaults")) return store.activeFaults();
     List<Rules.Event> current = new ArrayList<>();
-    for (Rules.Event e : events) if (e.at() >= baseline) current.add(e);
+    long baseline = store.prefs.getLong("baselineFrom", 0);
+    for (var event : occupancyEvents()) if (event.at() >= baseline) current.add(event);
     return Rules.activeFaults(current);
+  }
+
+  private List<Rules.Event> scopedFaults() {
+    List<Rules.Event> result = new ArrayList<>();
+    for (var event : activeFaults()) if (inScope(event.crossing())) result.add(event);
+    return result;
+  }
+
+  private List<Rules.Event> faultsAt(String point) {
+    List<Rules.Event> result = new ArrayList<>();
+    for (var event : activeFaults())
+      if (Rules.km(event.crossing()).equals(Rules.km(point))) result.add(event);
+    return result;
   }
 
   private void navigate(String next) {
@@ -417,10 +431,12 @@ public class MainActivity extends Activity {
       if (page.equals("overview")) screen.addView(status);
       else content.addView(status);
     }
-    TextView credit = text("Designed by Cao Xuân Cường", 8, 0xFF627A98, true);
-    credit.setGravity(Gravity.END);
-    credit.setPadding(0, dp(3), dp(22), dp(5));
-    screen.addView(credit);
+    if (page.equals("settings")) {
+      TextView credit = text("Designed by Cao Xuân Cường", 8, 0xFF627A98, true);
+      credit.setGravity(Gravity.END);
+      credit.setPadding(dp(16), dp(3), dp(16), dp(5));
+      screen.addView(credit);
+    }
     navigation();
   }
 
@@ -513,7 +529,7 @@ public class MainActivity extends Activity {
     panel.removeAllViews();
     List<Rules.Event> trains = new ArrayList<>();
     for (Rules.Event e : today()) if (Rules.direction(e.text()) != 0) trains.add(e);
-    List<Rules.Event> faults = currentFaults(today());
+    List<Rules.Event> faults = scopedFaults();
     float density = getResources().getDisplayMetrics().density,
         scale = getResources().getConfiguration().fontScale;
     float available = height / density;
@@ -772,12 +788,22 @@ public class MainActivity extends Activity {
     List<Rules.Event> records =
         demo && selected.equals(LocalDate.now(WebSource.ZONE))
             ? samples()
-            : demo ? List.of() : store.events(from, Math.max(to, System.currentTimeMillis() + 1));
+            : demo ? List.of() : store.incidentEvents(from, to);
+    Set<String> openIds = new HashSet<>();
+    if (selected.equals(LocalDate.now(WebSource.ZONE))) {
+      records = new ArrayList<>(records);
+      Set<String> present = new HashSet<>();
+      for (var event : records) present.add(event.id());
+      for (var event : activeFaults()) {
+        openIds.add(event.id());
+        if (!present.contains(event.id())) records.add(event);
+      }
+    }
     int shown = 0;
     long baseline = demo ? 0 : store.prefs.getLong("baselineFrom", 0);
     for (Rules.Incident incident : Rules.incidentHistory(records)) {
-      if (incident.fault().at() < from
-          || incident.fault().at() >= to
+      if ((!openIds.contains(incident.fault().id())
+              && (incident.fault().at() < from || incident.fault().at() >= to))
           || !inScope(incident.fault().crossing())) continue;
       boolean recovered = incident.recovery() != null,
           reset = !recovered && incident.fault().at() < baseline;
@@ -1030,6 +1056,24 @@ public class MainActivity extends Activity {
             store.prefs.getBoolean("sound", true),
             options);
     sound.setOnCheckedChangeListener((b, on) -> setAlarmSound(on));
+    gap(options, 10);
+    options.addView(
+        action(
+            "Cài đặt chạy nền",
+            "link",
+            false,
+            () ->
+                startActivity(
+                    new Intent(
+                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        android.net.Uri.parse("package:" + getPackageName())))));
+    gap(options, 7);
+    options.addView(
+        text(
+            "Cho phép thông báo và chọn pin Không giới hạn để theo dõi khi khóa màn hình.",
+            10,
+            MUTED,
+            false));
     content.addView(options);
     content.addView(
         action(
@@ -1066,7 +1110,7 @@ public class MainActivity extends Activity {
                     .putBoolean("demoUi", false)
                     .apply();
                 demo = false;
-                startForegroundService(new Intent(this, MonitorService.class));
+                startForegroundService(new Intent(this, MonitorService.class).setAction("RESTART"));
                 navigate("overview");
               } catch (Exception e) {
                 Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
@@ -1097,8 +1141,8 @@ public class MainActivity extends Activity {
     content.addView(preview);
     TextView note =
         text(
-            "Bản thử giao diện 0.5 · Chưa dùng trực vận hành.\n"
-                + "Tự kích chưa bật. Sơ đồ theo bản tin chiếm dụng, chưa xác minh bằng web thật."
+            "Bản 0.6 · Đồng bộ bản tin từ website.\n"
+                + "Nghi tự kích được đối chiếu lại sau một chu kỳ; lỗi gốc giữ nguyên nội dung web."
                 + " Theo dõi nền dùng thông báo thường trực. Website HTTP không mã hóa đường"
                 + " truyền.",
             10,
@@ -1135,7 +1179,7 @@ public class MainActivity extends Activity {
       if (Rules.isStation(point) || !inScope(point)) continue;
       if (index++ > 0) divider(list);
       List<Rules.Event> events = crossingEvents(point);
-      boolean fault = !currentFaults(events).isEmpty();
+      boolean fault = !faultsAt(point).isEmpty();
       LinearLayout entry = row();
       LinearLayout words = column();
       words.addView(text("Km " + point, 15, INK, true));
@@ -1185,30 +1229,37 @@ public class MainActivity extends Activity {
       LinearLayout parent, String title, String value, String kind, boolean error) {
     LinearLayout r = new LinearLayout(this);
     r.setGravity(Gravity.TOP);
-    r.addView(icon(kind, error ? RED : BLUE, 17));
+    boolean recovered = value.toLowerCase(Locale.ROOT).contains("khôi phục tốt");
+    r.addView(icon(kind, error ? RED : recovered ? GREEN : BLUE, 17));
     TextView name = text(title, 11, MUTED, false);
     name.setPadding(dp(9), 0, dp(8), 0);
     r.addView(name, new LinearLayout.LayoutParams(dp(108), -2));
     TextView status =
-        text(value, 11, error ? RED : value.equals("Chưa có dữ liệu") ? MUTED : INK, true);
+        text(
+            value,
+            11,
+            error ? RED : recovered ? GREEN : value.equals("Chưa có dữ liệu") ? MUTED : INK,
+            true);
     r.addView(status, new LinearLayout.LayoutParams(0, -2, 1));
     parent.addView(r);
   }
 
   private void crossingDetail() {
     List<Rules.Event> events = crossingEvents(selectedCrossing);
-    List<Rules.Event> faults = currentFaults(events);
+    List<Rules.Event> faults = faultsAt(selectedCrossing);
     LinearLayout summary = card(Color.WHITE);
     LinearLayout top = row();
     top.addView(
         text("Km " + selectedCrossing, 22, INK, true), new LinearLayout.LayoutParams(0, -2, 1));
-    top.addView(
-        pill(
-            !demo && store.prefs.getLong("baselineFrom", 0) > 0 && faults.isEmpty()
+    boolean resetBaseline = !demo && store.prefs.getLong("baselineFrom", 0) > 0;
+    String badge =
+        !faults.isEmpty()
+            ? "Đang có sự cố"
+            : resetBaseline
                 ? "✓ Đã đặt lại"
-                : "Nhật ký",
-            !demo && store.prefs.getLong("baselineFrom", 0) > 0 && faults.isEmpty() ? GREEN : BLUE,
-            0xFFEDF4FF));
+                : events.isEmpty() ? "Chờ dữ liệu" : "✓ Chưa ghi nhận lỗi";
+    int badgeColor = !faults.isEmpty() ? RED : events.isEmpty() && !resetBaseline ? MUTED : GREEN;
+    top.addView(pill(badge, badgeColor, !faults.isEmpty() ? 0xFFFFE1E4 : 0xFFEDF8F2));
     summary.addView(top);
     gap(summary, 9);
     summary.addView(
@@ -1223,14 +1274,12 @@ public class MainActivity extends Activity {
     String bell = deviceReading(events, faults, "chuông"),
         light = deviceReading(events, faults, "đèn");
     String barriers = deviceReading(events, faults, "cần chắn");
-    String sensors = "Chưa có dữ liệu";
-    for (Rules.Event e : events) {
-      String value = e.text().toLowerCase(Locale.ROOT);
-      if (value.contains("cảm biến") && !value.contains("điện áp")) {
-        sensors = e.text() + " · " + time(e.at());
-        break;
-      }
-    }
+    List<Rules.Event> sensorEvents = new ArrayList<>(), sensorFaults = new ArrayList<>();
+    for (var event : events)
+      if (!event.text().toLowerCase(Locale.ROOT).contains("điện áp")) sensorEvents.add(event);
+    for (var event : faults)
+      if (!event.text().toLowerCase(Locale.ROOT).contains("điện áp")) sensorFaults.add(event);
+    String sensors = deviceReading(sensorEvents, sensorFaults, "cảm biến");
     String connection = deviceReading(events, faults, "kết nối giám sát"),
         voltage = deviceReading(events, faults, "điện áp", "220vac");
     String[] labels = {"Chuông", "Đèn", "Cần chắn", "Cảm biến", "Kết nối", "Điện áp"};
@@ -1252,7 +1301,7 @@ public class MainActivity extends Activity {
       if (i > 0) divider(history);
       Rules.Event e = events.get(i);
       eventRow(history, e, e.red());
-      String note = Rules.axleNote(e.counts());
+      String note = Rules.axleNote(e);
       if (!note.isEmpty()) {
         gap(history, 10);
         history.addView(text(note, 11, MUTED, false));

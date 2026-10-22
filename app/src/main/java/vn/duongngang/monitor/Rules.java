@@ -153,6 +153,12 @@ public final class Rules {
     return result;
   }
 
+  public static String axleNote(Event event) {
+    return event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+        ? axleNote(event.counts())
+        : "";
+  }
+
   public static String axleNote(List<String> raw) {
     if (raw.size() != 6) return "";
     List<Integer> values = new ArrayList<>();
@@ -206,18 +212,83 @@ public final class Rules {
     return true;
   }
 
+  public static boolean isSelfTrigger(Event event) {
+    return event.id().startsWith("self:");
+  }
+
+  private static String eventFaultKey(Event event) {
+    return isSelfTrigger(event) ? "@self" : faultKey(event.text());
+  }
+
+  /** Each upstream report can justify one downstream arrival of the same direction. */
+  public static List<Event> suspectedSelfTriggers(
+      Route route, List<Event> input, long coverageStart) {
+    List<Event> ordered = new ArrayList<>(input);
+    ordered.sort(Comparator.comparingLong(Event::at).thenComparing(Event::id));
+    Map<String, ArrayDeque<Event>> evidence = new HashMap<>();
+    List<Event> suspects = new ArrayList<>();
+    Set<String> seen = new HashSet<>();
+    for (Event event : ordered) {
+      int direction = direction(event.text());
+      String point = km(event.crossing());
+      if (event.at() < coverageStart
+          || direction == 0
+          || !route.crossings().contains(point)
+          || !seen.add(event.id())) continue;
+      String upstream = route.upstream(point, direction);
+      if (upstream != null) {
+        var queue = evidence.get(upstream + "|" + direction);
+        if (queue == null || queue.isEmpty()) suspects.add(event);
+        else queue.removeFirst();
+      }
+      evidence.computeIfAbsent(point + "|" + direction, k -> new ArrayDeque<>()).addLast(event);
+    }
+    return suspects;
+  }
+
+  /** Wait for another successful poll so late upstream uploads can disprove an early suspicion. */
+  public static List<Event> confirmedSelfTriggers(
+      List<Event> candidates, Map<String, Long> firstSeen, long now, long baseline, long delay) {
+    Set<String> current = new HashSet<>();
+    List<Event> confirmed = new ArrayList<>();
+    for (Event event : candidates) {
+      if (event.at() < baseline) continue;
+      current.add(event.id());
+      long first = firstSeen.computeIfAbsent(event.id(), k -> now);
+      if (now - first >= delay)
+        confirmed.add(
+            new Event(
+                "self:" + event.id(),
+                event.at(),
+                event.crossing(),
+                "Nghi tự kích",
+                true,
+                List.of()));
+    }
+    firstSeen.keySet().retainAll(current);
+    return confirmed;
+  }
+
   /** Generic system restoration must never clear unrelated device faults. */
   public static String faultKey(String text) {
     String t = text.toLowerCase(Locale.ROOT);
     if (t.contains("220vac")) return "nguồn 220VAC";
     if (t.contains("kết nối giám sát")) return "kết nối giám sát";
+    var voltage = java.util.regex.Pattern.compile("điện áp\\s+cảm biến\\s*(\\d+)").matcher(t);
+    if (voltage.find()) return "điện áp cảm biến " + voltage.group(1);
     var m =
         java.util.regex.Pattern.compile(
                 "(cảm biến|cần chắn|chuông|đèn)(?:\\s+(?:điện|cảnh báo|tín hiệu|đỏ|số))*\\s*(\\d+)")
             .matcher(t);
     if (m.find()) return m.group(1) + " " + m.group(2);
-    if (t.contains("chuông")) return "chuông";
-    if (t.contains("đèn")) return "đèn";
+    for (String family : List.of("chuông", "đèn")) {
+      int start = t.indexOf(family);
+      if (start >= 0) {
+        String device =
+            t.substring(start).split("\\s+(?:hỏng|khôi phục|mất|bất thường|bị)\\b", 2)[0].trim();
+        return device.isEmpty() ? family : device;
+      }
+    }
     return t;
   }
 
@@ -241,13 +312,16 @@ public final class Rules {
     List<Incident> result = new ArrayList<>();
     Map<String, List<Integer>> open = new HashMap<>();
     for (Event event : ordered) {
-      String key = km(event.crossing()) + "|" + faultKey(event.text());
+      String key = km(event.crossing()) + "|" + eventFaultKey(event);
       if (event.red()) {
         open.computeIfAbsent(key, k -> new ArrayList<>()).add(result.size());
         result.add(new Incident(event, null));
-      } else if (event.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")) {
+      } else if (event.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")
+          || event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")) {
         List<String> matches = new ArrayList<>();
-        matches.add(key);
+        if (event.text().trim().equalsIgnoreCase("Khôi phục hệ thống"))
+          matches.add(km(event.crossing()) + "|@self");
+        else matches.add(key);
         String lower = event.text().toLowerCase(Locale.ROOT);
         if (lower.contains("cần chắn") && faultKey(event.text()).equals(lower)) {
           String prefix = km(event.crossing()) + "|cần chắn ";
@@ -271,9 +345,11 @@ public final class Rules {
     sorted.sort(Comparator.comparingLong(Event::at));
     Map<String, Event> faults = new LinkedHashMap<>();
     for (Event e : sorted) {
-      String k = km(e.crossing()) + "|" + faultKey(e.text());
+      String k = km(e.crossing()) + "|" + eventFaultKey(e);
       if (e.red()) faults.put(k, e);
-      else if (e.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")) {
+      else if (e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")) {
+        faults.remove(km(e.crossing()) + "|@self");
+      } else if (e.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")) {
         faults.remove(k);
         // The actual web has a collective "Cần chắn khôi phục tốt" event.
         if (e.text().toLowerCase(Locale.ROOT).contains("cần chắn")
