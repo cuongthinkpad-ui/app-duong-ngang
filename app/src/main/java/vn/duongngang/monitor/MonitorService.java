@@ -67,6 +67,8 @@ public class MonitorService extends Service {
     return START_NOT_STICKY;
   }
 
+  private boolean firstPoll = true;
+
   private void poll() {
     String account = store.account();
     try {
@@ -77,8 +79,10 @@ public class MonitorService extends Service {
               store.password());
       LocalDate today = LocalDate.now(WebSource.ZONE);
       long last = store.prefs.getLong("lastSuccess", 0);
+      long pollStart = System.currentTimeMillis();
+      boolean reset = Rules.needsNewBaseline(last, pollStart, firstPoll);
       List<Rules.Event> events = new ArrayList<>();
-      if (last > 0) {
+      if (last > 0 && !reset) {
         LocalDate start = Instant.ofEpochMilli(last).atZone(WebSource.ZONE).toLocalDate();
         if (start.isBefore(today.minusDays(7)))
           throw new Exception("Gián đoạn quá 7 ngày; cần tải lại lịch sử trước khi theo dõi");
@@ -90,9 +94,25 @@ public class MonitorService extends Service {
       List<Rules.Event> added = store.saveForAccount(account, events);
       long now = System.currentTimeMillis();
       // First successful sync builds the baseline silently. No speculative self-trigger alerts yet.
-      if (last > 0) for (var e : added) if (e.red()) notifyFault(e);
-      store.prefs.edit().putLong("lastSuccess", now).putString("status", "Đã cập nhật").apply();
+      if (last > 0 && !reset)
+        for (var e : added)
+          if (e.red() && e.at() >= store.prefs.getLong("baselineFrom", 0)) notifyFault(e);
+      if (reset) {
+        store.prefs.edit().putLong("baselineFrom", now).apply();
+        var notifications = getSystemService(NotificationManager.class);
+        for (var notification : notifications.getActiveNotifications())
+          if (notification.getId() != 1) notifications.cancel(notification.getId());
+      }
+      firstPoll = false;
+      store
+          .prefs
+          .edit()
+          .putLong("lastSuccess", now)
+          .putString(
+              "status", reset ? "Đã đặt lại theo dõi · Chưa ghi nhận lỗi mới" : "Đã cập nhật")
+          .apply();
     } catch (Exception e) {
+      if (!store.account().equals(account) || Thread.currentThread().isInterrupted()) return;
       store
           .prefs
           .edit()

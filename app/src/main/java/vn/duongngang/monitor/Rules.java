@@ -106,6 +106,17 @@ public final class Rules {
     return t;
   }
 
+  public static boolean needsNewBaseline(long last, long now, boolean restarted) {
+    if (last <= 0 || now <= last) return false;
+    java.time.ZoneId zone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+    return now - last >= 24L * 60 * 60 * 1000
+        || (restarted
+            && !java.time.Instant.ofEpochMilli(last)
+                .atZone(zone)
+                .toLocalDate()
+                .equals(java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate()));
+  }
+
   public static List<Event> activeFaults(List<Event> input) {
     List<Event> sorted = new ArrayList<>(input);
     sorted.sort(Comparator.comparingLong(Event::at));
@@ -113,7 +124,15 @@ public final class Rules {
     for (Event e : sorted) {
       String k = km(e.crossing()) + "|" + faultKey(e.text());
       if (e.red()) faults.put(k, e);
-      else if (e.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")) faults.remove(k);
+      else if (e.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")) {
+        faults.remove(k);
+        // The actual web has a collective "Cần chắn khôi phục tốt" event.
+        if (e.text().toLowerCase(Locale.ROOT).contains("cần chắn")
+            && faultKey(e.text()).equals(e.text().toLowerCase(Locale.ROOT))) {
+          String prefix = km(e.crossing()) + "|cần chắn ";
+          faults.keySet().removeIf(key -> key.startsWith(prefix));
+        }
+      }
     }
     var result = new ArrayList<>(faults.values());
     result.sort(Comparator.comparingLong(Event::at).reversed());

@@ -61,7 +61,7 @@ public final class Store {
           !url.equals(prefs.getString("url", "")) || !user.equals(prefs.getString("user", ""));
       if (changed) {
         context.deleteDatabase("events.db");
-        prefs.edit().remove("lastSuccess").remove("coverage").apply();
+        prefs.edit().remove("lastSuccess").remove("coverage").remove("baselineFrom").apply();
       }
       prefs
           .edit()
