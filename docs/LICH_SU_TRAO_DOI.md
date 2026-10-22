@@ -90,3 +90,7 @@ Chủ dự án yêu cầu giữ cả phần trao đổi để phiên sau hiểu 
 Các tài liệu này không tự chuyển lịch sử chat của tài khoản ChatGPT. Nếu cần nguyên văn kèm ảnh gốc, chủ dự án dùng chức năng **Xuất dữ liệu** trong Cài đặt → Kiểm soát dữ liệu của ChatGPT, giữ tệp xuất riêng và cung cấp phần cần thiết cho phiên sau. Cuộc chat từng chứa thông tin đăng nhập thử; không đưa toàn bộ tệp xuất đó lên GitHub công khai.
 
 Khóa riêng dùng ký APK cũng cần sao lưu riêng ngoài cloud để tài khoản/môi trường mới ký được bản cài đè; xem mục khóa ký trong bản bàn giao. GitHub hiện giữ mã nguồn/APK/tài liệu, chưa có bản sao khóa ký riêng.
+
+## 11. Chuẩn bị sao lưu khóa ký
+
+Chủ dự án hỏi ý nghĩa khóa ký và cần làm gì để giữ khả năng cập nhật khi đổi tài khoản/môi trường. Đã giải thích: app đã cài vẫn dùng được; khóa cũ cần cho bản APK mới cài đè. Sau đó đã chuẩn bị bản sao mã hóa, mật khẩu ngẫu nhiên riêng, công cụ/hướng dẫn khôi phục và kiểm chứng khôi phục đúng khóa/chứng chỉ, từ chối mật khẩu sai/nội dung bị sửa. Tệp khóa, bản mã và mật khẩu ở ngoài Git, giao riêng cho chủ dự án để tải về; chỉ công cụ và hướng dẫn vào repo. Chưa xác nhận chủ dự án đã lưu ra máy/ổ riêng. Xem `docs/SAO_LUU_KHOA_KY.md`.

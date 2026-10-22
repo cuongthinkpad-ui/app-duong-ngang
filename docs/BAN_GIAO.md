@@ -97,7 +97,7 @@ APK hiện dùng **khóa debug của môi trường cloud này**; khóa riêng k
 
 - Vị trí khóa ở môi trường hiện tại: `/workspace/toolchains/android-home/debug.keystore` (đã kiểm tra tồn tại khi bàn giao).
 - SHA-256 chứng chỉ đang dùng: `281d109c85d7c1d4cb6dc88ed1e69972f1a44cbc74f368991c7d93fae7c18e44`.
-- Cần sao lưu khóa vào nơi riêng do chủ dự án giữ, kèm thông tin sử dụng khóa; không đưa khóa thô lên repository công khai. Tài liệu này **chưa thực hiện xuất/lưu khóa ra ngoài cloud**.
+- Cần sao lưu khóa vào nơi riêng do chủ dự án giữ, kèm thông tin sử dụng khóa; không đưa khóa thô lên repository công khai. Đã tạo bản sao mã hóa và thử khôi phục; xem [hướng dẫn sao lưu khóa](SAO_LUU_KHOA_KY.md). **Chưa có xác nhận chủ dự án tải bản sao ra ngoài cloud**. Tệp mã hóa và mật khẩu nằm ngoài repo và được giao riêng trong chat.
 - Phiên mới cần khóa cũ để ký bản cập nhật cài đè. Nếu không có khóa, vẫn phát triển được mã nguồn, nhưng phải giải quyết phương án cài lại/chuyển sang khóa phát hành và tác động dữ liệu với chủ dự án.
 
 ## Kiểm chứng và việc còn lại
