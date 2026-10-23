@@ -591,15 +591,19 @@ final class UiRefreshChecks {
               "Khôi phục hệ thống",
               false,
               List.of("40", "40", "40", "52", "40", "40")));
-      for (int i = 0; i < 7; i++)
-        axleRecords.add(
-            new Rules.Event(
-                "ui-exempt-" + i,
-                axleStart + i * 1000,
-                "320+445",
-                "Khôi phục hệ thống",
-                false,
-                List.of("40", "40", i == 6 ? "28" : "37", "40", "40", "40")));
+      List<String> exemptPoints =
+          List.of("320+445", "307+507", "309+056", "280+500", "343+350", "338+900");
+      for (String exemptPoint : exemptPoints) {
+        for (int i = 0; i < 7; i++)
+          axleRecords.add(
+              new Rules.Event(
+                  "ui-exempt-" + exemptPoint + "-" + i,
+                  axleStart + i * 1000,
+                  exemptPoint,
+                  "Khôi phục hệ thống",
+                  false,
+                  List.of("40", "40", i == 6 ? "28" : "37", "40", "40", "40")));
+      }
       axleRecords.add(
           new Rules.Event(
               "ui-exempt-hardware",
@@ -617,7 +621,10 @@ final class UiRefreshChecks {
                 "Cần chắn 1 đã nâng",
                 false,
                 List.of()));
-      store.saveForAccount(store.account(), new WebSource.DayData(axleRecords, Rules.DEMO_ROUTE));
+      List<String> axlePoints = new ArrayList<>(Rules.DEMO_ROUTE.points());
+      for (String point : exemptPoints) if (!axlePoints.contains(point)) axlePoints.add(point);
+      Rules.Route axleRoute = new Rules.Route(axlePoints);
+      store.saveForAccount(store.account(), new WebSource.DayData(axleRecords, axleRoute));
       store.updateActiveFaults(store.account(), axleStart, axleNow, axleStart + 30000, List.of());
       store
           .prefs
@@ -680,6 +687,40 @@ final class UiRefreshChecks {
                 "320+445 keeps its raw hardware fault but no axle statistics or comparison note");
           });
       UiPreview.shot(runner, activity, "axle-exempt-detail-0.13.png");
+      for (String exemptPoint : exemptPoints) {
+        if (exemptPoint.equals("320+445")) continue;
+        store.saveForAccount(
+            store.account(),
+            new WebSource.DayData(
+                List.of(
+                    new Rules.Event(
+                        "ui-hardware-" + exemptPoint,
+                        axleStart + 40000,
+                        exemptPoint,
+                        "Chuông 2 hỏng",
+                        true,
+                        List.of())),
+                axleRoute));
+        store.updateActiveFaults(store.account(), axleStart, axleNow, axleStart + 30000, List.of());
+        ui(
+            () -> {
+              Field point = MainActivity.class.getDeclaredField("selectedCrossing");
+              point.setAccessible(true);
+              point.set(activity, exemptPoint);
+              navigate("detail");
+              String visible = labels((View) field(activity, "screen"));
+              check(
+                  visible.contains("Km " + exemptPoint)
+                      && visible.contains("Chuông 2 hỏng")
+                      && visible.contains("Đang có sự cố")
+                      && !visible.contains("Đếm trục lỗi")
+                      && !visible.contains("CB3 thiếu")
+                      && !visible.contains("CB3 thừa"),
+                  "new exemption keeps real hardware but hides derived axle details: "
+                      + exemptPoint);
+            });
+      }
+      UiPreview.shot(runner, activity, "axle-exempt-detail-0.15.png");
       ui(
           () -> {
             ((Runnable) field(activity, "refresh")).run();

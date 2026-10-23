@@ -1233,6 +1233,58 @@ public class RulesTest {
     check(
         Rules.axleAlerts(Rules.DEMO_ROUTE, List.of(axle(axleDay, "320+957", 3, 10))).size() == 1,
         "normal neighboring crossings still alert at exactly ten axles");
+    for (String point : List.of("280+500", "307+507", "309+056", "320+445", "338+900", "343+350")) {
+      var exemptRoute = new Rules.Route(List.of("100+000", point, "400+000"));
+      String[] parts = point.split("\\+");
+      check(
+          Rules.isAxleExempt("Km " + parts[0] + " + " + parts[1])
+              && Rules.isAxleExempt("0" + point),
+          "excluded chainage is recognized with formatting variations: " + point);
+      List<Rules.Event> counts = new ArrayList<>();
+      for (int i = 0; i < 7; i++) counts.add(axle(axleDay + i * 1000, point, 3, i == 6 ? -10 : 3));
+      check(
+          counts.stream().allMatch(e -> Rules.axleNote(e).isEmpty()), "no axle notes at " + point);
+      check(Rules.axleErrors(exemptRoute, counts).isEmpty(), "no axle statistics at " + point);
+      check(
+          Rules.axleAlerts(exemptRoute, counts).isEmpty(), "neither threshold alerts at " + point);
+      var legacy =
+          new Rules.Event(
+              "axle:3:old-" + point,
+              axleDay,
+              point,
+              "CB3 đếm thiếu 10 trục trong 1 lần",
+              true,
+              List.of("40", "40", "30", "40", "40", "40"));
+      var raw = event(axleDay + 1, point, "Chuông 2 hỏng", true);
+      var rawAxleText = event(axleDay + 2, point, "CB3 đếm thiếu 10 trục trong 1 lần", true);
+      check(
+          Rules.activeFaults(List.of(legacy, raw, rawAxleText)).size() == 2,
+          "only derived alerts are removed, including when raw text mentions axles: " + point);
+      check(
+          Rules.incidentHistory(List.of(legacy, raw, rawAxleText)).size() == 2,
+          "archived derived alert is hidden but raw incidents remain: " + point);
+      var train = event(axleDay + 3, point, "Tàu lẻ", false);
+      check(
+          Rules.occupancies(exemptRoute, List.of(train)).size() == 1,
+          "axle exclusion keeps train occupation: " + point);
+      var travel = Rules.travelState(exemptRoute, Rules.TravelState.empty(), List.of(train));
+      check(
+          Rules.trackSegments(exemptRoute, travel).size() == 1,
+          "axle exclusion keeps train diagram: " + point);
+    }
+    for (String normal :
+        List.of(
+            "280+499", "280+501", "307+506", "307+508", "309+055", "309+057", "338+899", "338+901",
+            "343+349", "343+351")) {
+      var normalRoute = new Rules.Route(List.of(normal));
+      check(
+          !Rules.isAxleExempt(normal)
+              && Rules.axleAlerts(normalRoute, List.of(axle(axleDay, normal, 3, 10))).size() == 1,
+          "neighboring chainage remains subject to axle alerts: " + normal);
+    }
+    check(
+        !Rules.isAxleExempt(null) && !Rules.isAxleExempt("not-a-crossing"),
+        "invalid input is not an exemption");
     System.out.println(scenarios + " domain scenarios passed");
   }
 }

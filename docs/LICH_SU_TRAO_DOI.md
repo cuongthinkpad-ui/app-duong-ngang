@@ -165,3 +165,7 @@ Chủ dự án đã tìm thấy mục Đếm trục lỗi trong chi tiết và k
 Chủ dự án hỏi về Google Stitch, muốn mang đặc tả sang thiết kế giao diện rồi áp dụng trở lại app hiện có. Chủ dự án muốn viền sáng nhẹ và logo nhấp nháy; đã thống nhất dùng nhịp sáng dịu, không làm nháy trắng hoặc chuyển động tàu giả. Chủ dự án gửi bảng màu dark telemetry, JSON mẫu và ảnh riêng của bốn tab, sau đó yêu cầu thực hiện linh hoạt, căn theo app đã code, không cần sao chép chính xác từng chi tiết.
 
 Đã chỉ rõ số liệu mẫu không nhất quán (11 đường ngang/2 ga so với số 14), pin/góc cần/hướng cố định không có nguồn web, lỗi điện áp phải giữ đỏ, nguyên văn thiết bị và ngoại lệ 320+445 phải giữ. JSON chỉ là minh họa, không phải API Visitec. Sự cố Tất cả vẫn xếp theo giờ phát sinh, không nhóm đỏ trước xanh. Bản 0.14 chỉ đổi lớp giao diện Android Java, giữ toàn bộ quy tắc nghiệp vụ và khóa ký. Chi tiết kiểm tra/ảnh tổng hợp tại docs/UI_REVIEW_0.14.md.
+
+## 19. Mở rộng ngoại lệ trục — 0.15
+
+Chủ dự án yêu cầu thêm 307+507, 309+056, 280+500, 343+350 và 338+900 vào danh sách không tính lệch trục. Đã áp dụng như ngoại lệ 320+445: không đối chiếu/ghi chú/thống kê/hiển thị dữ liệu trục hoặc cảnh báo trục suy ra; giữ toàn bộ dòng đỏ gốc, tàu và các tính năng khác. Nâng cache trục từ 2 lên 3 để dọn các cảnh báo trục cũ tại cả sáu điểm kể cả trước khi đọc web mới. Không xóa raw, cấu hình hoặc dấu chống báo lặp của điểm khác. Xem docs/UI_REVIEW_0.15.md cho kiểm chứng và APK.

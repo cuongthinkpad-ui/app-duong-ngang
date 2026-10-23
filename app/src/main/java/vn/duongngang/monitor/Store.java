@@ -12,7 +12,7 @@ import org.json.*;
 
 public final class Store {
   private static final int TRAVEL_VERSION = 3;
-  private static final int AXLE_VERSION = 2;
+  private static final int AXLE_VERSION = 3;
   private final Context context;
   public final android.content.SharedPreferences prefs;
 

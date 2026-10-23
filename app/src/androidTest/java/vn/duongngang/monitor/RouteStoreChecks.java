@@ -536,128 +536,154 @@ public final class RouteStoreChecks extends Instrumentation {
       check(
           store.claimAxleNotice(newDayNotice, axleDay + 86400000 + 2000),
           "same sensor can notify again only on a new day or a new large deviation");
-      store.credentials("https://rail.example.test/", "exempt-upgrade", "test-only");
-      var exemptSource = new java.util.ArrayList<Rules.Event>();
-      for (int i = 0; i < 7; i++)
-        exemptSource.add(
+      for (String exemptPoint :
+          List.of("320+445", "307+507", "309+056", "280+500", "343+350", "338+900")) {
+        store.credentials(
+            "https://rail.example.test/", "exempt-upgrade-" + exemptPoint, "test-only");
+        var exemptSource = new java.util.ArrayList<Rules.Event>();
+        for (int i = 0; i < 7; i++)
+          exemptSource.add(
+              new Rules.Event(
+                  "exempt-source-" + i,
+                  axleDay + 1000 + i * 1000,
+                  "Km " + exemptPoint,
+                  "Khôi phục hệ thống",
+                  false,
+                  List.of("40", "40", i == 6 ? "28" : "37", "40", "40", "40")));
+        var legacyExempt =
             new Rules.Event(
-                "exempt-source-" + i,
-                axleDay + 1000 + i * 1000,
-                "Km 320+445",
+                "axle:3:legacy-exempt",
+                axleDay + 7000,
+                "Km " + exemptPoint,
+                "CB3 đếm thiếu 12 trục trong 1 lần",
+                true,
+                List.of("40", "40", "28", "40", "40", "40"));
+        var legacyOldDay =
+            new Rules.Event(
+                "axle:3:legacy-exempt-yesterday",
+                axleDay - 1000,
+                exemptPoint,
+                "CB3 đếm sai 6 lần trong ngày",
+                true,
+                List.of("40", "40", "37", "40", "40", "40"));
+        var cacheOnlyExempt =
+            new Rules.Event(
+                "axle:4:legacy-cache-only",
+                axleDay + 7000,
+                exemptPoint,
+                "CB4 đếm thiếu 12 trục trong 1 lần",
+                true,
+                List.of());
+        var actualExempt =
+            new Rules.Event(
+                "actual-exempt-red",
+                axleDay + 9000,
+                exemptPoint,
+                "Cảm biến 3 hỏng",
+                true,
+                List.of());
+        var neighborSource =
+            new Rules.Event(
+                "normal-neighbor",
+                axleDay + 9000,
+                "320+957",
                 "Khôi phục hệ thống",
                 false,
-                List.of("40", "40", i == 6 ? "28" : "37", "40", "40", "40")));
-      var legacyExempt =
-          new Rules.Event(
-              "axle:3:legacy-exempt",
-              axleDay + 7000,
-              "Km 320+445",
-              "CB3 đếm thiếu 12 trục trong 1 lần",
-              true,
-              List.of("40", "40", "28", "40", "40", "40"));
-      var legacyOldDay =
-          new Rules.Event(
-              "axle:3:legacy-exempt-yesterday",
-              axleDay - 1000,
-              "320+445",
-              "CB3 đếm sai 6 lần trong ngày",
-              true,
-              List.of("40", "40", "37", "40", "40", "40"));
-      var cacheOnlyExempt =
-          new Rules.Event(
-              "axle:4:legacy-cache-only",
-              axleDay + 7000,
-              "320+445",
-              "CB4 đếm thiếu 12 trục trong 1 lần",
-              true,
-              List.of());
-      var actualExempt =
-          new Rules.Event(
-              "actual-exempt-red", axleDay + 9000, "320+445", "Cảm biến 3 hỏng", true, List.of());
-      var neighborSource =
-          new Rules.Event(
-              "normal-neighbor",
-              axleDay + 9000,
-              "320+957",
-              "Khôi phục hệ thống",
-              false,
-              List.of("40", "40", "30", "40", "40", "40"));
-      exemptSource.addAll(List.of(legacyExempt, legacyOldDay, actualExempt, neighborSource));
-      store.saveForAccount(store.account(), new WebSource.DayData(exemptSource, Rules.DEMO_ROUTE));
-      var oldCache = new org.json.JSONArray();
-      for (var e : List.of(legacyExempt, cacheOnlyExempt, actualExempt))
-        oldCache.put(
-            new org.json.JSONArray()
-                .put(e.id())
-                .put(e.at())
-                .put(e.crossing())
-                .put(e.text())
-                .put(new org.json.JSONArray(e.counts())));
-      store
-          .prefs
-          .edit()
-          .putString("activeFaults", oldCache.toString())
-          .putInt("axleVersion", 1)
-          .commit();
-      check(
-          store.activeFaults().equals(List.of(actualExempt)),
-          "v0.12 cached 320+445 axle alert is hidden immediately without hiding its hardware"
-              + " fault");
-      check(
-          !store.claimAxleNotice(legacyExempt, axleDay + 20000)
-              && store.claimAxleNotice(actualExempt, axleDay + 20000),
-          "excluded axle alert cannot notify but original red fault can");
-      var manager = context.getSystemService(android.app.NotificationManager.class);
-      manager.createNotificationChannel(
-          new android.app.NotificationChannel(
-              "exempt-upgrade-test",
-              "Fixture only",
-              android.app.NotificationManager.IMPORTANCE_LOW));
-      int obsoleteNotification = 100 + Math.floorMod(legacyExempt.id().hashCode(), 1000000);
-      manager.notify(
-          obsoleteNotification,
-          new android.app.Notification.Builder(context, "exempt-upgrade-test")
-              .setSmallIcon(vn.duongngang.monitor.R.drawable.ic_train_header)
-              .setContentTitle("Synthetic upgrade check")
-              .build());
-      int cacheOnlyNotification = 100 + Math.floorMod(cacheOnlyExempt.id().hashCode(), 1000000);
-      manager.notify(
-          cacheOnlyNotification,
-          new android.app.Notification.Builder(context, "exempt-upgrade-test")
-              .setSmallIcon(vn.duongngang.monitor.R.drawable.ic_train_header)
-              .setContentTitle("Synthetic cache-only check")
-              .build());
-      store.updateActiveFaults(store.account(), axleDay, axleDay + 20000, axleDay, List.of());
-      check(
-          store.axleReady()
-              && store.activeFaults().size() == 2
-              && store.activeFaults().stream().anyMatch(e -> e.id().equals(actualExempt.id()))
-              && store.activeFaults().stream()
-                  .anyMatch(e -> Rules.isAxleFault(e) && e.crossing().equals("320+957")),
-          "upgrade keeps hardware and normal-crossing axle warnings while exempting 320+445");
-      check(
-          java.util.Arrays.stream(manager.getActiveNotifications())
-              .noneMatch(
-                  n -> n.getId() == obsoleteNotification || n.getId() == cacheOnlyNotification),
-          "upgrade cancels obsolete axle notifications including a cache-only alert");
-      manager.deleteNotificationChannel("exempt-upgrade-test");
-      try (var db = context.openOrCreateDatabase("events.db", 0, null);
-          var c =
-              db.rawQuery(
-                  "SELECT COUNT(*) FROM events WHERE id IN (?,?)",
-                  new String[] {legacyExempt.id(), legacyOldDay.id()})) {
-        c.moveToFirst();
-        check(c.getInt(0) == 0, "upgrade deletes derived exempt alerts from every stored day");
+                List.of("40", "40", "30", "40", "40", "40"));
+        exemptSource.addAll(List.of(legacyExempt, legacyOldDay, actualExempt, neighborSource));
+        store.saveForAccount(
+            store.account(),
+            new WebSource.DayData(exemptSource, new Rules.Route(List.of(exemptPoint, "320+957"))));
+        var oldCache = new org.json.JSONArray();
+        var normalDaily =
+            new Rules.Event(
+                "axle:3:normal-daily-already-notified",
+                axleDay + 9000,
+                "320+957",
+                "CB3 đếm sai 6 lần trong ngày",
+                true,
+                List.of("40", "40", "37", "40", "40", "40"));
+        check(
+            store.claimAxleNotice(normalDaily, axleDay + 20000),
+            "normal crossing records its one-time daily notice before migration");
+        for (var e : List.of(legacyExempt, cacheOnlyExempt, actualExempt))
+          oldCache.put(
+              new org.json.JSONArray()
+                  .put(e.id())
+                  .put(e.at())
+                  .put(e.crossing())
+                  .put(e.text())
+                  .put(new org.json.JSONArray(e.counts())));
+        store
+            .prefs
+            .edit()
+            .putString("activeFaults", oldCache.toString())
+            .putInt("axleVersion", exemptPoint.equals("320+445") ? 1 : 2)
+            .commit();
+        check(!store.axleReady(), "previous exclusion set forces migration for " + exemptPoint);
+        check(
+            store.activeFaults().equals(List.of(actualExempt)),
+            "v0.12 cached 320+445 axle alert is hidden immediately without hiding its hardware"
+                + " fault");
+        check(
+            !store.claimAxleNotice(legacyExempt, axleDay + 20000)
+                && store.claimAxleNotice(actualExempt, axleDay + 20000),
+            "excluded axle alert cannot notify but original red fault can");
+        var manager = context.getSystemService(android.app.NotificationManager.class);
+        manager.createNotificationChannel(
+            new android.app.NotificationChannel(
+                "exempt-upgrade-test",
+                "Fixture only",
+                android.app.NotificationManager.IMPORTANCE_LOW));
+        int obsoleteNotification = 100 + Math.floorMod(legacyExempt.id().hashCode(), 1000000);
+        manager.notify(
+            obsoleteNotification,
+            new android.app.Notification.Builder(context, "exempt-upgrade-test")
+                .setSmallIcon(vn.duongngang.monitor.R.drawable.ic_train_header)
+                .setContentTitle("Synthetic upgrade check")
+                .build());
+        int cacheOnlyNotification = 100 + Math.floorMod(cacheOnlyExempt.id().hashCode(), 1000000);
+        manager.notify(
+            cacheOnlyNotification,
+            new android.app.Notification.Builder(context, "exempt-upgrade-test")
+                .setSmallIcon(vn.duongngang.monitor.R.drawable.ic_train_header)
+                .setContentTitle("Synthetic cache-only check")
+                .build());
+        store.updateActiveFaults(store.account(), axleDay, axleDay + 20000, axleDay, List.of());
+        check(
+            !store.claimAxleNotice(normalDaily, axleDay + 20000),
+            "exemption migration preserves another crossing's daily notification suppression");
+        check(
+            store.axleReady()
+                && store.activeFaults().size() == 2
+                && store.activeFaults().stream().anyMatch(e -> e.id().equals(actualExempt.id()))
+                && store.activeFaults().stream()
+                    .anyMatch(e -> Rules.isAxleFault(e) && e.crossing().equals("320+957")),
+            "upgrade keeps hardware and normal-crossing axle warnings while exempting 320+445");
+        check(
+            java.util.Arrays.stream(manager.getActiveNotifications())
+                .noneMatch(
+                    n -> n.getId() == obsoleteNotification || n.getId() == cacheOnlyNotification),
+            "upgrade cancels obsolete axle notifications including a cache-only alert");
+        manager.deleteNotificationChannel("exempt-upgrade-test");
+        try (var db = context.openOrCreateDatabase("events.db", 0, null);
+            var c =
+                db.rawQuery(
+                    "SELECT COUNT(*) FROM events WHERE id IN (?,?)",
+                    new String[] {legacyExempt.id(), legacyOldDay.id()})) {
+          c.moveToFirst();
+          check(c.getInt(0) == 0, "upgrade deletes derived exempt alerts from every stored day");
+        }
+        check(
+            store.events(axleDay, axleDay + 20000).stream()
+                    .filter(e -> e.id().startsWith("exempt-source-"))
+                    .count()
+                == 7,
+            "upgrade preserves all original 320+445 measurements");
+        check(
+            Rules.incidentHistory(store.incidentEvents(axleDay - 86400000, axleDay)).isEmpty(),
+            "historical incident screen does not recreate exempt axle warnings");
       }
-      check(
-          store.events(axleDay, axleDay + 20000).stream()
-                  .filter(e -> e.id().startsWith("exempt-source-"))
-                  .count()
-              == 7,
-          "upgrade preserves all original 320+445 measurements");
-      check(
-          Rules.incidentHistory(store.incidentEvents(axleDay - 86400000, axleDay)).isEmpty(),
-          "historical incident screen does not recreate exempt axle warnings");
       store.credentials("https://rail.example.test/", "new-axle-account", "test-only");
       check(
           store.activeFaults().isEmpty()

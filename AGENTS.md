@@ -10,4 +10,4 @@ Read `docs/BAN_GIAO.md`, `docs/LICH_SU_TRAO_DOI.md` and `README.md` before editi
 - The APK signing key is not in this repo. Read the signing section in `docs/BAN_GIAO.md` before preparing an install-over update in a new environment.
 - Record material changes, validation and remaining limitations in the handoff/review documents. Do not present emulator checks as physical Xiaomi validation.
 
-- Km 320+445 uses more than six sensors and a different axle-counting mechanism. Exclude only app-derived axle notes/statistics/alerts there, including cached old alerts. Preserve original website faults, train tracking and other features.
+- Exclude app-derived axle notes/statistics/alerts at Km 280+500, 307+507, 309+056, 320+445, 338+900 and 343+350, including cached old alerts. These are the owner's explicit exclusions; 320+445 has more than six sensors and its own counting mechanism. Preserve original website faults, train tracking and other features at all six points.

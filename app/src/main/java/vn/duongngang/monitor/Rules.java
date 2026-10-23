@@ -4,6 +4,8 @@ import java.util.*;
 
 /** Domain rules independent of Android. All timestamps are epoch milliseconds. */
 public final class Rules {
+  private static final Set<Long> AXLE_EXEMPT_CHAINAGES =
+      Set.of(280500L, 307507L, 309056L, 320445L, 338900L, 343350L);
   private static final java.util.regex.Pattern POINT =
       java.util.regex.Pattern.compile(
           "(?iu)^(?:km\\s*)?(\\d+)\\s*\\+\\s*(\\d{1,3})(?:\\s*\\(\\s*([^()]+?)\\s*\\))?$");
@@ -492,9 +494,9 @@ public final class Rules {
     return compactJourneys(journeys);
   }
 
-  /** This crossing has more sensors and a different counting mechanism. */
+  /** Owner-specified exclusions from the app's six-sensor axle comparison, across accounts. */
   public static boolean isAxleExempt(String crossing) {
-    return isPoint(crossing) && chainage(km(crossing)) == 320445;
+    return isPoint(crossing) && AXLE_EXEMPT_CHAINAGES.contains(chainage(km(crossing)));
   }
 
   public static String axleNote(Event event) {

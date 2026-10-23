@@ -1,12 +1,14 @@
-# Đường Ngang — bản thử 0.14
+# Đường Ngang — bản thử 0.15
 
-**[Tải APK 0.14](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.14.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
+**[Tải APK 0.15](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.15.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
+
+- Thêm năm điểm **307+507, 309+056, 280+500, 343+350, 338+900** vào ngoại lệ trục cùng **320+445**: không ghi chú/thống kê/cảnh báo trục suy ra; cài đè tự dọn các cảnh báo trục cũ. Lỗi đỏ thật từ web và theo dõi tàu tại các điểm này vẫn giữ nguyên.
 
 - Làm lại bốn tab theo mẫu Stitch: navy/cyan, viền thẻ, ga màu hổ phách, nút chuyển màu cyan–mint. Tổng quan tự chia chiều cao; dữ liệu thực không bị thay bằng các con số mẫu.
 - Logo sáng dịu, vòng đếm sự cố pulse và đoạn tàu có viền sáng nhẹ. Hiệu ứng dừng khi app mất focus/chạy nền, tắt theo cài đặt hiệu ứng Android. LIVE phản ánh phiên đang chạy và độ mới của dữ liệu.
 - Danh sách đường ngang có bộ lọc theo lỗi thực tế. Dòng đỏ web giữ nguyên nội dung; phần Sự cố vẫn xếp thời điểm phát sinh mới nhất trước, kể cả sự cố đã khôi phục.
 
-- **Riêng Km 320+445 được loại khỏi đối chiếu/cảnh báo trục**, giữ lỗi đỏ thật trên website và theo dõi tàu. Cài đè tự xử lý cảnh báo trục cũ. Tối ưu đọc dữ liệu khi chuyển tab.
+- Những điểm ngoại lệ trục vẫn giữ lỗi đỏ thật trên website và theo dõi tàu. Cài đè tự xử lý cảnh báo trục cũ; giữ tối ưu đọc dữ liệu khi chuyển tab.
 - Cảnh báo đếm trục: cùng CB lệch từ **3 trục**, tới **lần thứ 6/ngày** thông báo một lần; một lần lệch từ **10 trục** cảnh báo ngay. Giữ đỏ đến hết ngày; chi tiết đường ngang có một mục **Đếm trục lỗi**, chỉ hiện thống kê CB đã đạt ngưỡng.
 - Chuông lỗi **6 hồi** (12 giây). **“Ấn nút Phục hồi”** ở điểm nghi tự kích sẽ đánh dấu sự cố đã khôi phục và tắt đoạn sáng tự kích tại đó, giữ nguyên các lỗi thiết bị khác.
 - Giao diện tối navy/cyan theo mẫu mới, Tổng quan vừa màn hình và cập nhật trong khung hiện tại.
@@ -20,4 +22,4 @@
 
 Có thể cài mới trực tiếp, không cần bản gốc. Nếu đã có app, cài đè bằng cùng chữ ký thử nghiệm để giữ cấu hình. Mở Cài đặt, nhập web/ID/mật khẩu rồi Lưu & theo dõi; chu kỳ 30 giây / 2 phút / 5 phút. Lượt đồng bộ đầu cần đọc hai ngày nên lâu hơn những lượt sau.
 
-Cần kiểm tra âm thanh, chạy nền và thông báo khi khóa màn hình lâu trên điện thoại thật, nhất là chế độ pin Xiaomi. Kiểm tra phát nhạc trên giả lập không chứng minh loa Xiaomi đã kêu. Bản thử không thay thế quy trình trực hiện có. Không nhúng tài khoản thử nghiệm vào APK. [Chi tiết kiểm tra](../docs/UI_REVIEW_0.14.md).
+Cần kiểm tra âm thanh, chạy nền và thông báo khi khóa màn hình lâu trên điện thoại thật, nhất là chế độ pin Xiaomi. Kiểm tra phát nhạc trên giả lập không chứng minh loa Xiaomi đã kêu. Bản thử không thay thế quy trình trực hiện có. Không nhúng tài khoản thử nghiệm vào APK. [Chi tiết kiểm tra](../docs/UI_REVIEW_0.15.md).

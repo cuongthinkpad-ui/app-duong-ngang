@@ -1,4 +1,4 @@
-# Đường Ngang — Android 0.14
+# Đường Ngang — Android 0.15
 
 **Đổi phiên/tài khoản ChatGPT:** đọc [Bản bàn giao và cách tiếp tục](docs/BAN_GIAO.md) và [Nhật ký trao đổi, yêu cầu đã chốt](docs/LICH_SU_TRAO_DOI.md). [Sao lưu khóa ký APK](docs/SAO_LUU_KHOA_KY.md).
 
@@ -6,7 +6,13 @@
 
 Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt navy, xanh cyan và xanh lá. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
 
-## Thay đổi 0.14
+## Thay đổi 0.15
+
+- Thêm **307+507, 309+056, 280+500, 343+350, 338+900** vào danh sách không đối chiếu trục; giữ ngoại lệ cũ **320+445**. Cả sáu điểm không tạo ghi chú, thống kê, dữ liệu trục hiển thị hoặc cảnh báo lệch trục do app suy ra.
+- Nâng phiên bản cache trục lên 3 để lọc ngay và dọn các cảnh báo dẫn xuất cũ ở cả sáu điểm, kể cả ngày trước và thông báo chỉ còn trong cache. Giữ bản tin web gốc, dòng đỏ thật, theo dõi tàu, tự kích, tài khoản, phạm vi và dấu chống báo lặp của điểm khác.
+- Giữ nguyên giao diện 0.14, chu kỳ, chuông sáu hồi và các ngưỡng trục ở những đường ngang còn lại. [Biên bản 0.15](docs/UI_REVIEW_0.15.md).
+
+## Thay đổi 0.14 (lịch sử)
 
 - Áp dụng mẫu Stitch vào app Android hiện có: nền navy tối, cyan, thẻ có viền, nút chính chuyển màu cyan–mint; căn lại cả bốn tab và màn chi tiết. Giữ Tổng quan vừa chiều cao màn hình, không chép những khoảng trống lớn hoặc thông số giả từ bản thiết kế.
 - Logo sáng dịu theo chu kỳ 2,8 giây; vòng đếm lỗi có hiệu ứng pulse; đoạn tàu có quầng sáng tĩnh và nhãn hướng liền mũi tên. Dừng pulse khi mất focus/chạy nền và tôn trọng tùy chọn tắt hiệu ứng của Android. Không dùng hiệu ứng để tự di chuyển tàu hoặc trì hoãn cảnh báo.
@@ -85,7 +91,7 @@
 - Mọi lỗi đỏ giữ nguyên chữ trên web, gồm tên/số thiết bị. Khôi phục chỉ xóa lỗi tương ứng; khôi phục hệ thống không xóa lỗi phần cứng. Sáu nhóm chi tiết: Chuông, Đèn, Cần chắn, Cảm biến, Kết nối, Điện áp.
 - Lưu lỗi chưa khôi phục trong ngày; khối hiện tại reset ở 00:00 giờ Việt Nam, lịch sử ngày cũ vẫn tra cứu được. Chiếm dụng tàu giữ qua nửa đêm tới bản tin khôi phục đúng điểm. Sau gián đoạn qua ngày hoặc trên 24 giờ, mốc theo dõi lỗi có thể được đặt lại với “Chưa ghi nhận lỗi mới”; đây không phải bản tin thiết bị phục hồi.
 - Ở chu kỳ **30 giây**, suy luận “Nghi tự kích” từ lượt tàu mới thiếu lượt tương ứng ở đường ngang phía trước theo hướng chạy, có chờ ít nhất một chu kỳ. Không áp dụng qua ga hay đầu/cuối tuyến, không áp dụng chu kỳ 2 phút/5 phút. Bản tin phía trước tới muộn sẽ bỏ suy luận; bản tin gốc được giữ. Đây là suy luận theo dữ liệu web, cần đối chiếu hiện trường.
-- CB1–CB6 ở bản tin khôi phục hệ thống được đối chiếu số trục theo số xuất hiện nhiều nhất. Ghi chú thừa/thiếu riêng từng CB; hòa chuẩn ghi “cảm biến đếm trục không đồng nhất, lỗi”. Ghi chú dưới ngưỡng không phát chuông; hai ngưỡng bản 0.12 được cảnh báo như lỗi. Riêng Km 320+445 không áp dụng phần đối chiếu trục. Không coi bản tin đo điện áp là số trục.
+- CB1–CB6 ở bản tin khôi phục hệ thống được đối chiếu số trục theo số xuất hiện nhiều nhất. Ghi chú thừa/thiếu riêng từng CB; hòa chuẩn ghi “cảm biến đếm trục không đồng nhất, lỗi”. Ghi chú dưới ngưỡng không phát chuông; hai ngưỡng bản 0.12 được cảnh báo như lỗi. Sáu điểm ngoại lệ nêu ở bản 0.15 không áp dụng phần đối chiếu trục. Không coi bản tin đo điện áp là số trục.
 
 ## Giao diện và thông báo
 
