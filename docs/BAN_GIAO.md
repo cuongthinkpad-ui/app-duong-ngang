@@ -6,7 +6,7 @@ Cập nhật: 23/10/2026, giờ Việt Nam. Tài liệu này ghi yêu cầu đã
 
 1. Kết nối cùng repository GitHub `cuongthinkpad-ui/app-duong-ngang`, lấy nhánh `main`; nếu không có công cụ GitHub, tải mã nguồn ZIP từ GitHub và cung cấp cho phiên mới.
 2. Đọc tài liệu này, `README.md`, `docs/LICH_SU_TRAO_DOI.md` và `docs/UI_REVIEW_0.12.md` trước khi thay đổi. Tài liệu 0.1–0.11 là lịch sử; các quyết định 0.12 và yêu cầu mới của chủ dự án được ưu tiên.
-3. Kiểm tra mã nguồn/commit thực tế. Bản ứng dụng mới nhất trong workspace là **0.12.0**, versionCode **12**, đã đóng gói và kiểm tra. **Hiện chưa đăng 0.12 lên GitHub**; chủ dự án đang xem lại thay đổi trước khi đăng. Không giả định main đã có bản mới; kiểm tra commit/APK thực tế. Không nhầm commit chỉ sửa tài liệu với bản APK mới.
+3. Kiểm tra mã nguồn/commit thực tế. Bản ứng dụng được chủ dự án chốt để phát hành là **0.12.0**, versionCode **12**, đã đóng gói và kiểm tra. Chủ dự án đã duyệt phương án và yêu cầu đăng lên cùng kho GitHub. Khi tiếp tục, kiểm tra commit/APK thực tế trên main; không nhầm commit chỉ sửa tài liệu với bản APK mới.
 4. Tài khoản ChatGPT mới cần được cấp quyền truy cập GitHub riêng. Lịch sử chat, bộ nhớ ChatGPT, cache build và cấu hình cloud không tự chuyển theo repository.
 5. Tài khoản/mật khẩu website được chủ dự án nhập trực tiếp trong app hoặc cung cấp riêng khi cần kiểm thử. Không yêu cầu gửi lại toàn bộ cuộc trò chuyện và không chép mật khẩu vào mã nguồn.
 

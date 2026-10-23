@@ -1,6 +1,6 @@
 # Chốt thay đổi bản 0.12
 
-Cập nhật 23/10/2026. APK đã đóng gói, kiểm tra và lưu trong workspace; **chưa đăng lên GitHub**, đang để chủ dự án xem lại trước khi đăng.
+Cập nhật 23/10/2026. Chủ dự án đã chốt phương án cuối và yêu cầu đăng mã nguồn/APK lên cùng kho GitHub. APK 0.12 đã đóng gói và kiểm tra; xem `downloads/DuongNgang-0.12.apk` và `downloads/SHA256SUMS`.
 
 ## Hai ngưỡng cảnh báo
 

@@ -148,3 +148,5 @@ Chủ dự án chọn giữ cảnh báo tới hết ngày/00:00 và yêu cầu n
 Chủ dự án sửa lại ngưỡng đơn lẻ ngay trước khi đóng gói: **lệch 10 trục trở lên**, bao gồm đúng 10, thay cho cách diễn đạt “quá 10” trước đó. Code, dấu thông báo và bài kiểm tra biên đều theo ngưỡng chốt này.
 
 Chốt giao diện cuối sau khi xem lại danh sách thay đổi: chủ dự án yêu cầu chỉ một mục **Đếm trục lỗi**, thống kê các CB đã đạt ngưỡng trong ngày, đặt trong chi tiết đường ngang. Bỏ hai mục/trang Đếm trục hôm nay và Xem các lần đếm trục. Chủ dự án xác nhận mục này là thống kê; khi đạt ngưỡng vẫn phải thông báo/đỏ/chuông như quy tắc đã chốt, không chỉ thêm vào bảng. Tổng quan không thêm bảng thống kê riêng.
+
+Chủ dự án đã duyệt phương án cuối và yêu cầu đăng bản 0.12 lên kho GitHub đang dùng để tải APK.
