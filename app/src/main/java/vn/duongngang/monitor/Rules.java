@@ -7,6 +7,14 @@ public final class Rules {
   private static final java.util.regex.Pattern POINT =
       java.util.regex.Pattern.compile(
           "(?iu)^(?:km\\s*)?(\\d+)\\s*\\+\\s*(\\d{1,3})(?:\\s*\\(\\s*([^()]+?)\\s*\\))?$");
+  private static final java.util.regex.Pattern WHITESPACE = java.util.regex.Pattern.compile("\\s+");
+  private static final java.util.regex.Pattern VOLTAGE_DEVICE =
+      java.util.regex.Pattern.compile("điện áp\\s+cảm biến\\s*(\\d+)");
+  private static final java.util.regex.Pattern NUMBERED_DEVICE =
+      java.util.regex.Pattern.compile(
+          "(cảm biến|cần chắn|chuông|đèn)(?:\\s+(?:điện|cảnh báo|tín hiệu|đỏ|số))*\\s*(\\d+)");
+  private static final java.util.regex.Pattern DEVICE_STATE =
+      java.util.regex.Pattern.compile("\\s+(?:hỏng|khôi phục|mất|bất thường|bị)\\b");
 
   /** Fixture only: operational routes must come from the authenticated page's full point list. */
   public static final Route DEMO_ROUTE =
@@ -167,7 +175,7 @@ public final class Rules {
 
   /** The operator's reset ends a self-trigger, not unrelated hardware faults. */
   public static boolean isManualRecovery(String text) {
-    return text.trim().replaceAll("\\s+", " ").equalsIgnoreCase("Ấn nút Phục hồi");
+    return WHITESPACE.matcher(text.trim()).replaceAll(" ").equalsIgnoreCase("Ấn nút Phục hồi");
   }
 
   private static int reportPhase(Event event) {
@@ -484,8 +492,14 @@ public final class Rules {
     return compactJourneys(journeys);
   }
 
+  /** This crossing has more sensors and a different counting mechanism. */
+  public static boolean isAxleExempt(String crossing) {
+    return isPoint(crossing) && chainage(km(crossing)) == 320445;
+  }
+
   public static String axleNote(Event event) {
-    return event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+    return !isAxleExempt(event.crossing())
+            && event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
         ? axleNote(event.counts())
         : "";
   }
@@ -552,6 +566,7 @@ public final class Rules {
     List<AxleError> out = new ArrayList<>();
     for (Event e : ordered) {
       if (e.red()
+          || isAxleExempt(e.crossing())
           || !e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
           || !route.crossings().contains(km(e.crossing()))
           || !seen.add(e.id())) continue;
@@ -592,6 +607,10 @@ public final class Rules {
 
   public static boolean isGenerated(Event event) {
     return isSelfTrigger(event) || isAxleFault(event);
+  }
+
+  public static boolean isExcludedAxleFault(Event event) {
+    return isAxleFault(event) && isAxleExempt(event.crossing());
   }
 
   public static boolean isLargeAxleFault(Event event) {
@@ -724,18 +743,14 @@ public final class Rules {
     String t = text.toLowerCase(Locale.ROOT);
     if (t.contains("220vac")) return "nguồn 220VAC";
     if (t.contains("kết nối giám sát")) return "kết nối giám sát";
-    var voltage = java.util.regex.Pattern.compile("điện áp\\s+cảm biến\\s*(\\d+)").matcher(t);
+    var voltage = VOLTAGE_DEVICE.matcher(t);
     if (voltage.find()) return "điện áp cảm biến " + voltage.group(1);
-    var m =
-        java.util.regex.Pattern.compile(
-                "(cảm biến|cần chắn|chuông|đèn)(?:\\s+(?:điện|cảnh báo|tín hiệu|đỏ|số))*\\s*(\\d+)")
-            .matcher(t);
+    var m = NUMBERED_DEVICE.matcher(t);
     if (m.find()) return m.group(1) + " " + m.group(2);
     for (String family : List.of("chuông", "đèn")) {
       int start = t.indexOf(family);
       if (start >= 0) {
-        String device =
-            t.substring(start).split("\\s+(?:hỏng|khôi phục|mất|bất thường|bị)\\b", 2)[0].trim();
+        String device = DEVICE_STATE.split(t.substring(start), 2)[0].trim();
         return device.isEmpty() ? family : device;
       }
     }
@@ -766,13 +781,22 @@ public final class Rules {
 
   public record Incident(Event fault, Event recovery) {}
 
+  private static boolean isFaultRelevant(Event event) {
+    return event.red()
+        || event.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")
+        || event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+        || isManualRecovery(event.text());
+  }
+
   /** Pair only explicit restoration messages with earlier faults of that device and crossing. */
   public static List<Incident> incidentHistory(List<Event> input) {
-    List<Event> ordered = new ArrayList<>(input);
+    List<Event> ordered = new ArrayList<>();
+    for (var event : input) if (isFaultRelevant(event)) ordered.add(event);
     ordered.sort(Comparator.comparingLong(Event::at).thenComparingInt(Rules::reportPhase));
     List<Incident> result = new ArrayList<>();
     Map<String, List<Integer>> open = new HashMap<>();
     for (Event event : ordered) {
+      if (isExcludedAxleFault(event)) continue;
       String key = km(event.crossing()) + "|" + eventFaultKey(event);
       if (event.red()) {
         open.computeIfAbsent(key, k -> new ArrayList<>()).add(result.size());
@@ -803,10 +827,12 @@ public final class Rules {
   }
 
   public static List<Event> activeFaults(List<Event> input) {
-    List<Event> sorted = new ArrayList<>(input);
+    List<Event> sorted = new ArrayList<>();
+    for (var event : input) if (isFaultRelevant(event)) sorted.add(event);
     sorted.sort(Comparator.comparingLong(Event::at).thenComparingInt(Rules::reportPhase));
     Map<String, Event> faults = new LinkedHashMap<>();
     for (Event e : sorted) {
+      if (isExcludedAxleFault(e)) continue;
       String k = km(e.crossing()) + "|" + eventFaultKey(e);
       if (e.red()) faults.put(k, e);
       else if (e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")

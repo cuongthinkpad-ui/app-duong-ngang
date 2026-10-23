@@ -53,7 +53,7 @@ def faults(state):
 
 phase = {'value': 0, 'at': int(time.time()), 'manual': False, 'pre_restore': False,
          'axles': 0, 'axle_other': False, 'axle_large': False, 'axle_exact': False, 'bell_recovered': False,
-         'axle_at': int(time.time())}
+         'axle_at': int(time.time()), 'exempt_at': int(time.time())-30}
 
 class Fixture(BaseHTTPRequestHandler):
     def log_message(self, *args):
@@ -69,19 +69,24 @@ class Fixture(BaseHTTPRequestHandler):
     def respond(self, selected):
         # The emulator uses Asia/Ho_Chi_Minh timestamps, independent of the host timezone.
         now = datetime.fromtimestamp(time.time(), timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
-        point_options = "<select name='route'><option value='all' selected>-- Tất cả --</option><option>Km 100+000</option><option>Km 101+000</option></select>"
+        point_options = "<select name='route'><option value='all' selected>-- Tất cả --</option><option>Km 100+000</option><option>Km 101+000</option><option>Km 320+445</option></select>"
         rows = []
         current = dict(phase)
+        if selected == now.date():
+            te = datetime.fromtimestamp(current['exempt_at'], timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
+            for i in range(7):
+                rows.append(('320+445', 'Khôi phục hệ thống', te+timedelta(seconds=i), False,
+                             [40,40,28 if i == 6 else 37,40,40,40]))
         if selected == now.date() and current['value']:
             t1 = datetime.fromtimestamp(current['at'], timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
-            rows = [('101+000', 'Tàu lẻ', t1, False), ('100+000', 'Chuông 2 hỏng', t1, True)]
+            rows += [('101+000', 'Tàu lẻ', t1, False), ('320+445', 'Chuông 2 hỏng', t1, True)]
             if current['manual']:
                 rows += [('101+000', 'Ấn nút Phục hồi', t1+timedelta(seconds=3), False)]
             if current['pre_restore']:
                 rows += [('101+000', 'Khôi phục hệ thống', t1+timedelta(seconds=2), False)]
             if current['value'] >= 2:
                 rows += [('100+000', 'Tàu lẻ', t1-timedelta(seconds=1), False),
-                         ('100+000', 'Chuông 2 khôi phục tốt', t1+timedelta(seconds=1), False)]
+                         ('320+445', 'Chuông 2 khôi phục tốt', t1+timedelta(seconds=1), False)]
             if current['value'] >= 3:
                 rows += [('100+000', 'Chuông 1 hỏng', t1+timedelta(seconds=2), True)]
             if current['bell_recovered']:
@@ -149,8 +154,10 @@ def main():
             adb('shell', 'run-as', PKG, 'rm', '-f', 'databases/events.db')
             adb('shell', 'settings', 'put', 'global', 'http_proxy', ':0')
             adb('shell', 'am', 'start', '-n', PKG+'/.MainActivity')
-            empty = wait_for(lambda s: int(s.get('lastSuccess','0')) > 0, 'initial empty snapshot accepted silently')
+            empty = wait_for(lambda s: int(s.get('lastSuccess','0')) > 0, 'initial snapshot accepted silently')
             assert int(empty.get('lastAlarm', '0')) == 0, 'Empty snapshot must not sound'
+            assert not faults(empty), 'Exempt axle reports must not create faults'
+            print('PASS: six qualifying errors and one large 320+445 deviation remain silent', flush=True)
             phase.update(value=1, at=int(time.time())-3)
             wait_for(lambda s: any(row[3]=='Chuông 2 hỏng' for row in faults(s)) and int(s.get('lastAlarm','0'))>0, 'original red bell message becomes active with app-owned audible playback')
             wait_for(lambda s: any(row[3]=='Nghi tự kích' for row in faults(s)), 'self-trigger confirmed after elapsed grace')
@@ -265,7 +272,7 @@ def main():
             wait_for(lambda s: any(row[0].startswith('axle:3:') and 'thiếu 10 trục trong 1 lần' in row[3] for row in faults(s))
                      and int(s.get('lastAlarm','0')) > int(large['lastAlarm']),
                      'exactly ten missing axles create another audible alert on previously warned sensor')
-            print('21 monitoring checks passed', flush=True)
+            print('22 monitoring checks passed', flush=True)
         finally:
             stop_service();adb('shell','am','force-stop',PKG)
             install(folder/'original.xml','shared_prefs/monitor.xml')

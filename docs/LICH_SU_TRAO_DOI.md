@@ -150,3 +150,12 @@ Chủ dự án sửa lại ngưỡng đơn lẻ ngay trước khi đóng gói: *
 Chốt giao diện cuối sau khi xem lại danh sách thay đổi: chủ dự án yêu cầu chỉ một mục **Đếm trục lỗi**, thống kê các CB đã đạt ngưỡng trong ngày, đặt trong chi tiết đường ngang. Bỏ hai mục/trang Đếm trục hôm nay và Xem các lần đếm trục. Chủ dự án xác nhận mục này là thống kê; khi đạt ngưỡng vẫn phải thông báo/đỏ/chuông như quy tắc đã chốt, không chỉ thêm vào bảng. Tổng quan không thêm bảng thống kê riêng.
 
 Chủ dự án đã duyệt phương án cuối và yêu cầu đăng bản 0.12 lên kho GitHub đang dùng để tải APK.
+
+
+## 17. Ngoại lệ 320+445 và tốc độ đổi tab ở 0.13
+
+Chủ dự án nhắc lại Km 320+445 có nhiều hơn sáu cảm biến và cơ chế đếm riêng: bỏ toàn bộ đối chiếu/ghi chú/thống kê/cảnh báo trục suy ra ở điểm này. Giữ dòng đỏ gốc website và các tính năng tàu, khôi phục, tự kích. Phải xử lý cả cảnh báo trục đã lưu ở bản cũ khi cài đè, không chỉ chặn bản tin mới.
+
+Chủ dự án phản hồi đổi tab mất khoảng 1–2 giây và yêu cầu tăng tốc, đồng thời xác nhận chỉ tối ưu, không giảm tính năng. Kiểm tra thấy giao diện đọc cả ngày nhiều lần, dựng lại tuyến cho từng sự kiện và quét lại toàn bộ sự kiện cho mỗi đường ngang. Sửa bằng bộ dữ liệu dùng chung trong một lượt dựng/cập nhật, nhóm sự kiện một lần, tái sử dụng mẫu nhận diện thiết bị; bộ dữ liệu tạm được xóa ở lượt cập nhật tiếp theo để dữ liệu vẫn mới. Giữ chu kỳ web, quy tắc cảnh báo, chuông và sơ đồ.
+
+Chủ dự án đã tìm thấy mục Đếm trục lỗi trong chi tiết và không yêu cầu đổi bố cục của mục này. Mục chỉ hiện khi có CB đạt ngưỡng; ngoại lệ 320+445 không hiện mục thống kê này. Kết quả kiểm tra và đo tốc độ ở `docs/UI_REVIEW_0.13.md`.

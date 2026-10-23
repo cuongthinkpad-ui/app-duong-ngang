@@ -332,7 +332,7 @@ public class RulesTest {
         new Rules.Event(
             "axle",
             1,
-            "320+445",
+            "320+957",
             "Khôi phục hệ thống",
             false,
             List.of("46", "46", "48", "44", "46", "46"));
@@ -1193,6 +1193,46 @@ public class RulesTest {
     check(
         Rules.activeFaults(Rules.axleAlerts(line, largeThenDaily)).size() == 3,
         "each new large measurement remains a distinct alert even on an already warned sensor");
+    check(
+        Rules.isAxleExempt("Km 320 + 445")
+            && Rules.isAxleExempt("0320+445")
+            && !Rules.isAxleExempt("320+957"),
+        "special counting mechanism is identified by crossing location");
+    List<Rules.Event> exemptCounts = new ArrayList<>();
+    for (int i = 0; i < 7; i++)
+      exemptCounts.add(axle(axleDay + i * 1000, "Km 320+445", 3, i == 6 ? -12 : 3));
+    check(
+        exemptCounts.stream().allMatch(e -> Rules.axleNote(e).isEmpty()),
+        "320+445 never receives the six-sensor comparison note");
+    check(
+        Rules.axleErrors(Rules.DEMO_ROUTE, exemptCounts).isEmpty(),
+        "320+445 has no daily six-sensor statistics");
+    check(
+        Rules.axleAlerts(Rules.DEMO_ROUTE, exemptCounts).isEmpty(),
+        "six errors and large errors at 320+445 never generate alerts");
+    var oldExempt =
+        new Rules.Event(
+            "axle:3:legacy-exempt",
+            axleDay,
+            "Km 320+445",
+            "CB3 đếm thiếu 12 trục trong 1 lần",
+            true,
+            List.of("40", "40", "28", "40", "40", "40"));
+    var actualExemptFault = event(axleDay, "320+445", "Cảm biến 3 hỏng", true);
+    check(
+        Rules.activeFaults(List.of(oldExempt, actualExemptFault))
+            .equals(List.of(actualExemptFault)),
+        "cached derived axle warnings are excluded while actual red faults remain");
+    check(
+        Rules.incidentHistory(List.of(oldExempt, actualExemptFault)).size() == 1
+            && Rules.incidentHistory(List.of(oldExempt, actualExemptFault))
+                .get(0)
+                .fault()
+                .equals(actualExemptFault),
+        "old derived 320+445 warnings do not reappear in historical incidents");
+    check(
+        Rules.axleAlerts(Rules.DEMO_ROUTE, List.of(axle(axleDay, "320+957", 3, 10))).size() == 1,
+        "normal neighboring crossings still alert at exactly ten axles");
     System.out.println(scenarios + " domain scenarios passed");
   }
 }

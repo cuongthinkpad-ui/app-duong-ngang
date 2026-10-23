@@ -50,6 +50,10 @@ public class MainActivity extends Activity {
   private final ExecutorService io = Executors.newSingleThreadExecutor();
   private final Handler handler = new Handler(Looper.getMainLooper());
   private String lastUiState = "";
+  private Rules.Route viewRoute;
+  private String viewRangeFrom, viewRangeTo;
+  private List<Rules.Event> viewDayEvents, viewFaults;
+  private Map<String, List<Rules.Event>> viewCrossingEvents;
   private final Runnable refresh =
       new Runnable() {
         public void run() {
@@ -86,13 +90,13 @@ public class MainActivity extends Activity {
     render();
     Store capturedStore = store;
     String capturedAccount = capturedStore.account();
-    if (!capturedStore.travelReady() || capturedStore.prefs.getInt("axleVersion", 0) != 1)
+    if (!capturedStore.travelReady() || !capturedStore.axleReady())
       io.execute(
           () -> {
             synchronized (Store.class) {
               if (!capturedStore.account().equals(capturedAccount)) return;
               capturedStore.prepareTravelState(capturedAccount, System.currentTimeMillis());
-              if (capturedStore.prefs.getInt("axleVersion", 0) != 1) {
+              if (!capturedStore.axleReady()) {
                 long now = System.currentTimeMillis();
                 capturedStore.updateActiveFaults(
                     capturedAccount,
@@ -294,15 +298,18 @@ public class MainActivity extends Activity {
   }
 
   private Rules.Route route() {
-    return demo ? Rules.DEMO_ROUTE : store.route();
+    if (viewRoute == null) viewRoute = demo ? Rules.DEMO_ROUTE : store.route();
+    return viewRoute;
   }
 
   private String rangeFrom() {
-    return store.rangeFrom(route(), demo);
+    if (viewRangeFrom == null) viewRangeFrom = store.rangeFrom(route(), demo);
+    return viewRangeFrom;
   }
 
   private String rangeTo() {
-    return store.rangeTo(route(), demo);
+    if (viewRangeTo == null) viewRangeTo = store.rangeTo(route(), demo);
+    return viewRangeTo;
   }
 
   private boolean inScope(String crossing) {
@@ -310,11 +317,25 @@ public class MainActivity extends Activity {
   }
 
   private List<Rules.Event> allToday() {
-    return demo
-        ? samples()
-        : store.events(
-            LocalDate.now(WebSource.ZONE).atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli(),
-            System.currentTimeMillis() + 1);
+    if (viewDayEvents == null)
+      viewDayEvents =
+          demo
+              ? samples()
+              : store.events(
+                  LocalDate.now(WebSource.ZONE)
+                      .atStartOfDay(WebSource.ZONE)
+                      .toInstant()
+                      .toEpochMilli(),
+                  System.currentTimeMillis() + 1);
+    return viewDayEvents;
+  }
+
+  /** Reuse one data snapshot during a view update; every poll/navigation reads fresh data. */
+  private void invalidateViewData() {
+    viewRoute = null;
+    viewRangeFrom = viewRangeTo = null;
+    viewDayEvents = viewFaults = null;
+    viewCrossingEvents = null;
   }
 
   private List<Rules.Event> occupancyEvents() {
@@ -361,6 +382,7 @@ public class MainActivity extends Activity {
         .putString(Store.rangeKey(demo, true), from)
         .putString(Store.rangeKey(demo, false), to)
         .apply();
+    invalidateViewData();
     if (!demo)
       for (Rules.Event e : activeFaults())
         if (!inScope(e.crossing()))
@@ -370,7 +392,8 @@ public class MainActivity extends Activity {
   }
 
   private List<Rules.Event> activeFaults() {
-    if (demo) return Rules.activeFaults(samples());
+    if (viewFaults != null) return viewFaults;
+    if (demo) return viewFaults = Rules.activeFaults(samples());
     long baseline =
         Rules.faultBaseline(store.prefs.getLong("baselineFrom", 0), System.currentTimeMillis());
     List<Rules.Event> current = new ArrayList<>();
@@ -384,7 +407,7 @@ public class MainActivity extends Activity {
               || Rules.isAxleFault(event)
                   && event.at() >= Rules.faultBaseline(0, System.currentTimeMillis()))
           && (selfEnabled || !Rules.isSelfTrigger(event))) current.add(event);
-    return Rules.activeFaults(current);
+    return viewFaults = Rules.activeFaults(current);
   }
 
   private List<Rules.Event> scopedFaults() {
@@ -406,6 +429,7 @@ public class MainActivity extends Activity {
   }
 
   private void render() {
+    invalidateViewData();
     summaryCard = null;
     routeWrapper = null;
     routeView = null;
@@ -511,6 +535,7 @@ public class MainActivity extends Activity {
   /** A poll changes data inside the existing window, never replaces its root/header/navigation. */
   private void refreshContent() {
     if (page.equals("settings")) return;
+    invalidateViewData();
     if (page.equals("overview")) {
       updateSummary();
       if (!renderedRoute.equals(route().points())) {
@@ -1394,10 +1419,16 @@ public class MainActivity extends Activity {
   }
 
   private List<Rules.Event> crossingEvents(String km) {
-    List<Rules.Event> list = new ArrayList<>();
-    for (Rules.Event e : allToday()) if (Rules.km(e.crossing()).equals(Rules.km(km))) list.add(e);
-    list.sort(Comparator.comparingLong(Rules.Event::at).reversed());
-    return list;
+    if (viewCrossingEvents == null) {
+      viewCrossingEvents = new HashMap<>();
+      for (var event : allToday())
+        viewCrossingEvents
+            .computeIfAbsent(Rules.km(event.crossing()), k -> new ArrayList<>())
+            .add(event);
+      for (var events : viewCrossingEvents.values())
+        events.sort(Comparator.comparingLong(Rules.Event::at).reversed());
+    }
+    return viewCrossingEvents.getOrDefault(Rules.km(km), List.of());
   }
 
   private void crossingList() {

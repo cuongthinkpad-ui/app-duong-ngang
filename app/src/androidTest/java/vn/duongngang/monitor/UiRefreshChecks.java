@@ -591,6 +591,23 @@ final class UiRefreshChecks {
               "Khôi phục hệ thống",
               false,
               List.of("40", "40", "40", "52", "40", "40")));
+      for (int i = 0; i < 7; i++)
+        axleRecords.add(
+            new Rules.Event(
+                "ui-exempt-" + i,
+                axleStart + i * 1000,
+                "320+445",
+                "Khôi phục hệ thống",
+                false,
+                List.of("40", "40", i == 6 ? "28" : "37", "40", "40", "40")));
+      axleRecords.add(
+          new Rules.Event(
+              "ui-exempt-hardware",
+              axleStart + 40000,
+              "320+445",
+              "Chuông 2 hỏng",
+              true,
+              List.of()));
       for (int i = 0; i < 15; i++)
         axleRecords.add(
             new Rules.Event(
@@ -617,7 +634,7 @@ final class UiRefreshChecks {
                 visible.contains("CB3 đếm sai 6 lần") && visible.contains("CB4 đếm thừa 12 trục"),
                 "both axle warning reasons appear on overview at five-minute polling");
           });
-      UiPreview.shot(runner, activity, "axle-overview-0.12.png");
+      UiPreview.shot(runner, activity, "axle-overview-0.13.png");
       ui(
           () -> {
             Field point = MainActivity.class.getDeclaredField("selectedCrossing");
@@ -635,7 +652,7 @@ final class UiRefreshChecks {
                 visible.contains("thiếu 3 trục") && visible.contains("thừa 12 trục"),
                 "daily axle summary preserves amount and sign for each sensor");
           });
-      UiPreview.shot(runner, activity, "axle-detail-0.12.png");
+      UiPreview.shot(runner, activity, "axle-detail-0.13.png");
       ui(
           () -> {
             Field point = MainActivity.class.getDeclaredField("selectedCrossing");
@@ -649,6 +666,22 @@ final class UiRefreshChecks {
           });
       ui(
           () -> {
+            Field point = MainActivity.class.getDeclaredField("selectedCrossing");
+            point.setAccessible(true);
+            point.set(activity, "320+445");
+            navigate("detail");
+            String visible = labels((View) field(activity, "screen"));
+            check(
+                visible.contains("Chuông 2 hỏng")
+                    && visible.contains("Đang có sự cố")
+                    && !visible.contains("Đếm trục lỗi")
+                    && !visible.contains("CB3 thiếu")
+                    && !visible.contains("CB3 thừa"),
+                "320+445 keeps its raw hardware fault but no axle statistics or comparison note");
+          });
+      UiPreview.shot(runner, activity, "axle-exempt-detail-0.13.png");
+      ui(
+          () -> {
             ((Runnable) field(activity, "refresh")).run();
             navigate("incidents");
             String visible = labels((View) field(activity, "screen"));
@@ -657,7 +690,7 @@ final class UiRefreshChecks {
                     && visible.contains("CB3 đếm sai 6 lần"),
                 "incident tab distinguishes derived axle warning from hardware restoration");
           });
-      UiPreview.shot(runner, activity, "axle-incidents-0.12.png");
+      UiPreview.shot(runner, activity, "axle-incidents-0.13.png");
       return checks;
     } finally {
       ui(() -> activity.finish());

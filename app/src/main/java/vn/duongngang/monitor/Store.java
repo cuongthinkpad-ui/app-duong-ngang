@@ -12,6 +12,7 @@ import org.json.*;
 
 public final class Store {
   private static final int TRAVEL_VERSION = 3;
+  private static final int AXLE_VERSION = 2;
   private final Context context;
   public final android.content.SharedPreferences prefs;
 
@@ -101,6 +102,7 @@ public final class Store {
       }
     } catch (JSONException ignored) {
     }
+    result.removeIf(Rules::isExcludedAxleFault);
     result.sort(
         java.util.Comparator.comparingLong(Rules.Event::at)
             .reversed()
@@ -135,6 +137,7 @@ public final class Store {
       String expected, long replayFrom, long now, long baseline, List<String> disproved) {
     synchronized (Store.class) {
       if (!account().equals(expected)) throw new IllegalStateException("Tài khoản đã thay đổi");
+      if (!axleReady()) discardExcludedAxleAlerts();
       long day = Rules.faultBaseline(0, now);
       List<Rules.Event> axleAlerts = syncAxleAlerts(expected, day, now + 1);
       List<Rules.Event> input = activeFaults();
@@ -165,11 +168,47 @@ public final class Store {
           .edit()
           .putString("activeFaults", list.toString())
           .putString("occupiedPoints", points.toString())
-          .putInt("axleVersion", 1)
+          .putInt("axleVersion", AXLE_VERSION)
           .apply();
       updateTravelState(now);
       return active;
     }
+  }
+
+  public boolean axleReady() {
+    return prefs.getInt("axleVersion", 0) == AXLE_VERSION;
+  }
+
+  /** Remove only obsolete derived alerts, across all days; preserve original website records. */
+  private void discardExcludedAxleAlerts() {
+    Set<String> obsolete = new HashSet<>();
+    try {
+      var cached = new JSONArray(prefs.getString("activeFaults", "[]"));
+      for (int i = 0; i < cached.length(); i++) {
+        var row = cached.getJSONArray(i);
+        var event =
+            new Rules.Event(
+                row.getString(0),
+                row.getLong(1),
+                row.getString(2),
+                row.getString(3),
+                true,
+                List.of());
+        if (Rules.isExcludedAxleFault(event)) obsolete.add(event.id());
+      }
+    } catch (JSONException ignored) {
+    }
+    try (var db = db()) {
+      try (var cursor =
+          db.rawQuery("SELECT id,km FROM events WHERE id GLOB ?", new String[] {"axle:[1-6]:*"})) {
+        while (cursor.moveToNext())
+          if (Rules.isAxleExempt(cursor.getString(1))) obsolete.add(cursor.getString(0));
+      }
+      for (String id : obsolete) db.delete("events", "id=?", new String[] {id});
+    }
+    var manager = context.getSystemService(android.app.NotificationManager.class);
+    if (manager != null)
+      for (String id : obsolete) manager.cancel(100 + Math.floorMod(id.hashCode(), 1000000));
   }
 
   /** Recompute derived warnings after late uploads; never edit the original website records. */
@@ -196,6 +235,7 @@ public final class Store {
   public boolean claimAxleNotice(Rules.Event event, long now) {
     synchronized (Store.class) {
       if (!Rules.isAxleFault(event)) return true;
+      if (Rules.isAxleExempt(event.crossing())) return false;
       long day = Rules.faultBaseline(0, now);
       if (Rules.faultBaseline(0, event.at()) != day) return false;
       String prefix = day + "|";
@@ -456,6 +496,7 @@ public final class Store {
                 new String[] {"" + from, "" + to})) {
       appendRows(c, out);
     }
+    out.removeIf(Rules::isExcludedAxleFault);
     return out;
   }
 
