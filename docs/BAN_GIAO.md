@@ -5,14 +5,14 @@ Cập nhật: 23/10/2026, giờ Việt Nam. Tài liệu này ghi yêu cầu đã
 ## Bắt đầu ở phiên mới
 
 1. Kết nối cùng repository GitHub `cuongthinkpad-ui/app-duong-ngang`, lấy nhánh `main`; nếu không có công cụ GitHub, tải mã nguồn ZIP từ GitHub và cung cấp cho phiên mới.
-2. Đọc tài liệu này, `README.md`, `docs/LICH_SU_TRAO_DOI.md` và `docs/UI_REVIEW_0.13.md` trước khi thay đổi. Tài liệu 0.1–0.12 là lịch sử; các quyết định 0.13 và yêu cầu mới của chủ dự án được ưu tiên.
-3. Kiểm tra mã nguồn/commit thực tế. Bản ứng dụng được chủ dự án chốt để phát hành là **0.13.0**, versionCode **13**, đã đóng gói và kiểm tra. Chủ dự án đã duyệt phương án và yêu cầu đăng lên cùng kho GitHub. Khi tiếp tục, kiểm tra commit/APK thực tế trên main; không nhầm commit chỉ sửa tài liệu với bản APK mới.
+2. Đọc tài liệu này, `README.md`, `docs/LICH_SU_TRAO_DOI.md` và `docs/UI_REVIEW_0.14.md` trước khi thay đổi. Tài liệu 0.1–0.13 là lịch sử; các quyết định 0.14 và yêu cầu mới của chủ dự án được ưu tiên.
+3. Kiểm tra mã nguồn/commit thực tế. Bản ứng dụng hiện tại là **0.14.0**, versionCode **14**, đã đóng gói và kiểm tra. Chủ dự án đã duyệt phương án và yêu cầu đăng lên cùng kho GitHub. Khi tiếp tục, kiểm tra commit/APK thực tế trên main; không nhầm commit chỉ sửa tài liệu với bản APK mới.
 4. Tài khoản ChatGPT mới cần được cấp quyền truy cập GitHub riêng. Lịch sử chat, bộ nhớ ChatGPT, cache build và cấu hình cloud không tự chuyển theo repository.
 5. Tài khoản/mật khẩu website được chủ dự án nhập trực tiếp trong app hoặc cung cấp riêng khi cần kiểm thử. Không yêu cầu gửi lại toàn bộ cuộc trò chuyện và không chép mật khẩu vào mã nguồn.
 
 Tin nhắn chủ dự án có thể sao chép vào cuộc trò chuyện mới:
 
-> Tiếp tục app Android Đường Ngang tại https://github.com/cuongthinkpad-ui/app-duong-ngang, nhánh main. Hãy đọc AGENTS.md, docs/BAN_GIAO.md, docs/LICH_SU_TRAO_DOI.md, README.md và biên bản kiểm tra mới nhất trước. Điểm bàn giao hiện tại là bản 0.13. Giữ các yêu cầu đã chốt, kiểm tra mã nguồn hiện có và tiếp tục từ đó. Phân biệt rõ phần đã thử trên giả lập và phần chưa được xác minh trên Xiaomi thật. Yêu cầu tiếp theo của tôi là: [ghi việc muốn làm].
+> Tiếp tục app Android Đường Ngang tại https://github.com/cuongthinkpad-ui/app-duong-ngang, nhánh main. Hãy đọc AGENTS.md, docs/BAN_GIAO.md, docs/LICH_SU_TRAO_DOI.md, README.md và biên bản kiểm tra mới nhất trước. Điểm bàn giao hiện tại là bản 0.14. Giữ các yêu cầu đã chốt, kiểm tra mã nguồn hiện có và tiếp tục từ đó. Phân biệt rõ phần đã thử trên giả lập và phần chưa được xác minh trên Xiaomi thật. Yêu cầu tiếp theo của tôi là: [ghi việc muốn làm].
 
 ## Mục tiêu và trạng thái
 
@@ -20,7 +20,7 @@ Chủ dự án: Cao Xuân Cường, công tác theo dõi đường ngang cảnh 
 
 - Website đã thử: `http://visitec.vn:7447/`, trang báo cáo ASP.NET `Default.aspx`, cần đăng nhập. Không chỉ hỗ trợ một danh sách 13 điểm cố định.
 - Chủ dự án phản hồi bản 0.10 cơ bản đã chạy tốt; bản 0.11 bổ sung chuông sáu hồi và phục hồi tự kích theo yêu cầu. Đây là bản thử có chức năng thật. Đã đăng nhập/đọc web thật, thử service và UI trên giả lập; chưa được chủ dự án xác nhận đủ độ tin cậy để dùng trực chính thức trên Xiaomi 14T Pro.
-- APK: `downloads/DuongNgang-0.13.apk`; checksum: `downloads/SHA256SUMS`. Đây là bản cài đầy đủ: cài mới trực tiếp hoặc cài đè cùng chữ ký để giữ cấu hình. Giao file qua GitHub, chọn **Download raw file**. Người dùng từng không tải được artifact trực tiếp từ workspace, kể cả ZIP.
+- APK: `downloads/DuongNgang-0.14.apk`; checksum: `downloads/SHA256SUMS`. Đây là bản cài đầy đủ: cài mới trực tiếp hoặc cài đè cùng chữ ký để giữ cấu hình. Giao file qua GitHub, chọn **Download raw file**. Người dùng từng không tải được artifact trực tiếp từ workspace, kể cả ZIP.
 - Play Protect từng chặn bản APK ban đầu; sau đó người dùng cài được. Không coi cảnh báo đã được xử lý cho mọi máy, không hướng dẫn vô hiệu hóa bảo vệ như mặc định.
 
 ## Nguyên lý thiết bị đã chốt
@@ -113,7 +113,7 @@ source scripts/env.sh
 python3 scripts/test-monitoring-e2e.py
 ```
 
-Tăng versionCode lớn hơn 13 khi xuất APK cập nhật mới. Giữ applicationId và chữ ký nếu muốn cài đè. Không đưa URL/ID/mật khẩu thử vào nguồn/APK, không đăng HTML đăng nhập hoặc ảnh dữ liệu vận hành vào repo.
+Tăng versionCode lớn hơn 14 khi xuất APK cập nhật mới. Giữ applicationId và chữ ký nếu muốn cài đè. Không đưa URL/ID/mật khẩu thử vào nguồn/APK, không đăng HTML đăng nhập hoặc ảnh dữ liệu vận hành vào repo.
 
 ## Khóa ký APK cần sao lưu riêng
 
@@ -145,3 +145,9 @@ Bản 0.6 đã đăng nhập Visitec thật, đọc đủ ngày hiện tại/ng�
 Cần người dùng xác nhận trên **Xiaomi 14T Pro/HyperOS**: còn chớp trắng hay không, bố cục/cỡ chữ, chạy nền lâu khi khóa màn hình, độ trễ chuông, reset 00:00, sự cố/khôi phục và tự kích so với thực tế. Chưa có phản hồi xác nhận đầy đủ bản 0.7. Chưa tự chạy sau khởi động máy. Web không cung cấp ID sự kiện độc lập nên dòng hoàn toàn giống nhau cùng giây được gộp; không cam kết tương thích mọi cấu trúc website.
 
 Các yêu cầu mới nhất và kiểm tra 0.13 xem `docs/UI_REVIEW_0.13.md`. Thuật toán đã được đối chiếu lại với dữ liệu web thật ở mốc ảnh phản hồi, nhưng bố cục/chuông/chạy nền Xiaomi vẫn cần chủ dự án xác nhận trên máy. Tình trạng sao lưu khóa ngoài cloud vẫn **chưa được chủ dự án xác nhận**.
+
+## Giao diện Stitch — 0.14
+
+Chủ dự án gửi bốn ảnh từng tab và bảng màu, yêu cầu làm tương tự nhưng căn linh hoạt. Áp dụng vào app Java hiện có, giữ toàn bộ nghiệp vụ 0.13. Nền navy/cyan, thẻ có viền, ga amber, nút lưu cyan–mint. Logo sáng dịu và vòng đếm lỗi pulse chu kỳ 2,8 giây; dừng khi app mất focus/chạy nền và tôn trọng tắt hiệu ứng Android. Đoạn tàu chỉ có quầng sáng tĩnh, không chạy giả theo hoạt ảnh. LIVE chỉ cho dữ liệu mới của phiên đang theo dõi. Danh sách thêm bộ lọc theo dữ liệu thực. Không dùng pin/góc cần/hướng cố định hoặc các con số giả của JSON mẫu. Xem docs/UI_REVIEW_0.14.md cho ảnh, kiểm tra và giới hạn.
+
+Kiểm tra 0.14: 391 quy tắc, 62 lưu trữ, 49 UI hồi quy và 20 telemetry UI (đạt khi bật và khi tắt hiệu ứng). Build/Lint đạt, 0 lỗi và 15 cảnh báo. Không kiểm tra lại web công ty/service fixture trong lượt đổi giao diện; cần xác nhận độ mượt/âm thanh trên Xiaomi thật.

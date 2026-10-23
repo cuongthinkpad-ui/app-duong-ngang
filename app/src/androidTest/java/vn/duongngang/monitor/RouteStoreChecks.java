@@ -8,7 +8,7 @@ import java.util.List;
 /** No test dependencies. Uses a separate device-protected sandbox, never the app's normal data. */
 public final class RouteStoreChecks extends Instrumentation {
   private int checks;
-  private boolean uiMode, previewMode, timingMode;
+  private boolean uiMode, previewMode, timingMode, telemetryMode;
 
   private void check(boolean result, String message) {
     checks++;
@@ -21,11 +21,24 @@ public final class RouteStoreChecks extends Instrumentation {
     previewMode = arguments != null && "preview".equals(arguments.getString("mode"));
     uiMode = arguments != null && "ui".equals(arguments.getString("mode"));
     timingMode = arguments != null && "timing".equals(arguments.getString("mode"));
+    telemetryMode = arguments != null && "telemetry".equals(arguments.getString("mode"));
     start();
   }
 
   @Override
   public void onStart() {
+    if (telemetryMode) {
+      Bundle result = new Bundle();
+      try {
+        result.putString(
+            "stream", new TelemetryUiChecks(this).run() + " telemetry UI checks passed\n");
+        finish(-1, result);
+      } catch (Throwable failure) {
+        result.putString("stream", "FAILED: " + failure + "\n");
+        finish(0, result);
+      }
+      return;
+    }
     if (timingMode) {
       Bundle result = new Bundle();
       try {

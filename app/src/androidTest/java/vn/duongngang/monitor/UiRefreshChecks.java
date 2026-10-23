@@ -200,7 +200,7 @@ final class UiRefreshChecks {
             android.graphics.drawable.ColorDrawable background =
                 (android.graphics.drawable.ColorDrawable) root.getBackground();
             check(
-                background.getColor() == 0xFF0C1220,
+                background.getColor() == 0xFF060E1F,
                 "overview uses requested dark navy background");
             check(
                 field(activity, "summaryCard") != null && !labels(root).contains("AN TOÀN"),

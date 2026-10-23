@@ -159,3 +159,9 @@ Chủ dự án nhắc lại Km 320+445 có nhiều hơn sáu cảm biến và c�
 Chủ dự án phản hồi đổi tab mất khoảng 1–2 giây và yêu cầu tăng tốc, đồng thời xác nhận chỉ tối ưu, không giảm tính năng. Kiểm tra thấy giao diện đọc cả ngày nhiều lần, dựng lại tuyến cho từng sự kiện và quét lại toàn bộ sự kiện cho mỗi đường ngang. Sửa bằng bộ dữ liệu dùng chung trong một lượt dựng/cập nhật, nhóm sự kiện một lần, tái sử dụng mẫu nhận diện thiết bị; bộ dữ liệu tạm được xóa ở lượt cập nhật tiếp theo để dữ liệu vẫn mới. Giữ chu kỳ web, quy tắc cảnh báo, chuông và sơ đồ.
 
 Chủ dự án đã tìm thấy mục Đếm trục lỗi trong chi tiết và không yêu cầu đổi bố cục của mục này. Mục chỉ hiện khi có CB đạt ngưỡng; ngoại lệ 320+445 không hiện mục thống kê này. Kết quả kiểm tra và đo tốc độ ở `docs/UI_REVIEW_0.13.md`.
+
+## 18. Thiết kế Stitch và hiệu ứng — 0.14
+
+Chủ dự án hỏi về Google Stitch, muốn mang đặc tả sang thiết kế giao diện rồi áp dụng trở lại app hiện có. Chủ dự án muốn viền sáng nhẹ và logo nhấp nháy; đã thống nhất dùng nhịp sáng dịu, không làm nháy trắng hoặc chuyển động tàu giả. Chủ dự án gửi bảng màu dark telemetry, JSON mẫu và ảnh riêng của bốn tab, sau đó yêu cầu thực hiện linh hoạt, căn theo app đã code, không cần sao chép chính xác từng chi tiết.
+
+Đã chỉ rõ số liệu mẫu không nhất quán (11 đường ngang/2 ga so với số 14), pin/góc cần/hướng cố định không có nguồn web, lỗi điện áp phải giữ đỏ, nguyên văn thiết bị và ngoại lệ 320+445 phải giữ. JSON chỉ là minh họa, không phải API Visitec. Sự cố Tất cả vẫn xếp theo giờ phát sinh, không nhóm đỏ trước xanh. Bản 0.14 chỉ đổi lớp giao diện Android Java, giữ toàn bộ quy tắc nghiệp vụ và khóa ký. Chi tiết kiểm tra/ảnh tổng hợp tại docs/UI_REVIEW_0.14.md.

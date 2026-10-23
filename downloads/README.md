@@ -1,6 +1,10 @@
-# Đường Ngang — bản thử 0.13
+# Đường Ngang — bản thử 0.14
 
-**[Tải APK 0.13](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.13.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
+**[Tải APK 0.14](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.14.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
+
+- Làm lại bốn tab theo mẫu Stitch: navy/cyan, viền thẻ, ga màu hổ phách, nút chuyển màu cyan–mint. Tổng quan tự chia chiều cao; dữ liệu thực không bị thay bằng các con số mẫu.
+- Logo sáng dịu, vòng đếm sự cố pulse và đoạn tàu có viền sáng nhẹ. Hiệu ứng dừng khi app mất focus/chạy nền, tắt theo cài đặt hiệu ứng Android. LIVE phản ánh phiên đang chạy và độ mới của dữ liệu.
+- Danh sách đường ngang có bộ lọc theo lỗi thực tế. Dòng đỏ web giữ nguyên nội dung; phần Sự cố vẫn xếp thời điểm phát sinh mới nhất trước, kể cả sự cố đã khôi phục.
 
 - **Riêng Km 320+445 được loại khỏi đối chiếu/cảnh báo trục**, giữ lỗi đỏ thật trên website và theo dõi tàu. Cài đè tự xử lý cảnh báo trục cũ. Tối ưu đọc dữ liệu khi chuyển tab.
 - Cảnh báo đếm trục: cùng CB lệch từ **3 trục**, tới **lần thứ 6/ngày** thông báo một lần; một lần lệch từ **10 trục** cảnh báo ngay. Giữ đỏ đến hết ngày; chi tiết đường ngang có một mục **Đếm trục lỗi**, chỉ hiện thống kê CB đã đạt ngưỡng.
@@ -16,4 +20,4 @@
 
 Có thể cài mới trực tiếp, không cần bản gốc. Nếu đã có app, cài đè bằng cùng chữ ký thử nghiệm để giữ cấu hình. Mở Cài đặt, nhập web/ID/mật khẩu rồi Lưu & theo dõi; chu kỳ 30 giây / 2 phút / 5 phút. Lượt đồng bộ đầu cần đọc hai ngày nên lâu hơn những lượt sau.
 
-Cần kiểm tra âm thanh, chạy nền và thông báo khi khóa màn hình lâu trên điện thoại thật, nhất là chế độ pin Xiaomi. Kiểm tra phát nhạc trên giả lập không chứng minh loa Xiaomi đã kêu. Bản thử không thay thế quy trình trực hiện có. Không nhúng tài khoản thử nghiệm vào APK. [Chi tiết kiểm tra](../docs/UI_REVIEW_0.13.md).
+Cần kiểm tra âm thanh, chạy nền và thông báo khi khóa màn hình lâu trên điện thoại thật, nhất là chế độ pin Xiaomi. Kiểm tra phát nhạc trên giả lập không chứng minh loa Xiaomi đã kêu. Bản thử không thay thế quy trình trực hiện có. Không nhúng tài khoản thử nghiệm vào APK. [Chi tiết kiểm tra](../docs/UI_REVIEW_0.14.md).

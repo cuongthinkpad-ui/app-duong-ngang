@@ -1,10 +1,19 @@
-# Đường Ngang — Android 0.13
+# Đường Ngang — Android 0.14
 
 **Đổi phiên/tài khoản ChatGPT:** đọc [Bản bàn giao và cách tiếp tục](docs/BAN_GIAO.md) và [Nhật ký trao đổi, yêu cầu đã chốt](docs/LICH_SU_TRAO_DOI.md). [Sao lưu khóa ký APK](docs/SAO_LUU_KHOA_KY.md).
 
 Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt navy, xanh cyan và xanh lá. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
 
-## Thay đổi 0.13
+## Thay đổi 0.14
+
+- Áp dụng mẫu Stitch vào app Android hiện có: nền navy tối, cyan, thẻ có viền, nút chính chuyển màu cyan–mint; căn lại cả bốn tab và màn chi tiết. Giữ Tổng quan vừa chiều cao màn hình, không chép những khoảng trống lớn hoặc thông số giả từ bản thiết kế.
+- Logo sáng dịu theo chu kỳ 2,8 giây; vòng đếm lỗi có hiệu ứng pulse; đoạn tàu có quầng sáng tĩnh và nhãn hướng liền mũi tên. Dừng pulse khi mất focus/chạy nền và tôn trọng tùy chọn tắt hiệu ứng của Android. Không dùng hiệu ứng để tự di chuyển tàu hoặc trì hoãn cảnh báo.
+- Badge LIVE chỉ hiện khi phiên đang theo dõi, dữ liệu còn mới; dừng/cũ/chưa có dữ liệu có nhãn riêng. Danh sách đường ngang thêm bộ lọc và số lượng theo dữ liệu thật; lỗi nguồn màu đỏ nếu web báo đỏ. Không bịa góc cần chắn, pin, hướng cố định hoặc mức độ nghiêm trọng.
+- Giữ nguyên đọc web, quy tắc tàu, phân trang, khôi phục, chuông sáu hồi, hai ngưỡng đếm trục và ngoại lệ Km 320+445; không đổi nền tảng, tài khoản, kho dữ liệu hoặc khóa ký.
+
+[Kiểm tra và ảnh 0.14](docs/UI_REVIEW_0.14.md).
+
+## Thay đổi 0.13 (lịch sử)
 
 - **Loại Km 320+445 khỏi toàn bộ đối chiếu sáu CB, ghi chú, thống kê và cảnh báo trục** vì có nhiều hơn sáu cảm biến và cơ chế đếm riêng. Dòng đỏ thật trên website, sơ đồ tàu và suy luận tự kích tại điểm này vẫn theo quy tắc cũ.
 - Khi cài đè, lọc ngay cảnh báo trục suy ra cũ của điểm này và dọn bản lưu dẫn xuất trên mọi ngày, hủy thông báo liên quan. Giữ bản tin web gốc, tài khoản, cài đặt, lịch sử thật và dấu chống báo lặp của các CB khác.
@@ -104,6 +113,7 @@ source scripts/env.sh
 # Với giả lập riêng đang chạy:
 ./scripts/test-android-route.sh
 ./scripts/test-android-ui.sh
+./scripts/test-telemetry-ui.sh
 python3 scripts/test-monitoring-e2e.py
 ```
 
