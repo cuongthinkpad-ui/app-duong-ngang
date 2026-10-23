@@ -491,36 +491,145 @@ public final class Rules {
   }
 
   public static String axleNote(List<String> raw) {
-    if (raw.size() != 6) return "";
+    AxleComparison comparison = compareAxles(raw);
+    if (comparison == null) return "";
+    if (comparison.standard() == null) return "cảm biến đếm trục không đồng nhất, lỗi";
+    List<String> notes = new ArrayList<>();
+    for (int i = 0; i < 6; i++) {
+      int delta = comparison.counts().get(i) - comparison.standard();
+      if (delta != 0) notes.add("CB" + (i + 1) + " " + axleDifference(delta));
+    }
+    return String.join(" · ", notes);
+  }
+
+  public record AxleComparison(List<Integer> counts, Integer standard) {}
+
+  /** null means invalid/voltage data; a null standard means a tied comparison. */
+  public static AxleComparison compareAxles(List<String> raw) {
+    if (raw.size() != 6) return null;
     List<Integer> values = new ArrayList<>();
     Map<Integer, Integer> frequencies = new HashMap<>();
     for (String s : raw) {
-      if (!s.trim().matches("\\d+")) return "";
+      if (!s.trim().matches("\\d+")) return null;
       try {
         int n = Integer.parseInt(s.trim());
         values.add(n);
         frequencies.merge(n, 1, Integer::sum);
       } catch (NumberFormatException e) {
-        return "";
+        return null;
       }
     }
-    if (frequencies.size() == 1) return "";
     int max = Collections.max(frequencies.values());
     List<Integer> modes = new ArrayList<>();
     frequencies.forEach(
         (n, c) -> {
           if (c == max) modes.add(n);
         });
-    if (modes.size() != 1 || max < 2) return "cảm biến đếm trục không đồng nhất, lỗi";
-    int standard = modes.get(0);
-    List<String> notes = new ArrayList<>();
-    for (int i = 0; i < 6; i++) {
-      int delta = values.get(i) - standard;
-      if (delta != 0)
-        notes.add(
-            "CB" + (i + 1) + " " + (delta > 0 ? "thừa " : "thiếu ") + Math.abs(delta) + " trục");
+    return new AxleComparison(
+        List.copyOf(values), modes.size() == 1 && max >= 2 ? modes.get(0) : null);
+  }
+
+  public static String axleDifference(int delta) {
+    return (delta > 0 ? "thừa " : "thiếu ") + Math.abs(delta) + " trục";
+  }
+
+  public record AxleError(
+      Event source,
+      int sensor,
+      int standard,
+      int observed,
+      int delta,
+      int dailyCount,
+      long missing,
+      long extra) {}
+
+  /** Count distinct restore measurements per crossing, sensor and Vietnamese calendar day. */
+  public static List<AxleError> axleErrors(Route route, List<Event> input) {
+    List<Event> ordered = new ArrayList<>(input);
+    ordered.sort(Comparator.comparingLong(Event::at).thenComparing(Event::id));
+    Set<String> seen = new HashSet<>();
+    Map<String, long[]> totals = new HashMap<>();
+    List<AxleError> out = new ArrayList<>();
+    for (Event e : ordered) {
+      if (e.red()
+          || !e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+          || !route.crossings().contains(km(e.crossing()))
+          || !seen.add(e.id())) continue;
+      AxleComparison c = compareAxles(e.counts());
+      if (c == null || c.standard() == null) continue;
+      long day = faultBaseline(0, e.at());
+      for (int i = 0; i < 6; i++) {
+        int delta = c.counts().get(i) - c.standard();
+        if (delta == 0) continue;
+        String key = day + "|" + km(e.crossing()) + "|" + i;
+        long[] count = totals.computeIfAbsent(key, k -> new long[3]);
+        if (Math.abs(delta) >= 3) count[0]++;
+        if (delta < 0) count[1] -= delta;
+        else count[2] += delta;
+        out.add(
+            new AxleError(
+                e,
+                i + 1,
+                c.standard(),
+                c.counts().get(i),
+                delta,
+                (int) count[0],
+                count[1],
+                count[2]));
+      }
     }
-    return String.join(" · ", notes);
+    return out;
+  }
+
+  public static boolean isAxleFault(Event event) {
+    String id = event.id();
+    return id.length() >= 7
+        && id.startsWith("axle:")
+        && id.charAt(5) >= '1'
+        && id.charAt(5) <= '6'
+        && id.charAt(6) == ':';
+  }
+
+  public static boolean isGenerated(Event event) {
+    return isSelfTrigger(event) || isAxleFault(event);
+  }
+
+  public static boolean isLargeAxleFault(Event event) {
+    if (!isAxleFault(event)) return false;
+    var comparison = compareAxles(event.counts());
+    return comparison != null
+        && comparison.standard() != null
+        && Math.abs(comparison.counts().get(event.id().charAt(5) - '1') - comparison.standard())
+            >= 10;
+  }
+
+  /** Sixth error and each single deviation of at least ten axles are new alerts, not reminders. */
+  public static List<Event> axleAlerts(Route route, List<Event> input) {
+    List<Event> alerts = new ArrayList<>();
+    for (AxleError e : axleErrors(route, input)) {
+      boolean large = Math.abs(e.delta()) >= 10;
+      if (!large && (Math.abs(e.delta()) < 3 || e.dailyCount() != 6)) continue;
+      String text =
+          "CB"
+              + e.sensor()
+              + (large
+                  ? " đếm " + axleDifference(e.delta()) + " trong 1 lần"
+                  : " đếm sai 6 lần trong ngày · Lần thứ 6 " + axleDifference(e.delta()))
+              + " · Chuẩn "
+              + e.standard()
+              + ", đếm "
+              + e.observed();
+      if (large && e.dailyCount() >= 6) text += " · Sai " + e.dailyCount() + " lần trong ngày";
+      alerts.add(
+          new Event(
+              "axle:" + e.sensor() + ":" + e.source().id(),
+              e.source().at(),
+              km(e.source().crossing()),
+              text,
+              true,
+              e.source().counts()));
+    }
+    return alerts;
   }
 
   /** Missing upstream evidence is meaningful only with complete coverage of the whole window. */
@@ -552,7 +661,13 @@ public final class Rules {
   }
 
   private static String eventFaultKey(Event event) {
-    return isSelfTrigger(event) ? "@self" : faultKey(event.text());
+    return isSelfTrigger(event)
+        ? "@self"
+        : isAxleFault(event)
+            ? (isLargeAxleFault(event)
+                ? "@axleSingle:" + event.id()
+                : "@axleDaily:" + event.id().charAt(5))
+            : faultKey(event.text());
   }
 
   /** Each upstream report can justify one downstream arrival of the same direction. */

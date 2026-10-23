@@ -148,7 +148,7 @@ final class UiPreview {
     if (error[0] != null) throw new AssertionError(error[0]);
   }
 
-  private static void shot(Instrumentation r, String name) throws Exception {
+  static void shot(Instrumentation r, String name) throws Exception {
     Bitmap image = r.getUiAutomation().takeScreenshot();
     if (image == null) throw new IllegalStateException("Screenshot unavailable");
     try (var out =
@@ -156,6 +156,24 @@ final class UiPreview {
       image.compress(Bitmap.CompressFormat.PNG, 100, out);
     } finally {
       image.recycle();
+    }
+  }
+
+  /** Capture the app window itself; unrelated emulator System UI dialogs are not app content. */
+  static void shot(Instrumentation r, MainActivity activity, String name) throws Exception {
+    Bitmap[] result = {null};
+    r.runOnMainSync(
+        () -> {
+          View root = activity.getWindow().getDecorView();
+          result[0] =
+              Bitmap.createBitmap(root.getWidth(), root.getHeight(), Bitmap.Config.ARGB_8888);
+          root.draw(new android.graphics.Canvas(result[0]));
+        });
+    try (var out =
+        new FileOutputStream(new java.io.File(r.getTargetContext().getCacheDir(), name))) {
+      result[0].compress(Bitmap.CompressFormat.PNG, 100, out);
+    } finally {
+      result[0].recycle();
     }
   }
 }

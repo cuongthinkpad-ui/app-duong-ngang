@@ -46,6 +46,8 @@ public class MainActivity extends Activity {
       incidentFilter = "Tất cả";
   private boolean demo = false, expanded = false, followToday = true;
   private LocalDate selected = LocalDate.now(WebSource.ZONE);
+  private LocalDate axleSelected = LocalDate.now(WebSource.ZONE);
+  private boolean axleFollowToday = true;
   private final long demoClock = System.currentTimeMillis();
   private final ExecutorService io = Executors.newSingleThreadExecutor();
   private final Handler handler = new Handler(Looper.getMainLooper());
@@ -54,6 +56,7 @@ public class MainActivity extends Activity {
       new Runnable() {
         public void run() {
           if (followToday) selected = LocalDate.now(WebSource.ZONE);
+          if (axleFollowToday) axleSelected = LocalDate.now(WebSource.ZONE);
           String state =
               store.prefs.getString("status", "")
                   + store.prefs.getLong("lastSuccess", 0)
@@ -86,10 +89,22 @@ public class MainActivity extends Activity {
     render();
     Store capturedStore = store;
     String capturedAccount = capturedStore.account();
-    if (!capturedStore.travelReady())
+    if (!capturedStore.travelReady() || capturedStore.prefs.getInt("axleVersion", 0) != 1)
       io.execute(
           () -> {
-            capturedStore.prepareTravelState(capturedAccount, System.currentTimeMillis());
+            synchronized (Store.class) {
+              if (!capturedStore.account().equals(capturedAccount)) return;
+              capturedStore.prepareTravelState(capturedAccount, System.currentTimeMillis());
+              if (capturedStore.prefs.getInt("axleVersion", 0) != 1) {
+                long now = System.currentTimeMillis();
+                capturedStore.updateActiveFaults(
+                    capturedAccount,
+                    Rules.faultBaseline(0, now),
+                    now,
+                    Rules.faultBaseline(capturedStore.prefs.getLong("baselineFrom", 0), now),
+                    List.of());
+              }
+            }
             runOnUiThread(
                 () -> {
                   if (!isFinishing()
@@ -368,8 +383,10 @@ public class MainActivity extends Activity {
             : store.events(baseline, System.currentTimeMillis() + 1);
     boolean selfEnabled = Rules.selfTriggerEnabled(store.prefs.getInt("interval", 30));
     for (var event : records)
-      if (event.at() >= baseline && (selfEnabled || !Rules.isSelfTrigger(event)))
-        current.add(event);
+      if ((event.at() >= baseline
+              || Rules.isAxleFault(event)
+                  && event.at() >= Rules.faultBaseline(0, System.currentTimeMillis()))
+          && (selfEnabled || !Rules.isSelfTrigger(event))) current.add(event);
     return Rules.activeFaults(current);
   }
 
@@ -421,24 +438,28 @@ public class MainActivity extends Activity {
                     ? "Cài đặt"
                     : page.equals("detail")
                         ? "Chi tiết đường ngang"
-                        : page.equals("trains") ? "Các lượt tàu" : "Danh sách đường ngang";
+                        : page.equals("axles")
+                            ? "Theo dõi đếm trục"
+                            : page.equals("trains") ? "Các lượt tàu" : "Danh sách đường ngang";
     titles.addView(text(heading, page.equals("overview") ? 18 : 17, INK, true));
     gap(titles, 5);
     titles.addView(text("Công ty CP TTTH Đường sắt Vinh", 11, MUTED, false));
     titleRow.addView(titles, new LinearLayout.LayoutParams(0, -2, 1));
     titleRow.addView(
         iconButton(
-            page.equals("detail") || page.equals("trains")
+            page.equals("detail") || page.equals("trains") || page.equals("axles")
                 ? "back"
                 : page.equals("settings") ? "close" : "settings",
             page.equals("settings") ? "Về tổng quan" : "Cài đặt",
             () ->
                 navigate(
-                    page.equals("trains")
-                        ? "overview"
-                        : page.equals("detail")
-                            ? "crossings"
-                            : page.equals("settings") ? "overview" : "settings")));
+                    page.equals("axles")
+                        ? "detail"
+                        : page.equals("trains")
+                            ? "overview"
+                            : page.equals("detail")
+                                ? "crossings"
+                                : page.equals("settings") ? "overview" : "settings")));
     header.addView(titleRow);
     screen.addView(header);
     content = column();
@@ -468,6 +489,7 @@ public class MainActivity extends Activity {
       else if (page.equals("crossings")) crossingList();
       else if (page.equals("detail")) crossingDetail();
       else if (page.equals("trains")) trainList();
+      else if (page.equals("axles")) axleList();
       else settings();
     }
     status = text("", 11, MUTED, false);
@@ -513,6 +535,7 @@ public class MainActivity extends Activity {
       else if (page.equals("crossings")) crossingList();
       else if (page.equals("detail")) crossingDetail();
       else if (page.equals("trains")) trainList();
+      else if (page.equals("axles")) axleList();
       content.addView(status);
       updateStatusLine();
       // Restore after measuring the new rows, before the next frame is drawn.
@@ -1015,7 +1038,10 @@ public class MainActivity extends Activity {
               && (incident.fault().at() < from || incident.fault().at() >= to))
           || !inScope(incident.fault().crossing())) continue;
       boolean recovered = incident.recovery() != null,
-          reset = !recovered && incident.fault().at() < baseline;
+          reset =
+              !recovered
+                  && !Rules.isAxleFault(incident.fault())
+                  && incident.fault().at() < baseline;
       if (incidentFilter.equals("Đã khôi phục") && !recovered) continue;
       if (incidentFilter.equals("Chưa khôi phục") && (recovered || reset)) continue;
       LinearLayout item = card(recovered ? GOOD : reset ? SURFACE : FAULT);
@@ -1024,7 +1050,13 @@ public class MainActivity extends Activity {
       LinearLayout state = row();
       TextView badge =
           text(
-              recovered ? "✓ Đã khôi phục" : reset ? "Đã đặt lại theo dõi" : "Chưa khôi phục",
+              recovered
+                  ? "✓ Đã khôi phục"
+                  : reset
+                      ? "Đã đặt lại theo dõi"
+                      : Rules.isAxleFault(incident.fault())
+                          ? "Cảnh báo đếm trục trong ngày"
+                          : "Chưa khôi phục",
               11,
               recovered ? GREEN : reset ? MUTED : RED,
               true);
@@ -1043,6 +1075,10 @@ public class MainActivity extends Activity {
   }
 
   private void loadHistory() {
+    loadHistory(selected);
+  }
+
+  private void loadHistory(LocalDate day) {
     if (demo) {
       Toast.makeText(this, "Dữ liệu minh họa không kết nối website", Toast.LENGTH_SHORT).show();
       return;
@@ -1051,9 +1087,8 @@ public class MainActivity extends Activity {
       navigate("settings");
       return;
     }
-    LocalDate day = selected;
     String account = store.account();
-    status.setText("Đang tải dữ liệu sự cố…");
+    status.setText("Đang tải dữ liệu…");
     status.setVisibility(View.VISIBLE);
     io.execute(
         () -> {
@@ -1065,6 +1100,14 @@ public class MainActivity extends Activity {
                     store.password());
             var data = source.readDay(day);
             store.saveForAccount(account, data);
+            long now = System.currentTimeMillis();
+            if (day.equals(LocalDate.now(WebSource.ZONE)))
+              store.updateActiveFaults(
+                  account,
+                  Rules.faultBaseline(0, now),
+                  now,
+                  Rules.faultBaseline(store.prefs.getLong("baselineFrom", 0), now),
+                  List.of());
             List<Rules.Event> events = data.events();
             runOnUiThread(
                 () -> {
@@ -1078,7 +1121,7 @@ public class MainActivity extends Activity {
                 () -> {
                   if (!isFinishing())
                     new AlertDialog.Builder(this)
-                        .setTitle("Chưa tải được dữ liệu sự cố")
+                        .setTitle("Chưa tải được dữ liệu")
                         .setMessage(e.getMessage())
                         .setPositiveButton("Đóng", null)
                         .show();
@@ -1484,7 +1527,7 @@ public class MainActivity extends Activity {
       if (!event.text().toLowerCase(Locale.ROOT).contains("điện áp")) sensorEvents.add(event);
     for (var event : faults)
       if (!event.text().toLowerCase(Locale.ROOT).contains("điện áp")) sensorFaults.add(event);
-    String sensors = deviceReading(sensorEvents, sensorFaults, "cảm biến");
+    String sensors = deviceReading(sensorEvents, sensorFaults, "cảm biến", "cb");
     String connection = deviceReading(events, faults, "kết nối giám sát"),
         voltage = deviceReading(events, faults, "điện áp", "220vac");
     String[] labels = {"Chuông", "Đèn", "Cần chắn", "Cảm biến", "Kết nối", "Điện áp"};
@@ -1497,6 +1540,7 @@ public class MainActivity extends Activity {
       if (i < labels.length - 1) divider(summary);
     }
     content.addView(summary);
+    axleSummary(events, faults);
     LinearLayout history = card(SURFACE);
     history.addView(text("Lịch sử sự kiện gần nhất", 15, INK, true));
     gap(history, 18);
@@ -1517,6 +1561,109 @@ public class MainActivity extends Activity {
     gap(content, 17);
   }
 
+  private void axleSummary(List<Rules.Event> events, List<Rules.Event> faults) {
+    LinearLayout panel = card(SURFACE);
+    panel.addView(text("Đếm trục hôm nay", 15, INK, true));
+    gap(panel, 8);
+    panel.addView(text("Tính riêng từng CB · Lệch từ 3 trục mới cộng số lần", 10, MUTED, false));
+    Map<Integer, Rules.AxleError> latest = new TreeMap<>();
+    for (var e : Rules.axleErrors(route(), events)) latest.put(e.sensor(), e);
+    Set<Integer> warned = new HashSet<>();
+    for (var fault : faults) if (Rules.isAxleFault(fault)) warned.add(fault.id().charAt(5) - '0');
+    for (var e : latest.values()) {
+      divider(panel);
+      int color = warned.contains(e.sensor()) ? RED : MUTED;
+      panel.addView(
+          text(
+              "CB" + e.sensor() + " · " + e.dailyCount() + " lần lệch từ 3 trục", 12, color, true));
+      gap(panel, 5);
+      panel.addView(
+          text(
+              "Gần nhất " + time(e.source().at()) + " · " + Rules.axleDifference(e.delta()),
+              11,
+              color,
+              false));
+      panel.addView(
+          text(
+              "Tổng ghi nhận: thiếu " + e.missing() + ", thừa " + e.extra() + " trục",
+              10,
+              MUTED,
+              false));
+    }
+    if (latest.isEmpty()) {
+      gap(panel, 8);
+      panel.addView(text("Chưa ghi nhận lệch trục có chuẩn đối chiếu", 11, MUTED, false));
+    }
+    gap(panel, 9);
+    TextView more = text("Xem các lần đếm trục  →", 11, BLUE, true);
+    touch(more, () -> navigate("axles"));
+    panel.addView(more);
+    content.addView(panel);
+  }
+
+  private void axleList() {
+    LinearLayout controls = card(SURFACE), date = row();
+    TextView label = text("Km " + selectedCrossing, 15, INK, true);
+    controls.addView(label);
+    gap(controls, 12);
+    TextView day =
+        text(axleSelected.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), 13, INK, true);
+    date.addView(day, new LinearLayout.LayoutParams(0, -2, 1));
+    TextView fetch = pill("Tải dữ liệu", BLUE, TINT);
+    touch(fetch, () -> loadHistory(axleSelected));
+    date.addView(fetch);
+    touch(
+        day,
+        () ->
+            new DatePickerDialog(
+                    this,
+                    (v, y, m, d) -> {
+                      axleSelected = LocalDate.of(y, m + 1, d);
+                      axleFollowToday = axleSelected.equals(LocalDate.now(WebSource.ZONE));
+                      render();
+                    },
+                    axleSelected.getYear(),
+                    axleSelected.getMonthValue() - 1,
+                    axleSelected.getDayOfMonth())
+                .show());
+    controls.addView(date);
+    gap(controls, 9);
+    controls.addView(
+        text("Ghi chú cả ngày · Lệch 1–2 trục không cộng bộ đếm cảnh báo", 10, MUTED, false));
+    content.addView(controls);
+    long from = axleSelected.atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
+    long to = axleSelected.plusDays(1).atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
+    List<Rules.Event> records = demo ? samples() : store.events(from, to);
+    List<Rules.Event> point = new ArrayList<>();
+    for (var e : records) if (Rules.km(e.crossing()).equals(selectedCrossing)) point.add(e);
+    Set<String> warnings = new HashSet<>();
+    for (var e : Rules.axleAlerts(route(), point)) warnings.add(e.id().substring(7));
+    int shown = 0;
+    for (var e : point) {
+      String note = Rules.axleNote(e);
+      if (note.isEmpty()) continue;
+      LinearLayout entry = card(warnings.contains(e.id()) ? FAULT : SURFACE);
+      eventRow(entry, e, false);
+      gap(entry, 8);
+      entry.addView(text(note, 12, warnings.contains(e.id()) ? RED : BLUE, true));
+      Rules.AxleComparison c = Rules.compareAxles(e.counts());
+      if (c != null && c.standard() != null) {
+        gap(entry, 5);
+        entry.addView(text("Chuẩn chung: " + c.standard() + " trục", 10, MUTED, false));
+        List<String> readings = new ArrayList<>();
+        for (int i = 0; i < 6; i++) readings.add("CB" + (i + 1) + ": " + c.counts().get(i));
+        entry.addView(text(String.join(" · ", readings), 10, MUTED, false));
+      }
+      content.addView(entry);
+      shown++;
+    }
+    if (shown == 0) {
+      LinearLayout empty = card(SURFACE);
+      empty(empty, "Chưa có ghi chú đếm trục", "Chọn ngày và tải dữ liệu để xem lại.", "rail");
+      content.addView(empty);
+    }
+  }
+
   private void navigation() {
     LinearLayout nav = row();
     nav.setPadding(dp(12), dp(5), dp(12), dp(5));
@@ -1528,7 +1675,7 @@ public class MainActivity extends Activity {
       String target = pages[i];
       boolean active =
           page.equals(target)
-              || (page.equals("detail") && target.equals("crossings"))
+              || ((page.equals("detail") || page.equals("axles")) && target.equals("crossings"))
               || (page.equals("trains") && target.equals("overview"));
       LinearLayout tab = column();
       tab.setGravity(Gravity.CENTER);

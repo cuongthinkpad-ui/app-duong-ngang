@@ -561,6 +561,103 @@ final class UiRefreshChecks {
             url.setText("https://rail.example.test/");
             check(url.getText().toString().startsWith("https://"), "prefix can be replaced");
           });
+      store.credentials("https://rail.example.test/", "ui-axles", "test-only");
+      long axleNow = System.currentTimeMillis();
+      long axleStart = Math.max(Rules.faultBaseline(0, axleNow) + 1000, axleNow - 3600000);
+      List<Rules.Event> axleRecords = new ArrayList<>();
+      for (int i = 0; i < 6; i++)
+        axleRecords.add(
+            new Rules.Event(
+                "ui-axle-" + i,
+                axleStart + i * 1000,
+                "313+800",
+                "Khôi phục hệ thống",
+                false,
+                List.of("40", "40", "37", "40", "40", "40")));
+      axleRecords.add(
+          new Rules.Event(
+              "ui-axle-large",
+              axleStart + 7000,
+              "313+800",
+              "Khôi phục hệ thống",
+              false,
+              List.of("40", "40", "40", "52", "40", "40")));
+      for (int i = 0; i < 15; i++)
+        axleRecords.add(
+            new Rules.Event(
+                "ui-after-axle-" + i,
+                axleStart + 8000 + i * 1000,
+                "313+800",
+                "Cần chắn 1 đã nâng",
+                false,
+                List.of()));
+      store.saveForAccount(store.account(), new WebSource.DayData(axleRecords, Rules.DEMO_ROUTE));
+      store.updateActiveFaults(store.account(), axleStart, axleNow, axleStart + 30000, List.of());
+      store
+          .prefs
+          .edit()
+          .putInt("interval", 300)
+          .putLong("lastSuccess", axleNow)
+          .putString("status", "Đã cập nhật")
+          .commit();
+      ui(() -> navigate("overview"));
+      ui(
+          () -> {
+            String visible = labels((View) field(activity, "screen"));
+            check(
+                visible.contains("CB3 đếm sai 6 lần") && visible.contains("CB4 đếm thừa 12 trục"),
+                "both axle warning reasons appear on overview at five-minute polling");
+          });
+      UiPreview.shot(runner, activity, "axle-overview-0.12.png");
+      ui(
+          () -> {
+            Field point = MainActivity.class.getDeclaredField("selectedCrossing");
+            point.setAccessible(true);
+            point.set(activity, "313+800");
+            navigate("detail");
+            String visible = labels((View) field(activity, "screen"));
+            check(
+                visible.contains("Đếm trục hôm nay")
+                    && visible.contains("CB3 · 6 lần lệch từ 3 trục"),
+                "daily sensor counts remain visible beyond twelve recent events");
+            check(
+                visible.contains("thiếu 3 trục") && visible.contains("thừa 12 trục"),
+                "daily axle summary preserves amount and sign for each sensor");
+          });
+      UiPreview.shot(runner, activity, "axle-detail-0.12.png");
+      ui(
+          () -> {
+            navigate("axles");
+            String visible = labels((View) field(activity, "screen"));
+            check(
+                visible.contains("CB3 thiếu 3 trục") && visible.contains("CB4 thừa 12 trục"),
+                "full-day axle list displays both early warnings and notes");
+            check(
+                visible.contains("CB3: 37") && visible.contains("CB6: 40"),
+                "axle list shows original six sensor readings");
+            Field day = MainActivity.class.getDeclaredField("axleSelected");
+            day.setAccessible(true);
+            Field follow = MainActivity.class.getDeclaredField("axleFollowToday");
+            follow.setAccessible(true);
+            follow.set(activity, false);
+            day.set(activity, java.time.LocalDate.now(WebSource.ZONE).minusDays(1));
+            ((Runnable) field(activity, "refresh")).run();
+            check(
+                day.get(activity).equals(java.time.LocalDate.now(WebSource.ZONE).minusDays(1)),
+                "explicit axle history day survives periodic refresh");
+            follow.set(activity, true);
+          });
+      ui(
+          () -> {
+            ((Runnable) field(activity, "refresh")).run();
+            navigate("incidents");
+            String visible = labels((View) field(activity, "screen"));
+            check(
+                visible.contains("Cảnh báo đếm trục trong ngày")
+                    && visible.contains("CB3 đếm sai 6 lần"),
+                "incident tab distinguishes derived axle warning from hardware restoration");
+          });
+      UiPreview.shot(runner, activity, "axle-incidents-0.12.png");
       return checks;
     } finally {
       ui(() -> activity.finish());

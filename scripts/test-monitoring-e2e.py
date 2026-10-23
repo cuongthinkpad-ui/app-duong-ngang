@@ -51,7 +51,9 @@ def wait_for(predicate, label, timeout=110):
 def faults(state):
     return json.loads(state.get('activeFaults', '[]'))
 
-phase = {'value': 0, 'at': int(time.time()), 'manual': False, 'pre_restore': False}
+phase = {'value': 0, 'at': int(time.time()), 'manual': False, 'pre_restore': False,
+         'axles': 0, 'axle_other': False, 'axle_large': False, 'axle_exact': False, 'bell_recovered': False,
+         'axle_at': int(time.time())}
 
 class Fixture(BaseHTTPRequestHandler):
     def log_message(self, *args):
@@ -82,9 +84,24 @@ class Fixture(BaseHTTPRequestHandler):
                          ('100+000', 'Chuông 2 khôi phục tốt', t1+timedelta(seconds=1), False)]
             if current['value'] >= 3:
                 rows += [('100+000', 'Chuông 1 hỏng', t1+timedelta(seconds=2), True)]
+            if current['bell_recovered']:
+                rows += [('100+000', 'Chuông 1 khôi phục tốt', t1+timedelta(seconds=5), False)]
+        if selected == now.date() and current['axles']:
+            ta = datetime.fromtimestamp(current['axle_at'], timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
+            for i in range(current['axles']):
+                rows.append(('100+000','Khôi phục hệ thống',ta+timedelta(seconds=i),False,[40,40,37,40,40,40]))
+            if current['axle_other']:
+                for i in range(6):
+                    rows.append(('100+000','Khôi phục hệ thống',ta+timedelta(seconds=20+i),False,[40,40,40,37,40,40]))
+            if current['axle_large']:
+                rows.append(('100+000','Khôi phục hệ thống',ta+timedelta(seconds=30),False,[40,40,28,40,40,40]))
+            if current['axle_exact']:
+                rows.append(('100+000','Khôi phục hệ thống',ta+timedelta(seconds=40),False,[40,40,30,40,40,40]))
         table = "<table id='FixtureGdata'>"
-        for point, text, at, red in reversed(rows):
-            table += f"<tr><td>Km {point}</td><td><font color={'red' if red else 'blue'}>{text}</font></td><td>{selected:%d/%m}</td><td>{at:%H:%M:%S}</td></tr>"
+        for entry in reversed(rows):
+            point, text, at, red = entry[:4]
+            counts = entry[4] if len(entry) > 4 else []
+            table += f"<tr><td>Km {point}</td><td><font color={'red' if red else 'blue'}>{text}</font></td><td>{selected:%d/%m}</td><td>{at:%H:%M:%S}</td>" + ''.join(f'<td>{n}</td>' for n in counts) + '</tr>'
         body = (f"<form method='post' action='/'><h1>BÁO CÁO ĐƯỜNG NGANG CBTĐ</h1><input name='date' value='{selected:%d/%m/%Y}'>"
                 + point_options + table + '</table></form>').encode()
         self.send_response(200)
@@ -201,7 +218,54 @@ def main():
             adb('shell', 'am', 'start', '-n', PKG+'/.MainActivity')
             wait_for(lambda s: any(row[3]=='Chuông 1 hỏng' for row in faults(s)) and int(s.get('lastAlarm','0')) > last_audible,
                      'monitoring start sounds for an already active red fault, including at 2-minute polling')
-            print('12 monitoring checks passed', flush=True)
+            # Statistical axle alerts: real polling, per-sensor daily suppression and new large error.
+            metadata_before_axles = metadata()
+            stop_service()
+            state_root = ET.fromstring(preferences_xml())
+            for node in state_root:
+                if node.get('name') in ('sound','running'): node.set('value','true')
+                if node.get('name') == 'interval': node.set('value','30')
+            (folder/'axle-start.xml').write_bytes(ET.tostring(state_root,encoding='utf-8'))
+            install(folder/'axle-start.xml','shared_prefs/monitor.xml')
+            phase.update(axles=5, axle_at=int(time.time())-20, bell_recovered=True)
+            adb('shell','am','start','-n',PKG+'/.MainActivity')
+            five = wait_for(lambda s: not faults(s) and int(s.get('lastSuccess','0')) > int(metadata_before_axles.get('lastSuccess','0')),
+                            'five qualifying axle errors remain notes without alert')
+            phase['axles'] = 6
+            sixth = wait_for(lambda s: any(row[0].startswith('axle:3:') and 'thiếu 3 trục' in row[3] for row in faults(s))
+                            and int(s.get('lastAlarm','0')) > int(five.get('lastAlarm','0')),
+                            'sixth error for CB3 raises red warning with audible playback')
+            seventh_at = int(sixth['lastSuccess'])
+            sixth_alarm = int(sixth['lastAlarm'])
+            phase['axles'] = 7
+            seventh = wait_for(lambda s: int(s.get('lastSuccess','0')) > seventh_at,
+                               'seventh measurement processed')
+            assert int(seventh['lastAlarm']) == sixth_alarm, 'Seventh daily error must not replay warning'
+            print('PASS: same sensor daily warning does not repeat after further errors',flush=True)
+            stop_service()
+            state_root = ET.fromstring(preferences_xml())
+            for node in state_root:
+                if node.get('name') == 'running': node.set('value','true')
+            (folder/'axle-restart.xml').write_bytes(ET.tostring(state_root,encoding='utf-8'))
+            install(folder/'axle-restart.xml','shared_prefs/monitor.xml')
+            adb('shell','am','start','-n',PKG+'/.MainActivity')
+            restarted = wait_for(lambda s: int(s.get('lastSuccess','0')) > int(seventh['lastSuccess']),
+                                 'monitoring restart reuses axle notice ledger')
+            assert int(restarted['lastAlarm']) == sixth_alarm, 'Restart must not replay already notified daily axle warning'
+            print('PASS: restart does not replay daily axle warning',flush=True)
+            phase['axle_other'] = True
+            other = wait_for(lambda s: any(row[0].startswith('axle:4:') for row in faults(s))
+                            and int(s.get('lastAlarm','0')) > sixth_alarm,
+                            'another sensor reaching six errors creates a new audible alert')
+            phase['axle_large'] = True
+            large = wait_for(lambda s: any(row[0].startswith('axle:3:') and 'thiếu 12 trục trong 1 lần' in row[3] for row in faults(s))
+                     and int(s.get('lastAlarm','0')) > int(other['lastAlarm']),
+                     'new deviation above ten axles alerts even on previously notified sensor')
+            phase['axle_exact'] = True
+            wait_for(lambda s: any(row[0].startswith('axle:3:') and 'thiếu 10 trục trong 1 lần' in row[3] for row in faults(s))
+                     and int(s.get('lastAlarm','0')) > int(large['lastAlarm']),
+                     'exactly ten missing axles create another audible alert on previously warned sensor')
+            print('21 monitoring checks passed', flush=True)
         finally:
             stop_service();adb('shell','am','force-stop',PKG)
             install(folder/'original.xml','shared_prefs/monitor.xml')

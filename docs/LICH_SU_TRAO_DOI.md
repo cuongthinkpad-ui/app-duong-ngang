@@ -135,3 +135,14 @@ Sửa 0.10 nối cả bản tin đã qua vào lượt phía trước, giữ liê
 Chủ dự án phản hồi “cơ bản là app đã chạy ok”, yêu cầu hai bổ sung: chuông đang ba hồi tăng thành **sáu hồi**; khi đường ngang đang tự kích nhận **“Ấn nút Phục hồi”**, phải hết cảnh báo tự kích và tắt đoạn xanh tương ứng trên sơ đồ.
 
 Bản 0.11 giữ âm sắc/nhịp âm cũ, tăng thời lượng từ 6 lên 12 giây (sáu hồi), vẫn một lần báo và một nút tắt chung. Quy tắc khôi phục chỉ khép lỗi suy luận của đúng điểm, giữ nguyên lỗi phần cứng khác. Sơ đồ lưu cờ tự kích gắn đúng lượt và đóng lượt đó khi có bản tin nút phục hồi; giữ dấu kết thúc để bản tin tàu tới muộn không tạo lại. Lượt tàu mới vẫn hiển thị bình thường. Cache tự chuyển từ raw, không yêu cầu gỡ bản cũ. Kết quả kiểm tra và giới hạn ở `docs/UI_REVIEW_0.11.md`.
+
+
+## 16. Ghi chú cả ngày và hai ngưỡng cảnh báo trục ở 0.12
+
+Chủ dự án không tìm thấy ghi chú thừa trục ở Km 313+800 buổi sáng. Kiểm tra code 0.11 cho thấy ghi chú chỉ nằm dưới dòng khôi phục trong 12 sự kiện gần nhất của chi tiết, không có bảng riêng. Chưa đối chiếu bản tin cụ thể sáng đó; không khẳng định app đã nhận được lượt đó.
+
+Chủ dự án yêu cầu thêm cảnh báo: cùng CB sai hơn năm lần/ngày hoặc một lần lệch hơn mười trục. Ngưỡng lệch nhỏ để cộng số lần được chỉnh qua vài tin nhắn; **chốt cuối lệch từ ba trục mới cộng**, lệch một/hai vẫn ghi chú nhưng không cộng. Đã hỏi rõ mốc “quá sáu lần” ở tin nhắn sau: chủ dự án chọn **lần thứ sáu như đã chốt**, không phải thứ bảy.
+
+Chủ dự án chọn giữ cảnh báo tới hết ngày/00:00 và yêu cầu ngưỡng số lần chỉ thông báo một lần/ngày cho CB đó. CB khác đạt ngưỡng hoặc một lần lệch từ mười trục thì thông báo mới; cùng lần đạt cả hai thì gộp. Lưu dấu chống báo lại qua đóng/mở app và tải bù. Cảnh báo đỏ trong Sự cố, chuông sáu hồi theo cài đặt; ghi đúng số thừa/thiếu, chuẩn chung, số đếm. Chi tiết đường ngang có Đếm trục hôm nay và các lần lệch cả ngày/chọn ngày/tải web. Xem `docs/UI_REVIEW_0.12.md` cho kết quả kiểm tra, ảnh tổng hợp và giới hạn.
+
+Chủ dự án sửa lại ngưỡng đơn lẻ ngay trước khi đóng gói: **lệch 10 trục trở lên**, bao gồm đúng 10, thay cho cách diễn đạt “quá 10” trước đó. Code, dấu thông báo và bài kiểm tra biên đều theo ngưỡng chốt này.

@@ -378,6 +378,145 @@ public final class RouteStoreChecks extends Instrumentation {
               && Rules.trackSegments(manualRoute, store.travelState()).isEmpty()
               && store.activeFaults().equals(List.of(rawFault)),
           "v0.10 cache migration replays manual reset without deleting device faults");
+      store.credentials("https://rail.example.test/", "axle-account", "test-only");
+      long axleDay = Rules.faultBaseline(0, System.currentTimeMillis());
+      List<Rules.Event> measurements = new java.util.ArrayList<>();
+      for (int i = 0; i < 5; i++)
+        measurements.add(
+            new Rules.Event(
+                "axle-source-" + i,
+                axleDay + 1000 + i * 1000,
+                "101+000",
+                "Khôi phục hệ thống",
+                false,
+                List.of("40", "40", "37", "40", "40", "40")));
+      store.saveForAccount(store.account(), new WebSource.DayData(measurements, manualRoute));
+      store.updateActiveFaults(store.account(), axleDay, axleDay + 6000, axleDay, List.of());
+      check(
+          store.activeFaults().isEmpty(), "five saved axle deviations do not become active alerts");
+      var sixthAxle =
+          new Rules.Event(
+              "axle-source-sixth",
+              axleDay + 7000,
+              "101+000",
+              "Khôi phục hệ thống",
+              false,
+              List.of("40", "40", "37", "40", "40", "40"));
+      store.saveForAccount(store.account(), new WebSource.DayData(List.of(sixthAxle), manualRoute));
+      store.updateActiveFaults(
+          store.account(), axleDay + 7000, axleDay + 8000, axleDay + 7500, List.of());
+      check(
+          store.activeFaults().size() == 1
+              && Rules.isAxleFault(store.activeFaults().get(0))
+              && store.activeFaults().get(0).text().contains("thiếu 3 trục"),
+          "sixth deviation raises an alert despite later generic fault baseline");
+      check(
+          store.events(axleDay, axleDay + 8000).stream().filter(e -> !Rules.isGenerated(e)).count()
+              == 6,
+          "derived axle alert preserves all original measurements");
+      String axleId = store.activeFaults().get(0).id();
+      var firstAxleNotice = store.activeFaults().get(0);
+      check(
+          store.claimAxleNotice(firstAxleNotice, axleDay + 8000)
+              && !new Store(context).claimAxleNotice(firstAxleNotice, axleDay + 8001),
+          "daily axle warning notifies once even after Store restart");
+      store.updateActiveFaults(store.account(), axleDay + 8001, axleDay + 9000, axleDay, List.of());
+      check(
+          store.activeFaults().size() == 1
+              && new Store(context).activeFaults().get(0).id().equals(axleId)
+              && store.events(axleDay, axleDay + 9000).size() == 7,
+          "poll and Store restart retain one stable alert without counting it again");
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "axle-correct",
+                      axleDay + 10000,
+                      "101+000",
+                      "Khôi phục hệ thống",
+                      false,
+                      List.of("40", "40", "40", "40", "40", "40"))),
+              manualRoute));
+      store.updateActiveFaults(
+          store.account(), axleDay + 10000, axleDay + 11000, axleDay, List.of());
+      check(
+          store.activeFaults().size() == 1,
+          "a later correct count keeps the statistical alert for the day");
+      store.resetDailyFaults(axleDay + 86400000 + 1000);
+      check(store.activeFaults().isEmpty(), "midnight resets current axle warnings");
+      check(
+          Rules.incidentHistory(store.incidentEvents(axleDay, axleDay + 86400000)).stream()
+              .anyMatch(i -> Rules.isAxleFault(i.fault())),
+          "daily reset preserves historical axle warning");
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "axle-backfill",
+                      axleDay + 500,
+                      "101+000",
+                      "Khôi phục hệ thống",
+                      false,
+                      List.of("40", "40", "37", "40", "40", "40"))),
+              manualRoute));
+      store.syncAxleAlerts(store.account(), axleDay, axleDay + 86400000);
+      var backfilled =
+          store.events(axleDay, axleDay + 86400000).stream().filter(Rules::isAxleFault)
+              .collect(java.util.stream.Collectors.toList());
+      check(
+          backfilled.size() == 1
+              && !backfilled.get(0).id().equals(axleId)
+              && backfilled.get(0).at() == axleDay + 5000,
+          "late earlier measurement moves sixth threshold and removes obsolete generated alert");
+      check(
+          !store.claimAxleNotice(backfilled.get(0), axleDay + 30000),
+          "moving sixth measurement after backfill never notifies the same sensor again");
+      var bigSame =
+          new Rules.Event(
+              "axle:3:large-test",
+              axleDay + 20000,
+              "101+000",
+              "CB3 đếm thiếu 12 trục trong 1 lần · Sai 7 lần trong ngày",
+              true,
+              List.of("40", "40", "28", "40", "40", "40"));
+      check(
+          store.claimAxleNotice(bigSame, axleDay + 30000)
+              && !store.claimAxleNotice(bigSame, axleDay + 30001),
+          "new single deviation above ten notifies same sensor once per measurement");
+      var otherSensor =
+          new Rules.Event(
+              "axle:4:other-sensor",
+              axleDay + 20000,
+              "101+000",
+              "CB4 đếm sai 6 lần trong ngày",
+              true,
+              List.of("40", "40", "40", "37", "40", "40"));
+      check(
+          store.claimAxleNotice(otherSensor, axleDay + 30000),
+          "another sensor has its own daily notification");
+      check(
+          !store.claimAxleNotice(firstAxleNotice, axleDay + 86400000 + 1000),
+          "old day warnings do not ring on the next day");
+      var newDayNotice =
+          new Rules.Event(
+              "axle:3:new-day",
+              axleDay + 86400000 + 1000,
+              "101+000",
+              "CB3 đếm sai 6 lần trong ngày",
+              true,
+              List.of("40", "40", "37", "40", "40", "40"));
+      check(
+          store.claimAxleNotice(newDayNotice, axleDay + 86400000 + 2000),
+          "same sensor can notify again only on a new day or a new large deviation");
+      store.credentials("https://rail.example.test/", "new-axle-account", "test-only");
+      check(
+          store.activeFaults().isEmpty()
+              && !store.prefs.contains("axleVersion")
+              && !store.prefs.contains("axleNotices")
+              && store.events(axleDay, axleDay + 86400000).isEmpty(),
+          "changing account clears axle counters and generated alerts");
       result.putString("stream", checks + " account storage checks passed\n");
 
     } catch (Throwable failure) {

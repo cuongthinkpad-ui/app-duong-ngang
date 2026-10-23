@@ -163,7 +163,7 @@ public class MonitorService extends Service {
       Set<String> known = new HashSet<>();
       if (!full)
         for (var e : store.events(dayStart, started + 1))
-          if (!Rules.isSelfTrigger(e)) known.add(e.id());
+          if (!Rules.isGenerated(e)) known.add(e.id());
       var data = full ? source.readDay(today) : source.readDelta(today, known);
       incoming.addAll(data.events());
       if (!data.connected()) reset = true;
@@ -181,7 +181,7 @@ public class MonitorService extends Service {
         if (reset) store.prefs.edit().putLong("baselineFrom", newDay ? dayStart : now).apply();
         List<Rules.Event> cached = store.events(Math.max(previousStart, coverage), now + 1);
         List<Rules.Event> original = new ArrayList<>();
-        for (var event : cached) if (!Rules.isSelfTrigger(event)) original.add(event);
+        for (var event : cached) if (!Rules.isGenerated(event)) original.add(event);
         boolean detectSelf = Rules.selfTriggerEnabled(store.prefs.getInt("interval", 30));
         List<Rules.Event> candidates =
             detectSelf ? Rules.suspectedSelfTriggers(data.route(), original, coverage) : List.of();
@@ -228,7 +228,12 @@ public class MonitorService extends Service {
         long baseline = Rules.faultBaseline(store.prefs.getLong("baselineFrom", 0), now);
         long replayFrom = incoming.stream().mapToLong(Rules.Event::at).min().orElse(now);
         for (var event : confirmed) replayFrom = Math.min(replayFrom, event.at());
+        Set<String> previousAxles = new HashSet<>();
+        for (var event : store.activeFaults())
+          if (Rules.isAxleFault(event)) previousAxles.add(event.id());
         var active = store.updateActiveFaults(account, replayFrom, now, baseline, disproved);
+        for (var event : active)
+          if (Rules.isAxleFault(event) && !previousAxles.contains(event.id())) added.add(event);
         Set<String> open = new HashSet<>();
         Set<Integer> notificationIds = new HashSet<>();
         for (var event : active) {
@@ -251,7 +256,8 @@ public class MonitorService extends Service {
             if (event.red()
                 && open.contains(event.id())
                 && (detectSelf || !Rules.isSelfTrigger(event))
-                && notificationIds.contains(notificationId(event))) {
+                && notificationIds.contains(notificationId(event))
+                && store.claimAxleNotice(event, now)) {
               notifyFault(event);
               ringingFaults.add(event.id());
               audibleNew = true;
@@ -261,7 +267,9 @@ public class MonitorService extends Service {
         if (firstPoll)
           for (var event : active)
             if (notificationIds.contains(notificationId(event))
-                && (detectSelf || !Rules.isSelfTrigger(event))) {
+                && (detectSelf || !Rules.isSelfTrigger(event))
+                && store.claimAxleNotice(event, now)) {
+              if (Rules.isAxleFault(event)) notifyFault(event);
               ringingFaults.add(event.id());
               audibleNew = true;
             }

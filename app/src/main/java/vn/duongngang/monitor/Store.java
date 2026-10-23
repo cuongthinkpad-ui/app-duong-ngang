@@ -135,14 +135,17 @@ public final class Store {
       String expected, long replayFrom, long now, long baseline, List<String> disproved) {
     synchronized (Store.class) {
       if (!account().equals(expected)) throw new IllegalStateException("Tài khoản đã thay đổi");
+      long day = Rules.faultBaseline(0, now);
+      List<Rules.Event> axleAlerts = syncAxleAlerts(expected, day, now + 1);
       List<Rules.Event> input = activeFaults();
-      input.removeIf(e -> e.at() < baseline || disproved.contains(e.id()));
+      input.removeIf(e -> Rules.isAxleFault(e) || e.at() < baseline || disproved.contains(e.id()));
+      input.addAll(axleAlerts);
       // A cached self-trigger may predate the newest delta page. Include its reset even
       // after upgrading from a version that did not yet recognize the manual button.
       long from = replayFrom;
       for (var fault : input) if (Rules.isSelfTrigger(fault)) from = Math.min(from, fault.at());
       List<Rules.Event> recent = events(from, now + 1);
-      for (var e : recent) if (e.at() >= baseline) input.add(e);
+      for (var e : recent) if (!Rules.isAxleFault(e) && e.at() >= baseline) input.add(e);
       List<Rules.Event> active = Rules.activeFaults(input);
       JSONArray list = new JSONArray();
       for (var e : active)
@@ -162,9 +165,54 @@ public final class Store {
           .edit()
           .putString("activeFaults", list.toString())
           .putString("occupiedPoints", points.toString())
+          .putInt("axleVersion", 1)
           .apply();
       updateTravelState(now);
       return active;
+    }
+  }
+
+  /** Recompute derived warnings after late uploads; never edit the original website records. */
+  public List<Rules.Event> syncAxleAlerts(String expected, long from, long to) {
+    synchronized (Store.class) {
+      if (!account().equals(expected)) throw new IllegalStateException("Tài khoản đã thay đổi");
+      List<Rules.Event> records = events(from, to);
+      List<Rules.Event> alerts = Rules.axleAlerts(route(), records);
+      Map<String, Rules.Event> wanted = new HashMap<>();
+      for (var e : alerts) wanted.put(e.id(), e);
+      try (var db = db()) {
+        for (var e : records)
+          if (Rules.isAxleFault(e) && !e.equals(wanted.get(e.id())))
+            db.delete("events", "id=?", new String[] {e.id()});
+      }
+      save(alerts);
+      return alerts;
+    }
+  }
+
+  /**
+   * Persist per-sensor daily notice suppression, including across restarts and backfilled pages.
+   */
+  public boolean claimAxleNotice(Rules.Event event, long now) {
+    synchronized (Store.class) {
+      if (!Rules.isAxleFault(event)) return true;
+      long day = Rules.faultBaseline(0, now);
+      if (Rules.faultBaseline(0, event.at()) != day) return false;
+      String prefix = day + "|";
+      Set<String> notices = new HashSet<>();
+      try {
+        JSONArray stored = new JSONArray(prefs.getString("axleNotices", "[]"));
+        for (int i = 0; i < stored.length(); i++)
+          if (stored.getString(i).startsWith(prefix)) notices.add(stored.getString(i));
+      } catch (JSONException ignored) {
+      }
+      String sensor = prefix + Rules.km(event.crossing()) + "|" + event.id().charAt(5);
+      boolean large = Rules.isLargeAxleFault(event);
+      String key = large ? sensor + "|large|" + event.id() : sensor + "|daily";
+      boolean first = notices.add(key);
+      if (event.text().contains("lần trong ngày")) notices.add(sensor + "|daily");
+      prefs.edit().putString("axleNotices", new JSONArray(notices).toString()).apply();
+      return first;
     }
   }
 
@@ -334,6 +382,8 @@ public final class Store {
             .remove("travelCheckpointAt")
             .remove("travelRoute")
             .remove("travelVersion")
+            .remove("axleVersion")
+            .remove("axleNotices")
             .remove("lastFull")
             .remove("route")
             .remove("rangeFrom")
@@ -434,6 +484,8 @@ public final class Store {
    */
   public synchronized List<Rules.Event> incidentEvents(long from, long to) {
     List<Rules.Event> out = events(from, to);
+    out.removeIf(Rules::isAxleFault);
+    out.addAll(Rules.axleAlerts(route(), out));
     Set<String> inferredPoints = new HashSet<>();
     for (var event : out) if (Rules.isSelfTrigger(event)) inferredPoints.add(event.crossing());
     try (var db = db()) {

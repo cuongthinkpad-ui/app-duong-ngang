@@ -13,6 +13,13 @@ public class RulesTest {
     return new Rules.Event(km + t + text, t, km, text, red, List.of());
   }
 
+  static Rules.Event axle(long t, String km, int sensor, int delta) {
+    List<String> counts = new ArrayList<>(Collections.nCopies(6, "40"));
+    counts.set(sensor - 1, "" + (40 + delta));
+    return new Rules.Event(
+        "measurement:" + km + ":" + t, t, km, "Khôi phục hệ thống", false, counts);
+  }
+
   static void oneSegment(
       Rules.Route route,
       Rules.TravelState state,
@@ -1021,6 +1028,171 @@ public class RulesTest {
                         evenArrival, evenSelf, event(3000, "102+000", "Ấn nút Phục hồi", false))))
             .isEmpty(),
         "manual self reset also handles even trains");
+    long axleDay = java.time.Instant.parse("2026-10-22T17:00:00Z").toEpochMilli();
+    List<Rules.Event> five = new ArrayList<>();
+    for (int i = 0; i < 5; i++)
+      five.add(axle(axleDay + i * 60000, "101+000", 3, i % 2 == 0 ? 3 : -3));
+    check(
+        Rules.axleAlerts(line, five).isEmpty(),
+        "five qualifying errors do not trigger daily warning");
+    List<Rules.Event> tiny = new ArrayList<>(five);
+    for (int i = 0; i < 20; i++)
+      tiny.add(axle(axleDay + (i + 5) * 60000, "101+000", 3, i % 2 == 0 ? 1 : -2));
+    check(
+        Rules.axleAlerts(line, tiny).isEmpty(),
+        "one- and two-axle errors never increment the daily trigger");
+    check(
+        Rules.axleErrors(line, tiny).get(tiny.size() - 1).dailyCount() == 5,
+        "count remains five after one- and two-axle notes");
+    var sixth = axle(axleDay + 30 * 60000, "101+000", 3, -3);
+    tiny.add(sixth);
+    var sixAlerts = Rules.axleAlerts(line, tiny);
+    check(
+        sixAlerts.size() == 1
+            && sixAlerts.get(0).text().contains("CB3 đếm sai 6 lần")
+            && sixAlerts.get(0).text().contains("thiếu 3 trục"),
+        "sixth three-axle deviation alerts with signed amount");
+    tiny.add(axle(axleDay + 31 * 60000, "101+000", 3, 1));
+    tiny.add(axle(axleDay + 32 * 60000, "101+000", 3, 3));
+    check(
+        Rules.axleAlerts(line, tiny).equals(sixAlerts),
+        "later small deviations do not become periodic reminders");
+    check(
+        Rules.axleErrors(line, tiny).get(tiny.size() - 1).dailyCount() == 7,
+        "daily qualifying count continues after alert");
+    check(
+        Rules.axleAlerts(line, List.of(axle(axleDay, "101+000", 4, 10))).size() == 1,
+        "exactly ten excess axles trigger a single-event alert");
+    check(
+        Rules.axleAlerts(line, List.of(axle(axleDay, "101+000", 4, -10))).size() == 1,
+        "exactly ten missing axles trigger a single-event alert");
+    check(
+        Rules.axleAlerts(line, List.of(axle(axleDay, "101+000", 4, 9))).isEmpty(),
+        "nine excess axles remain below single-event threshold");
+    check(
+        Rules.axleAlerts(line, List.of(axle(axleDay, "101+000", 4, -9))).isEmpty(),
+        "nine missing axles remain below single-event threshold");
+    var largeExtra = Rules.axleAlerts(line, List.of(axle(axleDay, "101+000", 4, 11)));
+    check(
+        largeExtra.size() == 1
+            && largeExtra.get(0).text().contains("thừa 11 trục trong 1 lần")
+            && largeExtra.get(0).text().contains("Chuẩn 40, đếm 51"),
+        "first event alerts for eleven excess axles with baseline");
+    var largeMissing = Rules.axleAlerts(line, List.of(axle(axleDay, "101+000", 4, -11)));
+    check(
+        largeMissing.size() == 1
+            && largeMissing.get(0).text().contains("thiếu 11 trục trong 1 lần")
+            && largeMissing.get(0).text().contains("đếm 29"),
+        "first event alerts for eleven missing axles");
+    List<Rules.Event> combined = new ArrayList<>(five);
+    combined.add(axle(axleDay + 31 * 60000, "101+000", 3, -12));
+    check(
+        Rules.axleAlerts(line, combined).size() == 1
+            && Rules.axleAlerts(line, combined).get(0).text().contains("Sai 6 lần"),
+        "same event crossing both thresholds creates one warning");
+    List<Rules.Event> separateAxles = new ArrayList<>(five);
+    for (int i = 0; i < 5; i++) {
+      separateAxles.add(axle(axleDay + (i + 6) * 60000, "101+000", 4, 3));
+      separateAxles.add(axle(axleDay + (i + 12) * 60000, "102+000", 3, -3));
+    }
+    check(
+        Rules.axleAlerts(line, separateAxles).isEmpty(),
+        "do not pool errors across sensors or crossings");
+    List<Rules.Event> duplicated = new ArrayList<>(tiny);
+    duplicated.addAll(tiny);
+    check(
+        Rules.axleAlerts(line, duplicated).equals(sixAlerts),
+        "duplicate reports do not double-count");
+    List<Rules.Event> daySplit = new ArrayList<>(five);
+    daySplit.add(axle(axleDay + 86400000, "101+000", 3, -3));
+    check(
+        Rules.axleAlerts(line, daySplit).isEmpty()
+            && Rules.axleErrors(line, daySplit).get(5).dailyCount() == 1,
+        "reset counts at Vietnamese midnight");
+    List<Rules.Event> nonconsecutive = new ArrayList<>();
+    for (int i = 0; i < 6; i++) {
+      nonconsecutive.add(axle(axleDay + i * 120000, "101+000", 3, 3));
+      nonconsecutive.add(axle(axleDay + i * 120000 + 60000, "101+000", 3, 0));
+    }
+    check(
+        Rules.axleAlerts(line, nonconsecutive).size() == 1,
+        "correct intervening trains do not reset daily cumulative count");
+    check(
+        Rules.activeFaults(
+                    List.of(
+                        sixAlerts.get(0),
+                        event(sixth.at() + 1, "101+000", "Ấn nút Phục hồi", false),
+                        event(sixth.at() + 2, "101+000", "Cảm biến 3 khôi phục tốt", false)))
+                .size()
+            == 1,
+        "statistical warning is latched for the day, not erased by generic/manual/device recovery");
+    List<Rules.Event> shuffledAxles = new ArrayList<>(tiny);
+    Collections.reverse(shuffledAxles);
+    check(
+        Rules.axleAlerts(line, shuffledAxles).equals(sixAlerts),
+        "out-of-order pages replay deterministic axle counts");
+    var voltageReading =
+        new Rules.Event(
+            "v",
+            axleDay,
+            "101+000",
+            "Khôi phục hệ thống",
+            false,
+            List.of("40V", "40V", "0V", "40V", "40V", "40V"));
+    check(
+        Rules.axleAlerts(line, List.of(voltageReading)).isEmpty(),
+        "voltage values never become axle alerts");
+    var tiedCounts =
+        new Rules.Event(
+            "tie",
+            axleDay,
+            "101+000",
+            "Khôi phục hệ thống",
+            false,
+            List.of("20", "20", "20", "40", "40", "40"));
+    check(
+        Rules.axleAlerts(line, List.of(tiedCounts)).isEmpty()
+            && Rules.axleNote(tiedCounts).equals("cảm biến đếm trục không đồng nhất, lỗi"),
+        "tied baseline keeps note without inventing an incorrect sensor");
+    var offRoute = axle(axleDay, "900+000", 3, -20);
+    check(
+        Rules.axleAlerts(line, List.of(offRoute)).isEmpty(), "ignore points outside account route");
+    var stationMeasurement = axle(axleDay, "319+200 (Vi)", 3, -20);
+    check(
+        Rules.axleAlerts(Rules.DEMO_ROUTE, List.of(stationMeasurement)).isEmpty(),
+        "station devices are not crossing axle counters");
+    var notRestore =
+        new Rules.Event(
+            "measure",
+            axleDay,
+            "101+000",
+            "Đo điện áp cảm biến",
+            false,
+            List.of("40", "40", "0", "40", "40", "40"));
+    check(
+        Rules.axleAlerts(line, List.of(notRestore)).isEmpty(),
+        "numeric voltage measurement labels are ignored");
+    List<Rules.Event> healthyAfter = new ArrayList<>(sixAlerts);
+    healthyAfter.add(axle(axleDay + 40 * 60000, "101+000", 3, 0));
+    check(
+        Rules.activeFaults(healthyAfter).size() == 1,
+        "a later correct count does not erase daily warning");
+    check(
+        Rules.axleNote(axle(axleDay, "101+000", 3, 1)).equals("CB3 thừa 1 trục"),
+        "one-axle deviation remains a silent note");
+    check(
+        Rules.axleAlerts(line, new ArrayList<>(sixAlerts)).isEmpty(),
+        "derived warnings do not count themselves");
+    List<Rules.Event> largeThenDaily = new ArrayList<>();
+    largeThenDaily.add(axle(axleDay, "101+000", 3, -12));
+    for (int i = 1; i < 6; i++) largeThenDaily.add(axle(axleDay + i * 60000, "101+000", 3, -3));
+    check(
+        Rules.activeFaults(Rules.axleAlerts(line, largeThenDaily)).size() == 2,
+        "large deviation and later daily threshold each remain visible for the same sensor");
+    largeThenDaily.add(axle(axleDay + 6 * 60000, "101+000", 3, 12));
+    check(
+        Rules.activeFaults(Rules.axleAlerts(line, largeThenDaily)).size() == 3,
+        "each new large measurement remains a distinct alert even on an already warned sensor");
     System.out.println(scenarios + " domain scenarios passed");
   }
 }
