@@ -16,12 +16,12 @@ Chỉ so sáu số nguyên CB1–CB6 của dòng Khôi phục hệ thống, vớ
 
 Cảnh báo hiện ở Tổng quan và Sự cố, theo giờ – đường ngang – nội dung. Ví dụ: “CB3 đếm sai 6 lần trong ngày · Lần thứ 6 thiếu 3 trục · Chuẩn 40, đếm 37”, hoặc “CB4 đếm thiếu 12 trục trong 1 lần · Chuẩn 40, đếm 28”. Dòng đỏ gốc trên website vẫn giữ nguyên, không đổi sang nội dung suy luận.
 
-Trong chi tiết, nhóm Cảm biến cũng nhận cảnh báo này. Khối **Đếm trục hôm nay** liệt kê số lần lệch từ 3 của mỗi CB, lần lệch gần nhất và tổng thừa/thiếu của mọi ghi chú (tổng bao gồm lệch 1–2). Chạm **Xem các lần đếm trục** để xem toàn ngày, chọn ngày khác hoặc tải lại web. Không giới hạn ở 12 sự kiện gần nhất. Ngày lịch sử được chọn chủ động không tự đổi theo chu kỳ.
+Chốt giao diện cuối của chủ dự án: trong chi tiết chỉ thêm một mục **Đếm trục lỗi**, chỉ xuất hiện khi có CB đạt ngưỡng trong ngày. Mục thống kê chỉ liệt kê các CB đã cảnh báo: số lần lệch từ 3, lần lệch gần nhất và tổng thừa/thiếu của mọi ghi chú (tổng gồm lệch 1–2). Không thêm nút hoặc trang đếm trục riêng. Các cảnh báo vẫn hiện ở Tổng quan/Sự cố và phát chuông theo hai ngưỡng; mục thống kê không thay thế thông báo. Ghi chú thường vẫn nằm dưới bản tin khôi phục trong sự kiện gần nhất.
 
 Ảnh dùng hoàn toàn dữ liệu tổng hợp và vẽ cửa sổ app Android thật, không chứa bản tin/ảnh vận hành hoặc hộp thoại System UI của giả lập:
 
 - [Tổng quan](screenshots/axle-overview-0.12.png)
-- [Chi tiết và bộ đếm theo CB](screenshots/axle-detail-0.12.png)
+- [Chi tiết với một mục Đếm trục lỗi](screenshots/axle-detail-0.12.png)
 - [Hai kiểu cảnh báo trong Sự cố](screenshots/axle-incidents-0.12.png)
 
 ## Lưu trữ và âm báo
@@ -36,10 +36,10 @@ Trong chi tiết, nhóm Cảm biến cũng nhận cảnh báo này. Khối **Đ�
 
 - **384 kiểm tra quy tắc** đạt, gồm biên 1/2/3, 5/6/7 lần, 9/10/11 trục, hai chiều thừa/thiếu, mốc nửa đêm Việt Nam, trùng trang, dữ liệu đảo thứ tự, CB/đường ngang độc lập, dòng điện áp/ga, hòa chuẩn, kết hợp hai lý do.
 - **55 kiểm tra lưu trữ Android** đạt, gồm giữ cảnh báo tới hết ngày, tải bù đổi vị trí lượt thứ sáu, nguyên vẹn bản tin gốc, dấu thông báo một lần qua khởi động lại, CB khác và lỗi lớn mới được báo tiếp, ngày mới/tài khoản mới.
-- **50 kiểm tra UI Android** đạt, gồm cảnh báo ở chu kỳ 5 phút, đủ hai kiểu cảnh báo trên Tổng quan, ghi chú buổi sáng ngoài 12 dòng vẫn thấy ở khối mới, số có dấu thừa/thiếu, danh sách cả ngày và chọn ngày, giữ các kiểm tra chống chớp/sơ đồ/âm báo cũ.
+- **48 kiểm tra UI Android** đạt trên APK chốt một mục: đủ hai kiểu cảnh báo ở chu kỳ 5 phút; mục Đếm trục lỗi giữ đúng số lần/thừa/thiếu ngoài 12 sự kiện gần nhất; năm lần lệch nhỏ vẫn chỉ ghi chú, không hiện mục thống kê; giữ kiểm tra chống chớp/sơ đồ/âm báo cũ. Đã bỏ các kiểm tra trang đếm trục riêng vì chủ dự án bỏ trang đó.
 - **12 parser / 13 đọc web fixture** đạt.
 - **21 kiểm tra service fixture** đạt: giữ các trường hợp lỗi gốc/tự kích/phục hồi/âm báo; thêm năm lần chưa cảnh báo, lần thứ sáu có âm, lần thứ bảy không nhắc, khởi động lại không báo lại, CB khác có âm mới, lệch 12 trục rồi đúng 10 trục trên CB đã báo đều có âm mới. Chạy chu kỳ đọc thật 30 giây; dữ liệu/proxy giả lập được khôi phục sau kiểm tra.
-- Build APK/gói Android test và Lint đạt: **0 lỗi, 15 cảnh báo Lint**.
+- Build APK/gói Android test và Lint đạt: **0 lỗi, 15 cảnh báo Lint**. Chạy lại build/Lint và UI sau khi gộp thống kê thành một mục. Các kiểm tra quy tắc/lưu trữ/parser/service đạt ở lượt trước đó trong 0.12; lần rút gọn này không đổi các mã đó.
 
 ## Bản cài và giới hạn
 

@@ -22,12 +22,12 @@ Chuẩn so sánh vẫn là số trục xuất hiện nhiều nhất ở CB1–CB
 - Ví dụ: “CB4 đếm thừa 10 trục trong 1 lần · Chuẩn 40, đếm 50”.
 - Giữ cảnh báo thống kê đến 00:00 giờ Việt Nam rồi đặt lại phần trong ngày; lịch sử vẫn lưu. Lượt đếm đúng hoặc nút phục hồi không xóa cảnh báo thống kê trước giờ này.
 - Dùng chuông sáu hồi nếu bật âm; tắt chuông chung vẫn giữ lỗi đỏ. Không có nhắc lại định kỳ.
-- Chi tiết đường ngang thêm **Đếm trục hôm nay**: số lần theo CB, lần lệch gần nhất, tổng thừa/thiếu. **Xem các lần đếm trục** mở danh sách cả ngày, chọn ngày và tải lại từ web, không bị giới hạn ở 12 sự kiện.
+- Chi tiết đường ngang chỉ thêm một mục **Đếm trục lỗi**, chỉ hiện khi có CB đạt ngưỡng. Thống kê các CB đó: số lần, lần lệch gần nhất và tổng thiếu/thừa. Không thêm màn danh sách đếm trục riêng. Khi đạt ngưỡng, thông báo đỏ/chuông vẫn phát như trên; mục thống kê không thay thế cảnh báo.
 
 Giữ các chức năng đã chốt trước: sơ đồ chuyển đúng một đoạn theo lượt tàu, ngắt tại ga; đủ tuyến khi lọc phạm vi; tự kích chỉ ở chu kỳ 30 giây; “Ấn nút Phục hồi” khép đúng lượt tự kích; nguyên văn lỗi đỏ của web; cập nhật trong các khung hiện tại; chữ ký chỉ ở Cài đặt. Cài mới được, cài đè cùng khóa giữ cài đặt.
 
 ## Kiểm tra và ngữ cảnh làm việc
 
-Đã đạt 384 kiểm tra quy tắc, 55 lưu trữ Android, 50 giao diện, 12 parser, 13 đọc web fixture và 21 service fixture; build/Lint không có lỗi. Lượt này dùng dữ liệu tổng hợp và giả lập, chưa kiểm tra loa/pin Xiaomi thật. Chi tiết và ảnh ở [biên bản 0.12](UI_REVIEW_0.12.md).
+Đã đạt 384 kiểm tra quy tắc, 55 lưu trữ Android, 48 giao diện, 12 parser, 13 đọc web fixture và 21 service fixture; build/Lint không có lỗi. Lượt này dùng dữ liệu tổng hợp và giả lập, chưa kiểm tra loa/pin Xiaomi thật. Chi tiết và ảnh ở [biên bản 0.12](UI_REVIEW_0.12.md).
 
 Yêu cầu/nguyên lý và quyết định cũ nằm trong [bản bàn giao](BAN_GIAO.md), [nhật ký trao đổi](LICH_SU_TRAO_DOI.md) và README. Đây là bản tóm tắt để tiếp tục công việc, **không phải bản sao nguyên văn toàn bộ cuộc trò chuyện**; tài liệu trong repository không tự sao lưu lịch sử hiển thị của ChatGPT.

@@ -63,7 +63,7 @@ Tuyến tài khoản đầu tiên, từ Bắc xuống Nam: 312+111, 313+456, 313
 - Cảnh báo dẫn xuất mang prefix `axle:<CB>:<ID bản tin gốc>`, khác khóa lỗi phần cứng. Hiện rõ thừa/thiếu, chuẩn chung và số đếm. So CB theo số xuất hiện nhiều nhất như trước; không xác định chuẩn duy nhất thì chỉ giữ ghi chú, không kết luận sai CB nào. Chỉ dùng bản tin Khôi phục hệ thống có đủ sáu số nguyên không kèm V, không dùng thiết bị ga.
 - Chủ dự án chọn giữ cảnh báo tới **00:00**, lượt đếm đúng/nút phục hồi/khôi phục phần cứng không xóa cảnh báo thống kê trong ngày. Mốc theo dõi chung sau gián đoạn không xóa thống kê đã đủ trong ngày. Reset ngày giữ archive, không giả thiết bị đã khôi phục.
 - Cảnh báo xuất hiện ở Tổng quan, Sự cố, nhóm Cảm biến trong chi tiết; chuông sáu hồi theo điều khiển âm chung. Áp dụng cả 30 giây/2 phút/5 phút, khác điều kiện tự kích chỉ 30 giây. Tải lịch sử riêng không phát chuông.
-- Chi tiết thêm Đếm trục hôm nay và danh sách ghi chú cả ngày có chọn ngày/tải web. Tổng số trục thừa/thiếu ở bảng là tổng mọi ghi chú, bao gồm lệch nhỏ; bộ đếm ngưỡng chỉ tính từ 3. Không bị giới hạn 12 sự kiện gần nhất. Cập nhật Tổng quan trong các khung có sẵn.
+- Chốt giao diện cuối: chi tiết chỉ thêm một mục **Đếm trục lỗi**, chỉ hiện khi có CB đạt một trong hai ngưỡng. Thống kê riêng các CB đã cảnh báo: số lần lệch từ 3, lần lệch gần nhất, tổng trục thiếu/thừa (tổng mọi ghi chú, gồm lệch nhỏ). Bỏ hai mục/trang riêng Đếm trục hôm nay và Xem các lần đếm trục. Mục thống kê không thay cho thông báo: đạt ngưỡng vẫn đỏ và chuông theo cài đặt. Cập nhật Tổng quan trong các khung có sẵn.
 - Store dựng lại cảnh báo từ bản tin gốc và loại cảnh báo dẫn xuất cũ khi tải bù, giữ nguyên dữ liệu web. Startup nâng cấp dựng cảnh báo ngày hiện tại nền, giữ tài khoản và khóa ký cũ.
 
 ## Giao diện cần giữ
@@ -124,7 +124,7 @@ APK hiện dùng **khóa debug của môi trường cloud này**; khóa riêng k
 
 ## Kiểm chứng và việc còn lại
 
-Bản 0.12: **384** quy tắc, **55** lưu trữ, **50** UI, **12** parser/**13** đọc web fixture và **21** service fixture đạt; build/Lint 0 lỗi, 15 cảnh báo. Cảnh báo ở lần thứ sáu (chỉ cộng lệch từ ba), một lần lệch từ mười; dấu chống báo lặp theo CB/ngày, CB khác và lỗi lớn mới vẫn báo. Không đăng nhập web thật trong lượt này, không xác minh loa Xiaomi thật. Xem `docs/UI_REVIEW_0.12.md`.
+Bản 0.12: **384** quy tắc, **55** lưu trữ, **48** UI, **12** parser/**13** đọc web fixture và **21** service fixture đạt; build/Lint 0 lỗi, 15 cảnh báo. Cảnh báo ở lần thứ sáu (chỉ cộng lệch từ ba), một lần lệch từ mười; dấu chống báo lặp theo CB/ngày, CB khác và lỗi lớn mới vẫn báo. Không đăng nhập web thật trong lượt này, không xác minh loa Xiaomi thật. Xem `docs/UI_REVIEW_0.12.md`.
 
 Bản 0.11: build/Lint đạt (0 lỗi, 15 cảnh báo), **355** quy tắc, **40** lưu trữ, **43** UI, **12** parser/**13** đọc web fixture và **12** service fixture đạt. Chuông sáu hồi/12 giây, nút phục hồi khép tự kích và tắt đoạn sáng, giữ lỗi thiết bị khác; kiểm tra cả di trú cache/khởi động lại/đổi chu kỳ. Lượt này không đăng nhập lại web thật; kiểm tra trên giả lập, loa Xiaomi vẫn cần chủ dự án thử. Xem `docs/UI_REVIEW_0.11.md`.
 

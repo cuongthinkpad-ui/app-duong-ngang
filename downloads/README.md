@@ -2,7 +2,7 @@
 
 **[Tải APK 0.12](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.12.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
 
-- Cảnh báo đếm trục: cùng CB lệch từ **3 trục**, tới **lần thứ 6/ngày** thông báo một lần; một lần lệch từ **10 trục** cảnh báo ngay. Giữ đỏ đến hết ngày, có thống kê và danh sách ghi chú cả ngày trong chi tiết đường ngang.
+- Cảnh báo đếm trục: cùng CB lệch từ **3 trục**, tới **lần thứ 6/ngày** thông báo một lần; một lần lệch từ **10 trục** cảnh báo ngay. Giữ đỏ đến hết ngày; chi tiết đường ngang có một mục **Đếm trục lỗi**, chỉ hiện thống kê CB đã đạt ngưỡng.
 - Chuông lỗi **6 hồi** (12 giây). **“Ấn nút Phục hồi”** ở điểm nghi tự kích sẽ đánh dấu sự cố đã khôi phục và tắt đoạn sáng tự kích tại đó, giữ nguyên các lỗi thiết bị khác.
 - Giao diện tối navy/cyan theo mẫu mới, Tổng quan vừa màn hình và cập nhật trong khung hiện tại.
 - Sơ đồ mỗi lượt tàu chỉ sáng một đoạn: đoạn tiếp cận → đoạn sau đường ngang khi báo tàu đã qua. Giữ liên tục giữa hai đường ngang, cả khi điểm trước khôi phục và điểm sau mới tiếp cận. Có mép tiếp cận ở đầu tuyến, đoạn vào/ra ga; không nối xuyên qua ga.

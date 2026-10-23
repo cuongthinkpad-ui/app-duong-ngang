@@ -9,7 +9,7 @@
 - Cùng một CB tại cùng đường ngang: chỉ cộng lần lệch **từ 3 trục trở lên**; đến **lần thứ 6 trong ngày** cảnh báo đỏ và thông báo một lần/ngày cho CB đó. Mở lại app, tải lại hoặc tải bù dữ liệu không phát lại cảnh báo này.
 - Một lần thừa/thiếu **từ 10 trục** cảnh báo ngay, kể cả CB đã báo ngưỡng số lần. CB khác có bộ đếm và thông báo riêng. Cùng lần chạm cả hai ngưỡng thì gộp một cảnh báo.
 - Cảnh báo có đúng CB, số trục thừa/thiếu, chuẩn chung và số đếm, dùng chuông sáu hồi theo cài đặt. Giữ cảnh báo tới 00:00 giờ Việt Nam; lịch sử vẫn lưu. Lượt đếm đúng sau đó không xóa thống kê lỗi trong ngày.
-- Chi tiết đường ngang thêm **Đếm trục hôm nay**, tổng theo từng CB và màn xem các lần lệch cả ngày/chọn ngày/tải lại web; không giới hạn 12 sự kiện. Lệch 1–2 trục vẫn là ghi chú, không cộng bộ đếm. Bản tin điện áp hoặc không xác định được chuẩn chung không tạo cảnh báo suy ra CB.
+- Chi tiết đường ngang chỉ thêm một mục **Đếm trục lỗi**, thống kê các CB đã đạt ngưỡng cảnh báo trong ngày; chưa đủ ngưỡng thì không hiện mục này. Không thêm trang/bộ lọc đếm trục riêng. Lệch 1–2 trục vẫn là ghi chú, không cộng bộ đếm. Bản tin điện áp hoặc không xác định được chuẩn chung không tạo cảnh báo suy ra CB.
 
 [Kiểm tra bản 0.12](docs/UI_REVIEW_0.12.md).
 
