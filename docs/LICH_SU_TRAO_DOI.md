@@ -128,3 +128,10 @@ Chủ dự án gửi ảnh app lúc 04:47:01 có nhiều khoảng sáng/mũi tê
 Sửa 0.10 nối cả bản tin đã qua vào lượt phía trước, giữ liên kết kế tiếp/dấu hoàn tất, loại đoạn cũ mâu thuẫn khi có bằng chứng hướng ngược tại điểm liên quan và ghép báo đảo thứ tự gần nhau. Không áp dụng xóa tàu theo một đồng hồ hết hạn. Cache sơ đồ cũ được chuyển nền từ raw đã lưu, giữ tài khoản/cài đặt/lỗi. Tên hướng và mũi tên gộp chung một nhãn, rút gọn khi đông.
 
 Đã dùng tài khoản kiểm thử được cho phép để đọc web thật và so sánh phát lại cùng dữ liệu ở mốc ảnh: thuật toán 0.9 có 8 đoạn (5 lẻ/3 chẵn), thuật toán sửa còn 1 đoạn chẵn. Chỉ lưu kết quả tổng hợp vào repo; không lưu tài khoản, cookie, ảnh hoặc bản tin vận hành vào Git. Các ảnh kiểm tra 0.10 vẫn là dữ liệu tổng hợp. Xem `docs/UI_REVIEW_0.10.md` để phân biệt kiểm tra thật, mô phỏng và phần còn cần xác nhận trên Xiaomi.
+
+
+## 15. Chuông sáu hồi và phục hồi tự kích ở 0.11
+
+Chủ dự án phản hồi “cơ bản là app đã chạy ok”, yêu cầu hai bổ sung: chuông đang ba hồi tăng thành **sáu hồi**; khi đường ngang đang tự kích nhận **“Ấn nút Phục hồi”**, phải hết cảnh báo tự kích và tắt đoạn xanh tương ứng trên sơ đồ.
+
+Bản 0.11 giữ âm sắc/nhịp âm cũ, tăng thời lượng từ 6 lên 12 giây (sáu hồi), vẫn một lần báo và một nút tắt chung. Quy tắc khôi phục chỉ khép lỗi suy luận của đúng điểm, giữ nguyên lỗi phần cứng khác. Sơ đồ lưu cờ tự kích gắn đúng lượt và đóng lượt đó khi có bản tin nút phục hồi; giữ dấu kết thúc để bản tin tàu tới muộn không tạo lại. Lượt tàu mới vẫn hiển thị bình thường. Cache tự chuyển từ raw, không yêu cầu gỡ bản cũ. Kết quả kiểm tra và giới hạn ở `docs/UI_REVIEW_0.11.md`.

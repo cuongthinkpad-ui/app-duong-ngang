@@ -3,7 +3,7 @@ package vn.duongngang.monitor;
 import android.content.Context;
 import android.media.*;
 
-/** One audible alert for a new fault; no periodic replay of old faults and no forced volume. */
+/** Six chimes per alert; no periodic replay of old faults and no forced volume. */
 final class AlarmSound {
   private MediaPlayer player;
   private AudioManager manager;

@@ -896,6 +896,131 @@ public class RulesTest {
     check(
         Rules.trackSegments(line, separatedVisits).size() == 2,
         "out-of-order reconciliation does not merge an unrelated hours-old pending visit");
+    var selfArrival = event(1000, "101+000", "Tàu lẻ", false);
+    var selfFault =
+        new Rules.Event(
+            "self:" + selfArrival.id(),
+            selfArrival.at(),
+            selfArrival.crossing(),
+            "Nghi tự kích",
+            true,
+            List.of());
+    var bellFault = event(1100, "101+000", "Chuông 2 hỏng", true);
+    var manualReset = event(3000, "101+000", "Ấn nút Phục hồi", false);
+    var selfReports = new ArrayList<>(List.of(selfArrival, selfFault, bellFault));
+    var selfTrip = Rules.travelState(line, Rules.TravelState.empty(), selfReports);
+    oneSegment(
+        line, selfTrip, "100+000", "101+000", 1, "self-trigger initially lights incoming interval");
+    check(
+        selfTrip.journeys().get(0).selfTriggered(),
+        "self qualification belongs to its exact arrival");
+    var selfReset = Rules.travelState(line, selfTrip, List.of(manualReset));
+    check(
+        Rules.trackSegments(line, selfReset).isEmpty(),
+        "manual reset extinguishes self-trigger incoming interval");
+    selfReports.add(manualReset);
+    check(
+        Rules.activeFaults(selfReports).equals(List.of(bellFault)),
+        "manual reset clears only self fault, retaining raw device fault");
+    check(
+        Rules.incidentHistory(selfReports).stream()
+            .anyMatch(i -> i.fault().equals(selfFault) && manualReset.equals(i.recovery())),
+        "manual reset marks self incident restored in history");
+    check(
+        Rules.incidentHistory(selfReports).stream()
+            .anyMatch(i -> i.fault().equals(bellFault) && i.recovery() == null),
+        "manual reset never pretends that bell is repaired");
+    var lateSelf = event(4000, "101+000", "Tàu lẻ đã qua đường ngang", false);
+    check(
+        Rules.trackSegments(line, Rules.travelState(line, selfReset, List.of(lateSelf))).isEmpty(),
+        "late self passage cannot relight canceled journey");
+    var selfOutgoing =
+        Rules.travelState(
+            line,
+            selfTrip,
+            List.of(
+                event(2000, "101+000", "Tàu lẻ đã qua đường ngang", false),
+                event(2500, "101+000", "Khôi phục hệ thống", false)));
+    oneSegment(
+        line,
+        selfOutgoing,
+        "101+000",
+        "102+000",
+        1,
+        "self outgoing interval survives ordinary source restore before manual reset");
+    check(
+        Rules.trackSegments(line, Rules.travelState(line, selfOutgoing, List.of(manualReset)))
+            .isEmpty(),
+        "manual reset also clears outgoing self interval after source restore");
+    var resetElsewhere = event(3000, "102+000", "Ấn nút Phục hồi", false);
+    check(
+        Rules.travelState(line, selfTrip, List.of(resetElsewhere)).equals(selfTrip),
+        "other crossing reset does not cancel this self-trigger journey");
+    check(
+        Rules.activeFaults(List.of(selfFault, resetElsewhere)).equals(List.of(selfFault)),
+        "other crossing reset does not recover this self fault");
+    var realTrip = Rules.travelState(line, Rules.TravelState.empty(), List.of(selfArrival));
+    check(
+        Rules.travelState(line, realTrip, List.of(manualReset)).equals(realTrip),
+        "manual button alone does not erase an unflagged real train");
+    var restarted =
+        Rules.travelState(line, selfReset, List.of(event(5000, "101+000", "Tàu lẻ", false)));
+    oneSegment(
+        line,
+        restarted,
+        "100+000",
+        "101+000",
+        1,
+        "a new later train still displays after manual reset");
+    check(
+        !restarted.journeys().get(restarted.journeys().size() - 1).selfTriggered(),
+        "old self classification is not inherited by a new train");
+    var interleaved =
+        Rules.travelState(line, selfTrip, List.of(event(2000, "103+000", "Tàu chẵn", false)));
+    oneSegment(
+        line,
+        Rules.travelState(line, interleaved, List.of(manualReset)),
+        null,
+        "103+000",
+        -1,
+        "reset leaves independent train elsewhere visible");
+    var resetReplay = new ArrayList<>(selfReports);
+    resetReplay.add(lateSelf);
+    Collections.reverse(resetReplay);
+    check(
+        Rules.trackSegments(line, Rules.travelState(line, Rules.TravelState.empty(), resetReplay))
+            .isEmpty(),
+        "shuffled archive replay respects manual reset and late passage");
+    check(
+        Rules.isManualRecovery("  ấn  nút PHỤC HỒI ") && !Rules.isManualRecovery("Ấn nút Duy tu"),
+        "manual recovery is tolerant of case and whitespace but not other buttons");
+    var simultaneousReset = event(1000, "101+000", "Ấn nút Phục hồi", false);
+    check(
+        Rules.trackSegments(
+                line,
+                Rules.travelState(
+                    line,
+                    Rules.TravelState.empty(),
+                    List.of(simultaneousReset, selfFault, selfArrival)))
+            .isEmpty(),
+        "second-resolution timestamps apply reset after arrival and inference");
+    check(
+        Rules.activeFaults(List.of(simultaneousReset, selfFault)).isEmpty(),
+        "same-second reset resolves inference regardless of input order");
+    var evenArrival = event(1000, "102+000", "Tàu chẵn", false);
+    var evenSelf =
+        new Rules.Event(
+            "self:" + evenArrival.id(), 1000, "102+000", "Nghi tự kích", true, List.of());
+    check(
+        Rules.trackSegments(
+                line,
+                Rules.travelState(
+                    line,
+                    Rules.TravelState.empty(),
+                    List.of(
+                        evenArrival, evenSelf, event(3000, "102+000", "Ấn nút Phục hồi", false))))
+            .isEmpty(),
+        "manual self reset also handles even trains");
     System.out.println(scenarios + " domain scenarios passed");
   }
 }

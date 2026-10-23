@@ -1,10 +1,18 @@
-# Đường Ngang — Android 0.10
+# Đường Ngang — Android 0.11
 
 **Đổi phiên/tài khoản ChatGPT:** đọc [Bản bàn giao và cách tiếp tục](docs/BAN_GIAO.md) và [Nhật ký trao đổi, yêu cầu đã chốt](docs/LICH_SU_TRAO_DOI.md). [Sao lưu khóa ký APK](docs/SAO_LUU_KHOA_KY.md).
 
 Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt navy, xanh cyan và xanh lá. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
 
-## Thay đổi 0.10
+## Thay đổi 0.11
+
+- Chuông lỗi phát **6 hồi** (12 giây), giữ âm cũ và nút tắt chuông chung.
+- Đường ngang đang **Nghi tự kích** nhận bản tin **“Ấn nút Phục hồi”**: khép cảnh báo, đánh dấu đã khôi phục trong Sự cố và tắt đúng đoạn sáng của lượt tự kích. Giữ lỗi thiết bị khác và các tàu độc lập.
+- Giữ dấu lượt đã kết thúc để bản tin tàu tới muộn không làm sáng lại. Tự chuyển cache khi cập nhật, giữ tài khoản/cài đặt/lịch sử.
+
+[Kiểm tra bản 0.11](docs/UI_REVIEW_0.11.md).
+
+## Thay đổi 0.10 (lịch sử)
 
 - Sửa lỗi giữ các đoạn/hướng tàu cũ. Bản tin **tàu đã qua** đóng lượt ở đoạn trước và chuyển sang đoạn sau ngay khi app nhận được, kể cả khi thiếu bản tin tiếp cận ở điểm đó; không đợi khôi phục.
 - Lưu liên kết lượt giữa hai điểm và dấu kết thúc để bản tin muộn không tạo lại tàu cũ. Bằng chứng hướng ngược tại một điểm loại bỏ các đoạn cũ mâu thuẫn chạm điểm đó, giữ các tàu độc lập ở nơi khác.

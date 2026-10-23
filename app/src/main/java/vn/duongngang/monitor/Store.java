@@ -11,7 +11,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import org.json.*;
 
 public final class Store {
-  private static final int TRAVEL_VERSION = 2;
+  private static final int TRAVEL_VERSION = 3;
   private final Context context;
   public final android.content.SharedPreferences prefs;
 
@@ -137,7 +137,11 @@ public final class Store {
       if (!account().equals(expected)) throw new IllegalStateException("Tài khoản đã thay đổi");
       List<Rules.Event> input = activeFaults();
       input.removeIf(e -> e.at() < baseline || disproved.contains(e.id()));
-      List<Rules.Event> recent = events(replayFrom, now + 1);
+      // A cached self-trigger may predate the newest delta page. Include its reset even
+      // after upgrading from a version that did not yet recognize the manual button.
+      long from = replayFrom;
+      for (var fault : input) if (Rules.isSelfTrigger(fault)) from = Math.min(from, fault.at());
+      List<Rules.Event> recent = events(from, now + 1);
       for (var e : recent) if (e.at() >= baseline) input.add(e);
       List<Rules.Event> active = Rules.activeFaults(input);
       JSONArray list = new JSONArray();
@@ -181,7 +185,8 @@ public final class Store {
                 j.getBoolean(6),
                 j.getBoolean(7),
                 j.isNull(8) ? null : j.getString(8),
-                j.optLong(9, j.getLong(4))));
+                j.optLong(9, j.getLong(4)),
+                j.optBoolean(10, false)));
       }
     } catch (JSONException ignored) {
     }
@@ -202,7 +207,8 @@ public final class Store {
               .put(j.released())
               .put(j.reached())
               .put(j.successorId() == null ? JSONObject.NULL : j.successorId())
-              .put(j.lastAt()));
+              .put(j.lastAt())
+              .put(j.selfTriggered()));
     return list.toString();
   }
 
@@ -440,10 +446,17 @@ public final class Store {
       for (String point : inferredPoints)
         try (var cursor =
             db.rawQuery(
-                "SELECT * FROM events WHERE km=? AND at>=? AND red=0 AND text=? COLLATE NOCASE"
-                    + " ORDER BY at LIMIT 1",
-                new String[] {point, "" + to, "Khôi phục hệ thống"})) {
-          appendRows(cursor, out);
+                "SELECT * FROM events WHERE km=? AND at>=? AND red=0 AND"
+                    + " (text=? COLLATE NOCASE OR text LIKE ?) ORDER BY at",
+                new String[] {point, "" + to, "Khôi phục hệ thống", "%n_t%"})) {
+          var recoveries = new ArrayList<Rules.Event>();
+          appendRows(cursor, recoveries);
+          for (var recovery : recoveries)
+            if (Rules.isManualRecovery(recovery.text())
+                || recovery.text().trim().equalsIgnoreCase("Khôi phục hệ thống")) {
+              out.add(recovery);
+              break;
+            }
         }
     }
     out.sort(Comparator.comparingLong(Rules.Event::at).reversed());

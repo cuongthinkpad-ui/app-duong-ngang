@@ -1,7 +1,8 @@
-# Đường Ngang — bản thử 0.10
+# Đường Ngang — bản thử 0.11
 
-**[Tải APK 0.10](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.10.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
+**[Tải APK 0.11](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.11.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
 
+- Chuông lỗi **6 hồi** (12 giây). **“Ấn nút Phục hồi”** ở điểm nghi tự kích sẽ đánh dấu sự cố đã khôi phục và tắt đoạn sáng tự kích tại đó, giữ nguyên các lỗi thiết bị khác.
 - Giao diện tối navy/cyan theo mẫu mới, Tổng quan vừa màn hình và cập nhật trong khung hiện tại.
 - Sơ đồ mỗi lượt tàu chỉ sáng một đoạn: đoạn tiếp cận → đoạn sau đường ngang khi báo tàu đã qua. Giữ liên tục giữa hai đường ngang, cả khi điểm trước khôi phục và điểm sau mới tiếp cận. Có mép tiếp cận ở đầu tuyến, đoạn vào/ra ga; không nối xuyên qua ga.
 - Khi không có sự cố, ghi đúng **“Không có sự cố”**.
@@ -13,4 +14,4 @@
 
 Có thể cài mới trực tiếp, không cần bản gốc. Nếu đã có app, cài đè bằng cùng chữ ký thử nghiệm để giữ cấu hình. Mở Cài đặt, nhập web/ID/mật khẩu rồi Lưu & theo dõi; chu kỳ 30 giây / 2 phút / 5 phút. Lượt đồng bộ đầu cần đọc hai ngày nên lâu hơn những lượt sau.
 
-Cần kiểm tra âm thanh, chạy nền và thông báo khi khóa màn hình lâu trên điện thoại thật, nhất là chế độ pin Xiaomi. Kiểm tra phát nhạc trên giả lập không chứng minh loa Xiaomi đã kêu. Bản thử không thay thế quy trình trực hiện có. Không nhúng tài khoản thử nghiệm vào APK. [Chi tiết kiểm tra](../docs/UI_REVIEW_0.10.md).
+Cần kiểm tra âm thanh, chạy nền và thông báo khi khóa màn hình lâu trên điện thoại thật, nhất là chế độ pin Xiaomi. Kiểm tra phát nhạc trên giả lập không chứng minh loa Xiaomi đã kêu. Bản thử không thay thế quy trình trực hiện có. Không nhúng tài khoản thử nghiệm vào APK. [Chi tiết kiểm tra](../docs/UI_REVIEW_0.11.md).

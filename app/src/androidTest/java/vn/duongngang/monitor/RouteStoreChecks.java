@@ -323,6 +323,61 @@ public final class RouteStoreChecks extends Instrumentation {
               && !store.prefs.contains("pendingSelf")
               && !store.prefs.contains("lastFull"),
           "new account clears inferred and active state");
+      var manualRoute = new Rules.Route(List.of("100+000", "101+000", "102+000", "103+000"));
+      long selfAt = midnight - 2 * 86400000L + 1000;
+      long resetAt = midnight + 1000;
+      var selfStart =
+          new Rules.Event("manual-start", selfAt, "101+000", "Tàu lẻ", false, List.of());
+      var selfFault =
+          new Rules.Event("self:manual-start", selfAt, "101+000", "Nghi tự kích", true, List.of());
+      var rawFault =
+          new Rules.Event(
+              "manual-bell", resetAt - 200, "101+000", "Chuông 2 hỏng", true, List.of());
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(List.of(selfStart, selfFault, rawFault), manualRoute));
+      store.updateActiveFaults(store.account(), 0, resetAt - 100, 0, List.of());
+      check(
+          new Store(context).travelState().journeys().stream().anyMatch(j -> j.selfTriggered()),
+          "self-trigger qualification persists across JSON and an old checkpoint");
+      var resetEvent =
+          new Rules.Event(
+              "manual-reset", resetAt, "101+000", "  ấn  nút PHỤC HỒI ", false, List.of());
+      store.saveForAccount(
+          store.account(), new WebSource.DayData(List.of(resetEvent), manualRoute));
+      store.updateActiveFaults(store.account(), resetAt + 1, resetAt + 500, 0, List.of());
+      check(
+          store.activeFaults().equals(List.of(rawFault))
+              && Rules.trackSegments(manualRoute, store.travelState()).isEmpty(),
+          "manual reset clears cached self fault and checkpointed diagram even before newest"
+              + " delta");
+      check(
+          Rules.incidentHistory(store.incidentEvents(selfAt, selfAt + 60000)).stream()
+              .anyMatch(i -> i.fault().equals(selfFault) && resetEvent.equals(i.recovery())),
+          "historical self incident finds later manual recovery with original spelling");
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "manual-late",
+                      resetAt + 1000,
+                      "101+000",
+                      "Tàu lẻ đã qua đường ngang",
+                      false,
+                      List.of())),
+              manualRoute));
+      store.updateActiveFaults(store.account(), resetAt + 501, resetAt + 1500, 0, List.of());
+      check(
+          Rules.trackSegments(manualRoute, new Store(context).travelState()).isEmpty(),
+          "restart and late passage do not recreate manually reset train");
+      store.prefs.edit().putInt("travelVersion", 2).commit();
+      store.prepareTravelState(store.account(), resetAt + 1500);
+      check(
+          store.travelReady()
+              && Rules.trackSegments(manualRoute, store.travelState()).isEmpty()
+              && store.activeFaults().equals(List.of(rawFault)),
+          "v0.10 cache migration replays manual reset without deleting device faults");
       result.putString("stream", checks + " account storage checks passed\n");
 
     } catch (Throwable failure) {

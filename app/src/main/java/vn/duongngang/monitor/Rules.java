@@ -165,6 +165,17 @@ public final class Rules {
     return 0;
   }
 
+  /** The operator's reset ends a self-trigger, not unrelated hardware faults. */
+  public static boolean isManualRecovery(String text) {
+    return text.trim().replaceAll("\\s+", " ").equalsIgnoreCase("Ấn nút Phục hồi");
+  }
+
+  private static int reportPhase(Event event) {
+    if (direction(event.text()) != 0) return 0;
+    if (event.red()) return 1;
+    return passedDirection(event.text()) != 0 ? 2 : 3;
+  }
+
   /** One source arrival, kept until both source release and downstream arrival are known. */
   public record Journey(
       String id,
@@ -176,7 +187,22 @@ public final class Rules {
       boolean released,
       boolean reached,
       String successorId,
-      long lastAt) {
+      long lastAt,
+      boolean selfTriggered) {
+    public Journey(
+        String id,
+        String from,
+        String to,
+        int direction,
+        long at,
+        boolean passed,
+        boolean released,
+        boolean reached,
+        String successorId,
+        long lastAt) {
+      this(id, from, to, direction, at, passed, released, reached, successorId, lastAt, false);
+    }
+
     public Journey(
         String id,
         String from,
@@ -252,7 +278,8 @@ public final class Rules {
         released,
         reached,
         successor,
-        Math.max(j.lastAt(), at));
+        Math.max(j.lastAt(), at),
+        j.selfTriggered());
   }
 
   private static Journey latestJourney(
@@ -358,8 +385,7 @@ public final class Rules {
     List<Event> ordered = new ArrayList<>(input);
     ordered.sort(
         Comparator.comparingLong(Event::at)
-            .thenComparingInt(
-                e -> direction(e.text()) != 0 ? 0 : passedDirection(e.text()) != 0 ? 1 : 2)
+            .thenComparingInt(Rules::reportPhase)
             .thenComparingLong(
                 e ->
                     isPoint(e.crossing())
@@ -375,9 +401,33 @@ public final class Rules {
     Set<String> seen = new HashSet<>(journeys.keySet());
     for (Event e : ordered) {
       String point = km(e.crossing());
-      if (e.red() || !seen.add(e.id()) || !route.crossings().contains(point)) continue;
+      if (!seen.add(e.id()) || !route.crossings().contains(point)) continue;
+      if (isSelfTrigger(e)) {
+        Journey j = journeys.get(e.id().substring(5));
+        if (j != null && j.from().equals(point))
+          journeys.put(
+              j.id(),
+              new Journey(
+                  j.id(),
+                  j.from(),
+                  j.to(),
+                  j.direction(),
+                  j.at(),
+                  j.passed(),
+                  j.released(),
+                  j.reached(),
+                  j.successorId(),
+                  j.lastAt(),
+                  true));
+        continue;
+      }
+      if (e.red()) continue;
       int d = direction(e.text()), passed = passedDirection(e.text());
-      if (d != 0) {
+      if (isManualRecovery(e.text())) {
+        for (Journey j : new ArrayList<>(journeys.values()))
+          if (j.from().equals(point) && j.selfTriggered() && !j.reached() && j.at() <= e.at())
+            journeys.put(j.id(), progress(j, j.passed(), true, true, j.successorId(), e.at()));
+      } else if (d != 0) {
         retireContradictions(route, journeys, point, d, e.at());
         for (Journey j : new ArrayList<>(journeys.values()))
           if (j.from().equals(point) && !j.released()) {
@@ -604,7 +654,7 @@ public final class Rules {
   /** Pair only explicit restoration messages with earlier faults of that device and crossing. */
   public static List<Incident> incidentHistory(List<Event> input) {
     List<Event> ordered = new ArrayList<>(input);
-    ordered.sort(Comparator.comparingLong(Event::at));
+    ordered.sort(Comparator.comparingLong(Event::at).thenComparingInt(Rules::reportPhase));
     List<Incident> result = new ArrayList<>();
     Map<String, List<Integer>> open = new HashMap<>();
     for (Event event : ordered) {
@@ -613,10 +663,11 @@ public final class Rules {
         open.computeIfAbsent(key, k -> new ArrayList<>()).add(result.size());
         result.add(new Incident(event, null));
       } else if (event.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")
-          || event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")) {
+          || event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+          || isManualRecovery(event.text())) {
         List<String> matches = new ArrayList<>();
-        if (event.text().trim().equalsIgnoreCase("Khôi phục hệ thống"))
-          matches.add(km(event.crossing()) + "|@self");
+        if (event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+            || isManualRecovery(event.text())) matches.add(km(event.crossing()) + "|@self");
         else matches.add(key);
         String lower = event.text().toLowerCase(Locale.ROOT);
         if (lower.contains("cần chắn") && faultKey(event.text()).equals(lower)) {
@@ -638,12 +689,13 @@ public final class Rules {
 
   public static List<Event> activeFaults(List<Event> input) {
     List<Event> sorted = new ArrayList<>(input);
-    sorted.sort(Comparator.comparingLong(Event::at));
+    sorted.sort(Comparator.comparingLong(Event::at).thenComparingInt(Rules::reportPhase));
     Map<String, Event> faults = new LinkedHashMap<>();
     for (Event e : sorted) {
       String k = km(e.crossing()) + "|" + eventFaultKey(e);
       if (e.red()) faults.put(k, e);
-      else if (e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")) {
+      else if (e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+          || isManualRecovery(e.text())) {
         faults.remove(km(e.crossing()) + "|@self");
       } else if (e.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")) {
         faults.remove(k);

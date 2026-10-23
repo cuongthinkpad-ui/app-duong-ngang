@@ -5,22 +5,22 @@ Cập nhật: 23/10/2026, giờ Việt Nam. Tài liệu này ghi yêu cầu đã
 ## Bắt đầu ở phiên mới
 
 1. Kết nối cùng repository GitHub `cuongthinkpad-ui/app-duong-ngang`, lấy nhánh `main`; nếu không có công cụ GitHub, tải mã nguồn ZIP từ GitHub và cung cấp cho phiên mới.
-2. Đọc tài liệu này, `README.md`, `docs/LICH_SU_TRAO_DOI.md` và `docs/UI_REVIEW_0.10.md` trước khi thay đổi. Tài liệu 0.1–0.9 là lịch sử; các quyết định 0.10 và yêu cầu mới của chủ dự án được ưu tiên.
-3. Kiểm tra mã nguồn/commit thực tế. Bản ứng dụng mới nhất khi viết tài liệu là **0.10.0**, versionCode **10**; xem commit thay đổi phiên bản/APK trên main. Không nhầm commit chỉ sửa tài liệu với bản APK mới.
+2. Đọc tài liệu này, `README.md`, `docs/LICH_SU_TRAO_DOI.md` và `docs/UI_REVIEW_0.11.md` trước khi thay đổi. Tài liệu 0.1–0.10 là lịch sử; các quyết định 0.11 và yêu cầu mới của chủ dự án được ưu tiên.
+3. Kiểm tra mã nguồn/commit thực tế. Bản ứng dụng mới nhất khi viết tài liệu là **0.11.0**, versionCode **11**; xem commit thay đổi phiên bản/APK trên main. Không nhầm commit chỉ sửa tài liệu với bản APK mới.
 4. Tài khoản ChatGPT mới cần được cấp quyền truy cập GitHub riêng. Lịch sử chat, bộ nhớ ChatGPT, cache build và cấu hình cloud không tự chuyển theo repository.
 5. Tài khoản/mật khẩu website được chủ dự án nhập trực tiếp trong app hoặc cung cấp riêng khi cần kiểm thử. Không yêu cầu gửi lại toàn bộ cuộc trò chuyện và không chép mật khẩu vào mã nguồn.
 
 Tin nhắn chủ dự án có thể sao chép vào cuộc trò chuyện mới:
 
-> Tiếp tục app Android Đường Ngang tại https://github.com/cuongthinkpad-ui/app-duong-ngang, nhánh main. Hãy đọc AGENTS.md, docs/BAN_GIAO.md, docs/LICH_SU_TRAO_DOI.md, README.md và biên bản kiểm tra mới nhất trước. Điểm bàn giao hiện tại là bản 0.10. Giữ các yêu cầu đã chốt, kiểm tra mã nguồn hiện có và tiếp tục từ đó. Phân biệt rõ phần đã thử trên giả lập và phần chưa được xác minh trên Xiaomi thật. Yêu cầu tiếp theo của tôi là: [ghi việc muốn làm].
+> Tiếp tục app Android Đường Ngang tại https://github.com/cuongthinkpad-ui/app-duong-ngang, nhánh main. Hãy đọc AGENTS.md, docs/BAN_GIAO.md, docs/LICH_SU_TRAO_DOI.md, README.md và biên bản kiểm tra mới nhất trước. Điểm bàn giao hiện tại là bản 0.11. Giữ các yêu cầu đã chốt, kiểm tra mã nguồn hiện có và tiếp tục từ đó. Phân biệt rõ phần đã thử trên giả lập và phần chưa được xác minh trên Xiaomi thật. Yêu cầu tiếp theo của tôi là: [ghi việc muốn làm].
 
 ## Mục tiêu và trạng thái
 
 Chủ dự án: Cao Xuân Cường, công tác theo dõi đường ngang cảnh báo tự động. App Android dùng tài khoản chỉ có quyền xem website để đọc sự kiện và cảnh báo trên điện thoại, cài APK cho nhiều người. Mỗi người có thể dùng URL/ID/mật khẩu riêng; tuyến thay đổi theo tài khoản.
 
 - Website đã thử: `http://visitec.vn:7447/`, trang báo cáo ASP.NET `Default.aspx`, cần đăng nhập. Không chỉ hỗ trợ một danh sách 13 điểm cố định.
-- Đây là bản thử có chức năng thật. Đã đăng nhập/đọc web thật, thử service và UI trên giả lập; chưa được chủ dự án xác nhận đủ độ tin cậy để dùng trực chính thức trên Xiaomi 14T Pro.
-- APK: `downloads/DuongNgang-0.10.apk`; checksum: `downloads/SHA256SUMS`. Đây là bản cài đầy đủ: cài mới trực tiếp hoặc cài đè cùng chữ ký để giữ cấu hình. Giao file qua GitHub, chọn **Download raw file**. Người dùng từng không tải được artifact trực tiếp từ workspace, kể cả ZIP.
+- Chủ dự án phản hồi bản 0.10 cơ bản đã chạy tốt; bản 0.11 bổ sung chuông sáu hồi và phục hồi tự kích theo yêu cầu. Đây là bản thử có chức năng thật. Đã đăng nhập/đọc web thật, thử service và UI trên giả lập; chưa được chủ dự án xác nhận đủ độ tin cậy để dùng trực chính thức trên Xiaomi 14T Pro.
+- APK: `downloads/DuongNgang-0.11.apk`; checksum: `downloads/SHA256SUMS`. Đây là bản cài đầy đủ: cài mới trực tiếp hoặc cài đè cùng chữ ký để giữ cấu hình. Giao file qua GitHub, chọn **Download raw file**. Người dùng từng không tải được artifact trực tiếp từ workspace, kể cả ZIP.
 - Play Protect từng chặn bản APK ban đầu; sau đó người dùng cài được. Không coi cảnh báo đã được xử lý cho mọi máy, không hướng dẫn vô hiệu hóa bảo vệ như mặc định.
 
 ## Nguyên lý thiết bị đã chốt
@@ -34,7 +34,7 @@ Lý trình tăng từ Bắc vào Nam. Bắc là phía lẻ, Nam là phía chẵn
 - **Đoạn ga:** sau khi qua đường ngang hướng vào ga, sáng đoạn đường ngang–ga cho tới khôi phục của chính đường ngang đó rồi tắt. Khi đường ngang phía ra báo tàu từ ga, sáng đoạn ga–đường ngang, sau bản tin đã qua thì chuyển sang đoạn kế tiếp. Không nối xuyên ga; bản tin riêng trong ga không tạo hoặc giữ tàu cả ngày. Hai đầu tuyến có mép vào/ra ngắn chỉ trong giai đoạn tương ứng, không giữ sau khôi phục khi tàu đã ra ngoài vùng tài khoản.
 - Nhiều lượt/hai hướng được hiển thị đồng thời, mỗi lượt một đoạn (các lượt cùng đoạn/hướng dùng chung nét xanh). `Rules.trackSegments` là quy tắc hình vẽ; `Rules.occupancies` vẫn là trạng thái phần cứng. Thiếu bản tin đã qua thì khôi phục chỉ nối tiếp khi đã biết hướng từ lượt báo tàu; khôi phục đơn lẻ không tự tạo hướng.
 - **Sửa 0.10 sau phản hồi ảnh thực:** “tàu đã qua” cũng nối/đóng lượt phía trước khi thiếu bản tin tiếp cận. Lưu `successorId` và dấu kết thúc, không xóa sạch dấu lượt hoàn tất rồi tạo mới từ bản tin muộn. Hướng ngược mới tại một điểm đóng các đoạn cũ mâu thuẫn chạm điểm đó; không xóa tàu ở các đoạn độc lập. Cảm biến kề nhau báo ngược thứ tự được ghép khi lượt phía sau chưa được dùng và thời gian lệch không quá 2 phút; giới hạn này chỉ để đối chiếu báo đảo thứ tự, **không làm hết hạn đoạn tàu đang chờ**.
-- Cache sơ đồ `travelVersion=2`: khi nâng cấp, dựng lại từ toàn bộ bản tin lưu được trước checkpoint và phát lại hai ngày gần nhất. Không dùng cache cũ trong lúc chuyển; chạy chuyển nền, giữ raw/tài khoản/lỗi. Mỗi Journey có thêm `successorId`/`lastAt`; giữ số dấu hoàn tất có giới hạn thay vì tăng theo mọi lượt tàu. Nhãn hướng là một dòng liền chữ/mũi tên, rút gọn khi đông đoạn; giữ khoảng cách tối thiểu và cuộn ngang trên máy hẹp.
+- Cache sơ đồ `travelVersion=3`: khi nâng cấp, dựng lại từ toàn bộ bản tin lưu được trước checkpoint và phát lại hai ngày gần nhất. Không dùng cache cũ trong lúc chuyển; chạy chuyển nền, giữ raw/tài khoản/lỗi. Mỗi Journey có `successorId`/`lastAt` và cờ `selfTriggered` đúng lượt; giữ số dấu hoàn tất có giới hạn thay vì tăng theo mọi lượt tàu. Nhãn hướng là một dòng liền chữ/mũi tên, rút gọn khi đông đoạn; giữ khoảng cách tối thiểu và cuộn ngang trên máy hẹp.
 - Đây là biểu diễn liên tục từ bản tin, không phải GPS, danh tính hoặc số đoàn tàu. Đoạn chờ không tự mất theo thời gian; giữ qua nửa đêm/khởi động lại. Store có checkpoint và phát lại hai ngày gần nhất để tiếp nhận bản tin tới muộn. Không bảo đảm sửa đúng các bản tin bổ sung cũ hơn mốc checkpoint.
 - Mọi tên điểm có hậu tố trong ngoặc là **ga**, nhãn sơ đồ dùng đúng chữ trong ngoặc (Vi, YX, CS, MLy, QHa…). Ga không phải đường ngang và ngắt đối chiếu liền kề ở cả hai phía. Không lấy bản tin ga làm bằng chứng tàu vì tàu có thể nằm trong ga lâu hoặc được tàu khác vượt.
 
@@ -46,12 +46,14 @@ Tuyến tài khoản đầu tiên, từ Bắc xuống Nam: 312+111, 313+456, 313
 - Ghép khôi phục đúng thiết bị. Chuông 2 khôi phục không xóa chuông 1; điện áp cảm biến phục hồi không xóa lỗi cảm biến hỏng. “Khôi phục hệ thống” không xóa mọi lỗi phần cứng. Bản tin khôi phục cần chắn chung có thể áp dụng các cần chắn tương ứng.
 - Sáu nhóm chi tiết: Chuông, Đèn, Cần chắn, Cảm biến, Kết nối, Điện áp. Không thêm camera.
 - Chỉ một điều khiển bật/tắt chuông chung, không nút lặp theo từng lỗi, không nhắc lại định kỳ hoặc xác nhận đã xem. Tắt chuông vẫn giữ lỗi đỏ.
-- **0.8 sửa phản hồi không nghe chuông:** app có `AlarmSound` dùng MediaPlayer và âm chime riêng 6 giây, phát một lần khi có lỗi mới hoặc bắt đầu phiên theo dõi với lỗi hiện tại chưa khôi phục. Không phát lại chỉ vì quay về Activity khi service vẫn chạy; không nhắc định kỳ. Tắt âm chung dừng player, khôi phục hết lỗi đang báo/reset ngày/dừng service cũng dừng âm. Dùng luồng âm lượng Báo thức, không ép tăng âm lượng hay vượt Không làm phiền. Cài đặt có nút “Thử chuông báo lỗi”. Cần kiểm chứng loa Xiaomi thật.
+- **0.8 sửa phản hồi không nghe chuông:** app có `AlarmSound` dùng MediaPlayer và âm chime riêng (bản 0.11: **6 hồi trong 12 giây**, trước đó 3 hồi/6 giây), phát một lần khi có lỗi mới hoặc bắt đầu phiên theo dõi với lỗi hiện tại chưa khôi phục. Không phát lại chỉ vì quay về Activity khi service vẫn chạy; không nhắc định kỳ. Tắt âm chung dừng player, khôi phục hết lỗi đang báo/reset ngày/dừng service cũng dừng âm. Dùng luồng âm lượng Báo thức, không ép tăng âm lượng hay vượt Không làm phiền. Cài đặt có nút “Thử chuông báo lỗi”. Cần kiểm chứng loa Xiaomi thật.
 - **Yêu cầu mới nhất 0.7: reset khối sự cố sau 00:00 giờ Việt Nam**. Không mang lỗi hôm trước sang Tổng quan; giữ lỗi mới sau 00:00. Không xóa kho lịch sử hoặc chiếm dụng tàu. Reset không được ghi là thiết bị đã khôi phục. Ngày mặc định ở tab Sự cố theo ngày mới; nếu chủ động chọn ngày cũ để tra cứu thì giữ lựa chọn đó.
 - Không cần bày các cột Status/số điện áp ở Tổng quan. Các bản tin điện áp đỏ vẫn phải báo lỗi.
 - CB1–CB6 ở dòng khôi phục: số không có V là số trục; bản tin đo điện áp không dùng để so trục. Chọn số xuất hiện nhiều nhất làm chuẩn, ghi riêng từng CB thừa/thiếu, có thể đồng thời thừa và thiếu. Khi không có chuẩn duy nhất ghi đúng “cảm biến đếm trục không đồng nhất, lỗi”. Chỉ ghi chú, không phát chuông lỗi từ ghi chú này.
 - Tự kích: một đường ngang báo tàu mà chưa có lượt tương ứng tại điểm liền kề phía trước theo hướng chạy thì nghi tự kích; bỏ đối chiếu qua ga và đầu/cuối tuyến. Ví dụ 313+456 báo tàu lẻ, thiếu lượt phía Bắc 312+111; 321+780 báo tàu chẵn, thiếu lượt phía Nam 327+327. Không yêu cầu điểm phía trước còn đang chiếm dụng: cần lịch sử lượt tàu tương ứng.
 - Bản hiện tại dùng chữ **“Nghi tự kích”**, **chỉ bật khi chu kỳ đúng 30 giây**, chờ ít nhất một chu kỳ để nhận bản tin chậm. Chủ dự án báo chu kỳ dài gây suy luận sai; 2 phút/5 phút bỏ suy luận hiện tại và pending, không tạo thêm suy luận, vẫn cảnh báo dòng đỏ thật. Lịch sử ngày cũ giữ nguyên. Chỉ xét lượt mới, không phát lại suy luận lịch sử. Có bằng chứng đến muộn thì bỏ riêng bản tin suy luận, không xóa bản tin gốc. Chỉ thông báo tên điểm/sự kiện, không trình bày lý do dài. Cần kiểm chứng suy luận ngoài hiện trường.
+
+- **Bổ sung 0.11:** nhận đúng bản tin “Ấn nút Phục hồi” (không phân biệt hoa/thường, gộp khoảng trắng) tại đường ngang đang nghi tự kích thì khép riêng lỗi suy luận ở đó, liên kết khôi phục trong lịch sử và đóng đoạn sáng của đúng lượt đã bị đánh dấu `selfTriggered`. Không xóa chuông/đèn/cần chắn hay tàu chưa bị đánh dấu tự kích. Giữ dấu hoàn tất qua cache/khởi động lại/đổi chu kỳ; bản tin đã qua đến muộn không làm sáng lại. Chiếm dụng phần cứng thô vẫn theo bản tin khôi phục hệ thống; đoạn sáng là trạng thái hiển thị riêng.
 
 ## Giao diện cần giữ
 
@@ -98,7 +100,7 @@ source scripts/env.sh
 python3 scripts/test-monitoring-e2e.py
 ```
 
-Tăng versionCode lớn hơn 10 khi xuất APK cập nhật mới. Giữ applicationId và chữ ký nếu muốn cài đè. Không đưa URL/ID/mật khẩu thử vào nguồn/APK, không đăng HTML đăng nhập hoặc ảnh dữ liệu vận hành vào repo.
+Tăng versionCode lớn hơn 11 khi xuất APK cập nhật mới. Giữ applicationId và chữ ký nếu muốn cài đè. Không đưa URL/ID/mật khẩu thử vào nguồn/APK, không đăng HTML đăng nhập hoặc ảnh dữ liệu vận hành vào repo.
 
 ## Khóa ký APK cần sao lưu riêng
 
@@ -110,6 +112,8 @@ APK hiện dùng **khóa debug của môi trường cloud này**; khóa riêng k
 - Phiên mới cần khóa cũ để ký bản cập nhật cài đè. Nếu không có khóa, vẫn phát triển được mã nguồn, nhưng phải giải quyết phương án cài lại/chuyển sang khóa phát hành và tác động dữ liệu với chủ dự án.
 
 ## Kiểm chứng và việc còn lại
+
+Bản 0.11: build/Lint đạt (0 lỗi, 15 cảnh báo), **355** quy tắc, **40** lưu trữ, **43** UI, **12** parser/**13** đọc web fixture và **12** service fixture đạt. Chuông sáu hồi/12 giây, nút phục hồi khép tự kích và tắt đoạn sáng, giữ lỗi thiết bị khác; kiểm tra cả di trú cache/khởi động lại/đổi chu kỳ. Lượt này không đăng nhập lại web thật; kiểm tra trên giả lập, loa Xiaomi vẫn cần chủ dự án thử. Xem `docs/UI_REVIEW_0.11.md`.
 
 Bản 0.10: build/Lint đạt (0 lỗi, 15 cảnh báo), **335** quy tắc, **35** lưu trữ, **36** UI, **12** parser/**13** đọc web fixture và **9** service fixture đạt. Đã đọc web thật 2.395 bản tin/13 điểm, phát lại tại mốc ảnh: 0.9 dựng 8 đoạn (5 lẻ/3 chẵn), 0.10 dựng 1 đoạn chẵn. Chỉ lưu tổng hợp, đã xóa audit riêng. Các kiểm tra này không phải UAT trên Xiaomi/hiện trường; xem `docs/UI_REVIEW_0.10.md`.
 
@@ -123,4 +127,4 @@ Bản 0.6 đã đăng nhập Visitec thật, đọc đủ ngày hiện tại/ng�
 
 Cần người dùng xác nhận trên **Xiaomi 14T Pro/HyperOS**: còn chớp trắng hay không, bố cục/cỡ chữ, chạy nền lâu khi khóa màn hình, độ trễ chuông, reset 00:00, sự cố/khôi phục và tự kích so với thực tế. Chưa có phản hồi xác nhận đầy đủ bản 0.7. Chưa tự chạy sau khởi động máy. Web không cung cấp ID sự kiện độc lập nên dòng hoàn toàn giống nhau cùng giây được gộp; không cam kết tương thích mọi cấu trúc website.
 
-Các yêu cầu mới nhất và kiểm tra 0.10 xem `docs/UI_REVIEW_0.10.md`. Thuật toán đã được đối chiếu lại với dữ liệu web thật ở mốc ảnh phản hồi, nhưng bố cục/chuông/chạy nền Xiaomi vẫn cần chủ dự án xác nhận trên máy. Tình trạng sao lưu khóa ngoài cloud vẫn **chưa được chủ dự án xác nhận**.
+Các yêu cầu mới nhất và kiểm tra 0.11 xem `docs/UI_REVIEW_0.11.md`. Thuật toán đã được đối chiếu lại với dữ liệu web thật ở mốc ảnh phản hồi, nhưng bố cục/chuông/chạy nền Xiaomi vẫn cần chủ dự án xác nhận trên máy. Tình trạng sao lưu khóa ngoài cloud vẫn **chưa được chủ dự án xác nhận**.

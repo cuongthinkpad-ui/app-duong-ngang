@@ -187,11 +187,25 @@ public class MonitorService extends Service {
             detectSelf ? Rules.suspectedSelfTriggers(data.route(), original, coverage) : List.of();
         Set<String> candidateIds = new HashSet<>();
         for (var event : candidates) candidateIds.add(event.id());
+        // Turning inference off must not erase the evidence that a manual reset ended
+        // an already classified journey, or replay could display it as a real train again.
+        Set<String> manuallyRestored = new HashSet<>();
+        if (!detectSelf) {
+          Map<String, Long> resets = new HashMap<>();
+          for (var event : cached)
+            if (!event.red() && Rules.isManualRecovery(event.text()))
+              resets.merge(Rules.km(event.crossing()), event.at(), Math::max);
+          for (var event : cached)
+            if (Rules.isSelfTrigger(event)
+                && resets.getOrDefault(Rules.km(event.crossing()), Long.MIN_VALUE) >= event.at())
+              manuallyRestored.add(event.id());
+        }
         List<String> disproved = new ArrayList<>();
         for (var event : cached)
           if (Rules.isSelfTrigger(event)
               && !candidateIds.contains(event.id().substring(5))
-              && (detectSelf || event.at() >= dayStart)) disproved.add(event.id());
+              && (detectSelf || event.at() >= dayStart && !manuallyRestored.contains(event.id())))
+            disproved.add(event.id());
         store.discardInferences(account, disproved);
         Map<String, Long> pending =
             last == 0 || reset || !detectSelf ? new HashMap<>() : store.pendingSelf();

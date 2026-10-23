@@ -410,6 +410,65 @@ final class UiRefreshChecks {
               segmentField.set(routeView, originalSegments);
             }
           });
+      store.prefs.edit().putInt("interval", 30).commit();
+      var uiSelf =
+          new Rules.Event(
+              "self:ui-new-reverse", reverseAt, points.get(3), "Nghi tự kích", true, List.of());
+      store.saveForAccount(store.account(), new WebSource.DayData(List.of(uiSelf), route));
+      store.updateActiveFaults(store.account(), 0, delayedAt + 20, 0, List.of());
+      store.prefs.edit().putLong("lastSuccess", delayedAt + 20).commit();
+      ui(
+          () -> {
+            ((Runnable) field(activity, "refresh")).run();
+            check(
+                labels((View) field(activity, "screen")).contains("Nghi tự kích"),
+                "active self-trigger is visible before manual recovery");
+          });
+      var uiReset =
+          new Rules.Event(
+              "ui-manual-reset",
+              delayedAt + 30,
+              points.get(3),
+              "Ấn nút Phục hồi",
+              false,
+              List.of());
+      store.saveForAccount(store.account(), new WebSource.DayData(List.of(uiReset), route));
+      store.updateActiveFaults(store.account(), 0, delayedAt + 40, 0, List.of());
+      store.prefs.edit().putLong("lastSuccess", delayedAt + 40).commit();
+      ui(
+          () -> {
+            ((Runnable) field(activity, "refresh")).run();
+            check(
+                ((List<?>) field(routeView, "segments")).isEmpty()
+                    && field(activity, "routeView") == routeView,
+                "manual recovery turns off self-trigger on the same canvas");
+            check(
+                !labels((View) field(activity, "screen")).contains("Nghi tự kích"),
+                "overview removes recovered self fault without rebuilding page");
+          });
+      AlarmSound sixChimes = new AlarmSound();
+      try {
+        ui(
+            () -> {
+              check(sixChimes.play(activity) && sixChimes.isPlaying(), "six-chime audio starts");
+              var player = (android.media.MediaPlayer) field(sixChimes, "player");
+              check(player.getDuration() == 12000, "six chimes have twelve seconds of playback");
+            });
+        android.os.SystemClock.sleep(6500);
+        ui(() -> check(sixChimes.isPlaying(), "alarm continues beyond old three-chime duration"));
+        // Software-emulated audio can drain more slowly than the wall clock. Bound the
+        // completion wait separately; getDuration above verifies the exact media length.
+        long completionDeadline = android.os.SystemClock.uptimeMillis() + 30000;
+        while (sixChimes.isPlaying() && android.os.SystemClock.uptimeMillis() < completionDeadline)
+          android.os.SystemClock.sleep(250);
+        ui(
+            () ->
+                check(
+                    !sixChimes.isPlaying(),
+                    "six-chime alarm finishes and releases without looping"));
+      } finally {
+        ui(sixChimes::stop);
+      }
       ui(
           () -> {
             AlarmSound sound = new AlarmSound();

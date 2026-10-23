@@ -51,7 +51,7 @@ def wait_for(predicate, label, timeout=110):
 def faults(state):
     return json.loads(state.get('activeFaults', '[]'))
 
-phase = {'value': 0, 'at': int(time.time())}
+phase = {'value': 0, 'at': int(time.time()), 'manual': False, 'pre_restore': False}
 
 class Fixture(BaseHTTPRequestHandler):
     def log_message(self, *args):
@@ -73,6 +73,10 @@ class Fixture(BaseHTTPRequestHandler):
         if selected == now.date() and current['value']:
             t1 = datetime.fromtimestamp(current['at'], timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
             rows = [('101+000', 'Tàu lẻ', t1, False), ('100+000', 'Chuông 2 hỏng', t1, True)]
+            if current['manual']:
+                rows += [('101+000', 'Ấn nút Phục hồi', t1+timedelta(seconds=3), False)]
+            if current['pre_restore']:
+                rows += [('101+000', 'Khôi phục hệ thống', t1+timedelta(seconds=2), False)]
             if current['value'] >= 2:
                 rows += [('100+000', 'Tàu lẻ', t1-timedelta(seconds=1), False),
                          ('100+000', 'Chuông 2 khôi phục tốt', t1+timedelta(seconds=1), False)]
@@ -136,7 +140,36 @@ def main():
             notes=adb('shell','dumpsys','notification','--noredact')
             assert re.search(r'Notification\(channel=faults_sound', notes), 'Expected sound-channel notification'
             print('PASS: active alerts use sound channel', flush=True)
+            phase['manual'] = True
+            cleared = wait_for(lambda s: len(faults(s))==1 and faults(s)[0][3]=='Chuông 2 hỏng'
+                               and all(row[7] for row in json.loads(s.get('travelState','[]'))),
+                               'manual recovery clears self-trigger and diagram while keeping original bell fault')
+            assert any(row[10] for row in json.loads(cleared['travelState'])), 'Expected persisted self-trigger classification'
+            print('PASS: manually completed self-trigger retains its classification and completion record', flush=True)
+            # Backfill an earlier generic restore: it must not hide the later manual reset
+            # when deciding which completed inference evidence to retain at longer intervals.
+            phase['pre_restore'] = True
+            stop_service()
+            state_root = ET.fromstring(preferences_xml())
+            for node in state_root:
+                if node.get('name') == 'interval': node.set('value', '120')
+                if node.get('name') == 'running': node.set('value', 'true')
+            (folder/'manual-disabled.xml').write_bytes(ET.tostring(state_root, encoding='utf-8'))
+            install(folder/'manual-disabled.xml', 'shared_prefs/monitor.xml')
+            adb('shell', 'am', 'start', '-n', PKG+'/.MainActivity')
+            wait_for(lambda s: int(s.get('lastSuccess','0')) > int(cleared['lastSuccess'])
+                     and all(row[7] for row in json.loads(s.get('travelState','[]')))
+                     and any(row[10] for row in json.loads(s.get('travelState','[]'))),
+                     'switching to 2-minute polling keeps manually reset self interval off')
+            stop_service()
+            state_root = ET.fromstring(preferences_xml())
+            for node in state_root:
+                if node.get('name') == 'interval': node.set('value', '30')
+                if node.get('name') == 'running': node.set('value', 'true')
+            (folder/'manual-enabled.xml').write_bytes(ET.tostring(state_root, encoding='utf-8'))
+            install(folder/'manual-enabled.xml', 'shared_prefs/monitor.xml')
             phase['value']=2
+            adb('shell', 'am', 'start', '-n', PKG+'/.MainActivity')
             wait_for(lambda s: not faults(s) and json.loads(s.get('pendingSelf','{}'))=={}, 'late upstream evidence removes inference; explicit bell recovery clears bell')
             last_audible = int(metadata().get('lastAlarm', '0'))
             # Change only the global sound preference; restart the same account to prove no replay.
@@ -168,7 +201,7 @@ def main():
             adb('shell', 'am', 'start', '-n', PKG+'/.MainActivity')
             wait_for(lambda s: any(row[3]=='Chuông 1 hỏng' for row in faults(s)) and int(s.get('lastAlarm','0')) > last_audible,
                      'monitoring start sounds for an already active red fault, including at 2-minute polling')
-            print('9 monitoring checks passed', flush=True)
+            print('12 monitoring checks passed', flush=True)
         finally:
             stop_service();adb('shell','am','force-stop',PKG)
             install(folder/'original.xml','shared_prefs/monitor.xml')
