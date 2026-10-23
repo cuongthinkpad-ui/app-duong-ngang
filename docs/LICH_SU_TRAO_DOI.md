@@ -146,3 +146,5 @@ Chủ dự án yêu cầu thêm cảnh báo: cùng CB sai hơn năm lần/ngày 
 Chủ dự án chọn giữ cảnh báo tới hết ngày/00:00 và yêu cầu ngưỡng số lần chỉ thông báo một lần/ngày cho CB đó. CB khác đạt ngưỡng hoặc một lần lệch từ mười trục thì thông báo mới; cùng lần đạt cả hai thì gộp. Lưu dấu chống báo lại qua đóng/mở app và tải bù. Cảnh báo đỏ trong Sự cố, chuông sáu hồi theo cài đặt; ghi đúng số thừa/thiếu, chuẩn chung, số đếm. Chi tiết đường ngang có Đếm trục hôm nay và các lần lệch cả ngày/chọn ngày/tải web. Xem `docs/UI_REVIEW_0.12.md` cho kết quả kiểm tra, ảnh tổng hợp và giới hạn.
 
 Chủ dự án sửa lại ngưỡng đơn lẻ ngay trước khi đóng gói: **lệch 10 trục trở lên**, bao gồm đúng 10, thay cho cách diễn đạt “quá 10” trước đó. Code, dấu thông báo và bài kiểm tra biên đều theo ngưỡng chốt này.
+
+Chốt giao diện sau khi xem lại danh sách thay đổi: chủ dự án đồng ý giữ **Đếm trục hôm nay** và **Xem các lần đếm trục** trong chi tiết đường ngang để tra cứu khi cần. Tổng quan vẫn chỉ hiển thị cảnh báo theo ngưỡng, không thêm bảng thống kê riêng.
