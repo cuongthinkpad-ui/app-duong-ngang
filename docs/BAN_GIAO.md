@@ -1,18 +1,18 @@
 # Bàn giao để tiếp tục ở tài khoản ChatGPT khác
 
-Cập nhật: 23/10/2026, giờ Việt Nam. Tài liệu này ghi yêu cầu đã chốt và tình trạng thực tế, giúp tiếp tục dự án khi đổi phiên/tài khoản. Không chứa mật khẩu website hoặc khóa ký riêng.
+Cập nhật: 24/10/2026, giờ Việt Nam. Tài liệu này ghi yêu cầu đã chốt và tình trạng thực tế, giúp tiếp tục dự án khi đổi phiên/tài khoản. Không chứa mật khẩu website hoặc khóa ký riêng.
 
 ## Bắt đầu ở phiên mới
 
 1. Kết nối cùng repository GitHub `cuongthinkpad-ui/app-duong-ngang`, lấy nhánh `main`; nếu không có công cụ GitHub, tải mã nguồn ZIP từ GitHub và cung cấp cho phiên mới.
-2. Đọc tài liệu này, `README.md`, `docs/LICH_SU_TRAO_DOI.md` và `docs/UI_REVIEW_0.15.md` trước khi thay đổi. Tài liệu 0.1–0.14 là lịch sử; các quyết định 0.15 và yêu cầu mới của chủ dự án được ưu tiên.
-3. Kiểm tra mã nguồn/commit thực tế. Bản ứng dụng hiện tại là **0.15.0**, versionCode **15**, đã đóng gói và kiểm tra. Chủ dự án đã duyệt phương án và yêu cầu đăng lên cùng kho GitHub. Khi tiếp tục, kiểm tra commit/APK thực tế trên main; không nhầm commit chỉ sửa tài liệu với bản APK mới.
+2. Đọc tài liệu này, `README.md`, `docs/LICH_SU_TRAO_DOI.md` và `docs/UI_REVIEW_0.16.md` trước khi thay đổi. Tài liệu 0.1–0.15 là lịch sử; các quyết định 0.16 và yêu cầu mới của chủ dự án được ưu tiên.
+3. Kiểm tra mã nguồn/commit thực tế. Bản ứng dụng hiện tại là **0.16.0**, versionCode **16**, đã đóng gói và kiểm tra. Chủ dự án đã duyệt phương án và yêu cầu đăng lên cùng kho GitHub. Khi tiếp tục, kiểm tra commit/APK thực tế trên main; không nhầm commit chỉ sửa tài liệu với bản APK mới.
 4. Tài khoản ChatGPT mới cần được cấp quyền truy cập GitHub riêng. Lịch sử chat, bộ nhớ ChatGPT, cache build và cấu hình cloud không tự chuyển theo repository.
 5. Tài khoản/mật khẩu website được chủ dự án nhập trực tiếp trong app hoặc cung cấp riêng khi cần kiểm thử. Không yêu cầu gửi lại toàn bộ cuộc trò chuyện và không chép mật khẩu vào mã nguồn.
 
 Tin nhắn chủ dự án có thể sao chép vào cuộc trò chuyện mới:
 
-> Tiếp tục app Android Đường Ngang tại https://github.com/cuongthinkpad-ui/app-duong-ngang, nhánh main. Hãy đọc AGENTS.md, docs/BAN_GIAO.md, docs/LICH_SU_TRAO_DOI.md, README.md và biên bản kiểm tra mới nhất trước. Điểm bàn giao hiện tại là bản 0.15. Giữ các yêu cầu đã chốt, kiểm tra mã nguồn hiện có và tiếp tục từ đó. Phân biệt rõ phần đã thử trên giả lập và phần chưa được xác minh trên Xiaomi thật. Yêu cầu tiếp theo của tôi là: [ghi việc muốn làm].
+> Tiếp tục app Android Đường Ngang tại https://github.com/cuongthinkpad-ui/app-duong-ngang, nhánh main. Hãy đọc AGENTS.md, docs/BAN_GIAO.md, docs/LICH_SU_TRAO_DOI.md, README.md và biên bản kiểm tra mới nhất trước. Điểm bàn giao hiện tại là bản 0.16. Giữ các yêu cầu đã chốt, kiểm tra mã nguồn hiện có và tiếp tục từ đó. Phân biệt rõ phần đã thử trên giả lập và phần chưa được xác minh trên Xiaomi thật. Yêu cầu tiếp theo của tôi là: [ghi việc muốn làm].
 
 ## Mục tiêu và trạng thái
 
@@ -20,7 +20,7 @@ Chủ dự án: Cao Xuân Cường, công tác theo dõi đường ngang cảnh 
 
 - Website đã thử: `http://visitec.vn:7447/`, trang báo cáo ASP.NET `Default.aspx`, cần đăng nhập. Không chỉ hỗ trợ một danh sách 13 điểm cố định.
 - Chủ dự án phản hồi bản 0.10 cơ bản đã chạy tốt; bản 0.11 bổ sung chuông sáu hồi và phục hồi tự kích theo yêu cầu. Đây là bản thử có chức năng thật. Đã đăng nhập/đọc web thật, thử service và UI trên giả lập; chưa được chủ dự án xác nhận đủ độ tin cậy để dùng trực chính thức trên Xiaomi 14T Pro.
-- APK: `downloads/DuongNgang-0.15.apk`; checksum: `downloads/SHA256SUMS`. Đây là bản cài đầy đủ: cài mới trực tiếp hoặc cài đè cùng chữ ký để giữ cấu hình. Giao file qua GitHub, chọn **Download raw file**. Người dùng từng không tải được artifact trực tiếp từ workspace, kể cả ZIP.
+- APK: `downloads/DuongNgang-0.16.apk`; checksum: `downloads/SHA256SUMS`. Đây là bản cài đầy đủ: cài mới trực tiếp hoặc cài đè cùng chữ ký để giữ cấu hình. Giao file qua GitHub, chọn **Download raw file**. Người dùng từng không tải được artifact trực tiếp từ workspace, kể cả ZIP.
 - Play Protect từng chặn bản APK ban đầu; sau đó người dùng cài được. Không coi cảnh báo đã được xử lý cho mọi máy, không hướng dẫn vô hiệu hóa bảo vệ như mặc định.
 
 ## Nguyên lý thiết bị đã chốt
@@ -113,7 +113,7 @@ source scripts/env.sh
 python3 scripts/test-monitoring-e2e.py
 ```
 
-Tăng versionCode lớn hơn 15 khi xuất APK cập nhật mới. Giữ applicationId và chữ ký nếu muốn cài đè. Không đưa URL/ID/mật khẩu thử vào nguồn/APK, không đăng HTML đăng nhập hoặc ảnh dữ liệu vận hành vào repo.
+Tăng versionCode lớn hơn 16 khi xuất APK cập nhật mới. Giữ applicationId và chữ ký nếu muốn cài đè. Không đưa URL/ID/mật khẩu thử vào nguồn/APK, không đăng HTML đăng nhập hoặc ảnh dữ liệu vận hành vào repo.
 
 ## Khóa ký APK cần sao lưu riêng
 
@@ -157,3 +157,11 @@ Kiểm tra 0.14: 391 quy tắc, 62 lưu trữ, 49 UI hồi quy và 20 telemetry 
 Chủ dự án yêu cầu thêm 307+507, 309+056, 280+500, 343+350 và 338+900 vào danh sách không tính lệch trục, cùng ngoại lệ 320+445 cũ. Một tập lý trình số dùng chung; cache trục tăng lên 3 để dọn cả cảnh báo cũ của năm điểm mới. Giữ nguyên giao diện 0.14, lỗi đỏ web thật, tàu/tự kích, âm sáu hồi, tài khoản và các ngưỡng ở điểm khác. Xem docs/UI_REVIEW_0.15.md. Gói ZIP sao lưu đã giao trước đó vẫn là snapshot 0.14; nguồn mới và các quyết định sau nằm trên main.
 
 Kiểm tra 0.15: 450 quy tắc, 115 lưu trữ, 54 UI và 22 dịch vụ với web giả lập đạt trên bản cuối; build/Lint 0 lỗi, 15 cảnh báo. Không đọc web công ty trong lượt này, chưa xác nhận trên Xiaomi thật. Chữ ký APK giữ nguyên.
+
+## Quy trình bằng chứng tự kích — 0.16
+
+Chủ dự án đã xác nhận bổ sung cần chắn đã hạ/đã nâng và tàu đã qua cùng hướng ở đường ngang phía trước làm bằng chứng trong lượt đang xét. Số cần tùy ý; chỉ bản tin gốc xác nhận hoạt động, không dòng đỏ/lỗi. Gộp theo lượt, mỗi lượt dùng một lần, không lấy hoạt động từ lượt cũ hoặc sau khi lượt đang xét đã kết thúc. Bằng chứng bổ sung phù hợp gỡ riêng suy luận, giữ lỗi thật; cập nhật `selfEvidenceVersion=1` để đánh giá lại suy luận cũ khi cài đè, hủy thông báo sai và sửa phân loại sơ đồ từ raw mà không phát lại lịch sử. Giữ 30 giây, ranh giới ga/tuyến và toàn bộ các quy tắc khác. Xem docs/UI_REVIEW_0.16.md.
+
+Từ 24/10, chủ dự án muốn trao đổi bằng cách nhắc lại cách hiểu và đợi xác nhận trước khi sửa. Phương án 0.16 đã được xác nhận và có yêu cầu triển khai rõ; không hỏi lại cùng một sự chấp thuận cho các bước thực hiện/kiểm tra/phát hành thông thường. Dữ liệu web thật chỉ giữ riêng ngoài Git.
+
+Kiểm tra 0.16: 486 quy tắc, 130 lưu trữ, 54 UI và 25 dịch vụ theo chu kỳ thật đạt trên APK cuối; build/Lint 0 lỗi, 15 cảnh báo. Đã phát lại hai ngày báo cáo thật: tình huống cần đối chiếu từ một nghi vấn thành không còn nghi vấn; chỉ ghi kết quả tổng hợp, giữ dữ liệu xác thực/vận hành ngoài Git. Chưa xác nhận trên Xiaomi thật.

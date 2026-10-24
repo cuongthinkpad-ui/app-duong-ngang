@@ -1285,6 +1285,251 @@ public class RulesTest {
     check(
         !Rules.isAxleExempt(null) && !Rules.isAxleExempt("not-a-crossing"),
         "invalid input is not an exemption");
+    var activityLine = new Rules.Route(List.of("100+000", "101+000", "102+000"));
+    var downstream = event(15000, "101+000", "Tàu lẻ", false);
+    for (String motion :
+        List.of(
+            "Cần chắn 1 đã hạ",
+            "Cần chắn 2 đã nâng",
+            "Cần chắn 12 đã hạ",
+            "Cần chắn đã nâng",
+            "CẦN CHẮN 3 ĐÃ NÂNG",
+            " Cần  chắn  4  đã  hạ ",
+            "Cần chắn số 5 đã nâng"))
+      check(
+          Rules.suspectedSelfTriggers(
+                  activityLine, List.of(event(8000, "100+000", motion, false), downstream), 0)
+              .isEmpty(),
+          "completed upstream barrier activity justifies the current visit: " + motion);
+    check(
+        Rules.suspectedSelfTriggers(
+                    activityLine,
+                    List.of(
+                        event(8000, "100+000", "Cần chắn 1 đã hạ", false),
+                        event(9000, "100+000", "Cần chắn 2 đã hạ", false),
+                        event(10000, "100+000", "Cần chắn 1 đã nâng", false),
+                        event(11000, "100+000", "Cần chắn 2 đã nâng", false),
+                        downstream,
+                        event(18000, "101+000", "Tàu lẻ", false)),
+                    0)
+                .size()
+            == 1,
+        "all barrier messages in one visit can justify only one downstream arrival");
+    for (String passage : List.of("Tàu lẻ đã qua đường ngang", "Tàu chẵn đã qua đường ngang")) {
+      int d = passage.contains("lẻ") ? 1 : -1;
+      String upstream = d == 1 ? "100+000" : "102+000";
+      var arrival = event(15000, "101+000", d == 1 ? "Tàu lẻ" : "Tàu chẵn", false);
+      check(
+          Rules.suspectedSelfTriggers(
+                  activityLine, List.of(event(8000, upstream, passage, false), arrival), 0)
+              .isEmpty(),
+          "same-direction upstream passage can replace its missing arrival: " + passage);
+      check(
+          Rules.suspectedSelfTriggers(
+                  activityLine, List.of(arrival, event(16000, upstream, passage, false)), 0)
+              .isEmpty(),
+          "later same-visit passage disproves suspicion without a fixed timestamp allowance");
+    }
+    for (String wrong :
+        List.of(
+            "Cần chắn 1 không hạ",
+            "Cần chắn 1 hỏng",
+            "Cần chắn 1 đã nâng không hết",
+            "Cần chắn 1 mất trạng thái"))
+      check(
+          Rules.suspectedSelfTriggers(
+                      activityLine, List.of(event(8000, "100+000", wrong, false), downstream), 0)
+                  .size()
+              == 1,
+          "fault or incomplete barrier phrase is not successful movement evidence: " + wrong);
+    check(
+        Rules.suspectedSelfTriggers(
+                    activityLine,
+                    List.of(event(8000, "100+000", "Cần chắn 1 đã hạ", true), downstream),
+                    0)
+                .size()
+            == 1,
+        "red source message is not positive barrier evidence");
+    check(
+        Rules.suspectedSelfTriggers(
+                    activityLine,
+                    List.of(downstream, event(16000, "101+000", "Cần chắn 1 đã hạ", false)),
+                    0)
+                .size()
+            == 1,
+        "a crossing's own barrier dropping must not exonerate its own self-trigger");
+    check(
+        Rules.suspectedSelfTriggers(
+                    activityLine,
+                    List.of(
+                        event(8000, "100+000", "Tàu chẵn đã qua đường ngang", false), downstream),
+                    0)
+                .size()
+            == 1,
+        "upstream passage in the opposite direction is not evidence");
+    check(
+        Rules.suspectedSelfTriggers(
+                    activityLine,
+                    List.of(
+                        event(8000, "100+000", "Tàu chẵn", false),
+                        event(9000, "100+000", "Cần chắn 1 đã hạ", false),
+                        downstream),
+                    0)
+                .size()
+            == 2,
+        "barrier movement within a known opposite-direction visit does not change its direction");
+    check(
+        Rules.suspectedSelfTriggers(
+                    activityLine,
+                    List.of(
+                        event(1000, "100+000", "Cần chắn 1 đã hạ", false),
+                        event(2000, "100+000", "Khôi phục hệ thống", false),
+                        event(3000, "101+000", "Cần chắn 1 đã nâng", false),
+                        event(4000, "101+000", "Khôi phục hệ thống", false),
+                        downstream),
+                    0)
+                .size()
+            == 1,
+        "old activity before the preceding downstream visit ended is not recycled");
+    check(
+        Rules.suspectedSelfTriggers(
+                    activityLine,
+                    List.of(
+                        downstream,
+                        event(16000, "101+000", "Khôi phục hệ thống", false),
+                        event(17000, "100+000", "Tàu lẻ đã qua đường ngang", false)),
+                    0)
+                .size()
+            == 1,
+        "evidence from after the target visit ended cannot cancel its earlier suspicion");
+    check(
+        Rules.suspectedSelfTriggers(
+                activityLine,
+                List.of(
+                    event(1000, "100+000", "Cần chắn 1 đã hạ", false),
+                    event(2000, "100+000", "Khôi phục hệ thống", false),
+                    event(3000, "101+000", "Tàu lẻ", false),
+                    event(4000, "101+000", "Khôi phục hệ thống", false),
+                    event(5000, "100+000", "Cần chắn 2 đã nâng", false),
+                    downstream),
+                0)
+            .isEmpty(),
+        "separate upstream cycles independently support separate downstream visits");
+    check(
+        Rules.suspectedSelfTriggers(
+                    activityLine,
+                    List.of(
+                        event(1000, "100+000", "Tàu lẻ", false),
+                        event(2000, "100+000", "Cần chắn 1 đã hạ", false),
+                        event(3000, "100+000", "Tàu lẻ đã qua đường ngang", false),
+                        event(4000, "100+000", "Cần chắn 1 đã nâng", false),
+                        event(5000, "100+000", "Khôi phục hệ thống", false),
+                        event(6000, "101+000", "Tàu lẻ", false),
+                        downstream),
+                    0)
+                .size()
+            == 1,
+        "arrival plus barrier and passage evidence is one train, not independent tokens");
+    check(
+        Rules.suspectedSelfTriggers(
+                    activityLine,
+                    List.of(event(8000, "100+000", "Cần chắn 1 đã hạ", false), downstream),
+                    10000)
+                .size()
+            == 1,
+        "activity before known coverage is ignored");
+    var delayedCandidates = Rules.suspectedSelfTriggers(activityLine, List.of(downstream), 0);
+    check(delayedCandidates.size() == 1, "missing evidence initially remains suspected");
+    var correctedCandidates =
+        Rules.suspectedSelfTriggers(
+            activityLine,
+            List.of(downstream, event(16000, "100+000", "Tàu lẻ đã qua đường ngang", false)),
+            0);
+    var delayedPending = new HashMap<String, Long>();
+    delayedPending.put(downstream.id(), 100L);
+    check(
+        Rules.confirmedSelfTriggers(correctedCandidates, delayedPending, 50000, 0, 30000).isEmpty()
+            && delayedPending.isEmpty(),
+        "supplemental passage removes pending confirmation instead of alarming later");
+    check(
+        Rules.suspectedSelfTriggers(
+                activityLine,
+                List.of(
+                    event(1000, "100+000", "Tàu lẻ", false),
+                        event(2000, "100+000", "Tàu lẻ", false),
+                    event(3000, "101+000", "Tàu lẻ", false),
+                        event(4000, "101+000", "Tàu lẻ", false)),
+                0)
+            .isEmpty(),
+        "two queued explicit upstream trains remain distinct when their zones overlap");
+    check(
+        Rules.suspectedSelfTriggers(
+                    activityLine,
+                    List.of(
+                        event(1000, "100+000", "Tàu lẻ", false),
+                        event(2000, "100+000", "Khôi phục hệ thống", false),
+                        event(3000, "101+000", "Cần chắn 1 đã hạ", false),
+                        event(4000, "101+000", "Khôi phục hệ thống", false),
+                        downstream),
+                    0)
+                .size()
+            == 1,
+        "an unmatched old arrival belonging to an earlier unnamed target visit is not recycled");
+    for (String motion : List.of("Cần chắn 1 đã hạ", "Cần chắn 2 đã nâng")) {
+      check(
+          Rules.suspectedSelfTriggers(
+                  activityLine, List.of(downstream, event(16000, "100+000", motion, false)), 0)
+              .isEmpty(),
+          "late same-visit barrier activity also removes suspicion: " + motion);
+      check(
+          Rules.suspectedSelfTriggers(
+                      activityLine,
+                      List.of(
+                          downstream,
+                          event(16000, "101+000", "Khôi phục hệ thống", false),
+                          event(17000, "100+000", motion, false)),
+                      0)
+                  .size()
+              == 1,
+          "barrier activity from a later visit cannot explain an already ended target: " + motion);
+    }
+    var duplicates =
+        List.of(
+            event(1000, "100+000", "Cần chắn 1 đã hạ", false),
+            event(1000, "100+000", "Cần chắn 1 đã hạ", false),
+            event(1000, "100+000", "Cần chắn 2 đã hạ", false),
+            event(2000, "101+000", "Tàu lẻ", false),
+            event(3000, "101+000", "Tàu lẻ", false));
+    check(
+        Rules.suspectedSelfTriggers(activityLine, duplicates, 0).size() == 1,
+        "duplicate pages and simultaneous barriers do not multiply the evidence");
+    check(
+        Rules.suspectedSelfTriggers(
+                    activityLine,
+                    List.of(
+                        event(1000, "100+000", "Tàu lẻ", false),
+                        event(3000, "100+000", "Tàu lẻ đã qua đường ngang", false),
+                        event(5000, "101+000", "Tàu lẻ", false),
+                        event(6000, "100+000", "Cần chắn 1 đã hạ", false),
+                        event(7000, "101+000", "Tàu lẻ", false)),
+                    0)
+                .size()
+            == 1,
+        "repeated barrier action after passage without reset or new approach remains the same"
+            + " visit");
+    check(
+        Rules.suspectedSelfTriggers(
+                activityLine,
+                List.of(
+                    event(1000, "100+000", "Cần chắn 1 đã nâng", false),
+                    event(2000, "101+000", "Cần chắn 1 đã hạ", false),
+                    event(3000, "101+000", "Khôi phục hệ thống", false),
+                    event(10000, "100+000", "Tàu lẻ", false),
+                    downstream),
+                0)
+            .isEmpty(),
+        "a fresh explicit arrival still proves the train when earlier unpaired barrier status is"
+            + " present");
     System.out.println(scenarios + " domain scenarios passed");
   }
 }

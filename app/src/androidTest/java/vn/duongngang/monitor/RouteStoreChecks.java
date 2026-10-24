@@ -684,11 +684,194 @@ public final class RouteStoreChecks extends Instrumentation {
             Rules.incidentHistory(store.incidentEvents(axleDay - 86400000, axleDay)).isEmpty(),
             "historical incident screen does not recreate exempt axle warnings");
       }
+      store.credentials("https://rail.example.test/", "self-evidence-upgrade", "test-only");
+      var proofRoute =
+          new Rules.Route(
+              List.of("100+000", "101+000", "102+000", "103+000", "104+000", "105+000"));
+      long proofNow = axleDay + 300000;
+      var proof =
+          new Rules.Event(
+              "barrier-proof", axleDay + 100000, "100+000", "Cần chắn 2 đã nâng", false, List.of());
+      var arrival =
+          new Rules.Event(
+              "proved-arrival", axleDay + 110000, "101+000", "Tàu lẻ", false, List.of());
+      var oldSelf =
+          new Rules.Event(
+              "self:" + arrival.id(),
+              arrival.at(),
+              arrival.crossing(),
+              "Nghi tự kích",
+              true,
+              List.of());
+      var realBell =
+          new Rules.Event(
+              "real-bell", axleDay + 111000, "101+000", "Chuông 2 hỏng", true, List.of());
+      var isolated =
+          new Rules.Event(
+              "isolated-arrival", axleDay + 120000, "103+000", "Tàu lẻ", false, List.of());
+      var genuineSelf =
+          new Rules.Event(
+              "self:" + isolated.id(),
+              isolated.at(),
+              isolated.crossing(),
+              "Nghi tự kích",
+              true,
+              List.of());
+      var cacheArrival =
+          new Rules.Event("cache-arrival", axleDay + 130000, "105+000", "Tàu lẻ", false, List.of());
+      var latePassage =
+          new Rules.Event(
+              "late-passage",
+              axleDay + 131000,
+              "104+000",
+              "Tàu lẻ đã qua đường ngang",
+              false,
+              List.of());
+      var cacheSelf =
+          new Rules.Event(
+              "self:" + cacheArrival.id(),
+              cacheArrival.at(),
+              cacheArrival.crossing(),
+              "Nghi tự kích",
+              true,
+              List.of());
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  proof,
+                  arrival,
+                  oldSelf,
+                  realBell,
+                  isolated,
+                  genuineSelf,
+                  cacheArrival,
+                  latePassage),
+              proofRoute));
+      store.updateActiveFaults(store.account(), axleDay, proofNow, axleDay, List.of());
+      check(
+          store.travelState().journeys().stream()
+              .anyMatch(j -> j.id().equals(arrival.id()) && j.selfTriggered()),
+          "legacy inference marks the diagram before migration");
+      var selfCache = new org.json.JSONArray();
+      for (var e : List.of(oldSelf, realBell, genuineSelf, cacheSelf))
+        selfCache.put(
+            new org.json.JSONArray()
+                .put(e.id())
+                .put(e.at())
+                .put(e.crossing())
+                .put(e.text())
+                .put(new org.json.JSONArray(e.counts())));
+      store
+          .prefs
+          .edit()
+          .putString("activeFaults", selfCache.toString())
+          .putString(
+              "pendingSelf",
+              new org.json.JSONObject()
+                  .put(arrival.id(), 1000L)
+                  .put(isolated.id(), 2000L)
+                  .put(cacheArrival.id(), 3000L)
+                  .toString())
+          .commit();
+      check(!store.selfEvidenceReady(), "install-over has a pending self-evidence migration");
+      var selfManager = context.getSystemService(android.app.NotificationManager.class);
+      selfManager.createNotificationChannel(
+          new android.app.NotificationChannel(
+              "self-proof-test", "Fixture only", android.app.NotificationManager.IMPORTANCE_LOW));
+      for (var e : List.of(oldSelf, cacheSelf, genuineSelf))
+        selfManager.notify(
+            100 + Math.floorMod(e.id().hashCode(), 1000000),
+            new android.app.Notification.Builder(context, "self-proof-test")
+                .setSmallIcon(vn.duongngang.monitor.R.drawable.ic_train_header)
+                .setContentTitle("Synthetic self proof")
+                .build());
+      store.prepareSelfEvidence(store.account(), proofNow);
+      check(store.selfEvidenceReady(), "self-evidence migration records its version");
+      check(
+          store.activeFaults().stream()
+              .noneMatch(e -> e.id().equals(oldSelf.id()) || e.id().equals(cacheSelf.id())),
+          "successful movement or later passage removes legacy and cache-only false self alerts");
+      check(
+          store.activeFaults().stream().anyMatch(e -> e.id().equals(realBell.id()))
+              && store.activeFaults().stream().anyMatch(e -> e.id().equals(genuineSelf.id())),
+          "migration retains original hardware faults and still-unsupported self-trigger");
+      check(
+          store.events(axleDay, proofNow).stream()
+                  .filter(
+                      e ->
+                          e.id().equals(proof.id())
+                              || e.id().equals(arrival.id())
+                              || e.id().equals(realBell.id()))
+                  .count()
+              == 3,
+          "migration preserves raw movement, arrival and hardware records");
+      check(
+          store.events(axleDay, proofNow).stream().noneMatch(e -> e.id().equals(oldSelf.id())),
+          "migration removes disproved inference from archive rather than faking hardware"
+              + " recovery");
+      check(
+          store.pendingSelf().equals(java.util.Map.of(isolated.id(), 2000L)),
+          "pending candidates are cleared selectively and genuine first-observed time is retained");
+      check(
+          store.travelState().journeys().stream()
+              .noneMatch(j -> j.id().equals(arrival.id()) && j.selfTriggered()),
+          "diagram replay drops disproved classification without deleting real train reports");
+      check(
+          java.util.Arrays.stream(selfManager.getActiveNotifications())
+              .noneMatch(
+                  n ->
+                      n.getId() == 100 + Math.floorMod(oldSelf.id().hashCode(), 1000000)
+                          || n.getId() == 100 + Math.floorMod(cacheSelf.id().hashCode(), 1000000)),
+          "migration cancels disproved notifications including cache-only one");
+      check(
+          java.util.Arrays.stream(selfManager.getActiveNotifications())
+              .anyMatch(
+                  n -> n.getId() == 100 + Math.floorMod(genuineSelf.id().hashCode(), 1000000)),
+          "migration does not cancel genuine self-trigger notification");
+      int proofRows = store.events(0, proofNow).size();
+      store.prepareSelfEvidence(store.account(), proofNow);
+      check(
+          store.events(0, proofNow).size() == proofRows,
+          "migration is idempotent and creates no historic alarms");
+      selfManager.deleteNotificationChannel("self-proof-test");
+      store.credentials("https://rail.example.test/", "older-self-proof", "test-only");
+      long archiveAt = axleDay - 172800000;
+      var oldProof =
+          new Rules.Event(
+              "old-proof", archiveAt + 1000, "100+000", "Cần chắn 1 đã hạ", false, List.of());
+      var oldArrival =
+          new Rules.Event("old-arrival", archiveAt + 2000, "101+000", "Tàu lẻ", false, List.of());
+      var oldInference =
+          new Rules.Event(
+              "self:" + oldArrival.id(),
+              oldArrival.at(),
+              oldArrival.crossing(),
+              "Nghi tự kích",
+              true,
+              List.of());
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(List.of(oldProof, oldArrival, oldInference), proofRoute));
+      store.updateActiveFaults(store.account(), archiveAt, proofNow, axleDay, List.of());
+      check(
+          store.travelState().journeys().stream()
+              .anyMatch(j -> j.id().equals(oldArrival.id()) && j.selfTriggered()),
+          "old checkpoint contains the earlier classification before reconciliation");
+      store.prepareSelfEvidence(store.account(), proofNow);
+      check(
+          store.events(archiveAt, archiveAt + 10000).stream().noneMatch(Rules::isSelfTrigger),
+          "migration also removes older disproved history");
+      check(
+          store.travelState().journeys().stream()
+              .noneMatch(j -> j.id().equals(oldArrival.id()) && j.selfTriggered()),
+          "disproved record before checkpoint forces correct diagram rebuild");
       store.credentials("https://rail.example.test/", "new-axle-account", "test-only");
       check(
           store.activeFaults().isEmpty()
               && !store.prefs.contains("axleVersion")
               && !store.prefs.contains("axleNotices")
+              && !store.prefs.contains("selfEvidenceVersion")
               && store.events(axleDay, axleDay + 86400000).isEmpty(),
           "changing account clears axle counters and generated alerts");
       result.putString("stream", checks + " account storage checks passed\n");

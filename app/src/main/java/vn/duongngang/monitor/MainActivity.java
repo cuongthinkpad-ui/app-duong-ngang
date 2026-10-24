@@ -99,11 +99,14 @@ public class MainActivity extends Activity {
     render();
     Store capturedStore = store;
     String capturedAccount = capturedStore.account();
-    if (!capturedStore.travelReady() || !capturedStore.axleReady())
+    if (!capturedStore.travelReady()
+        || !capturedStore.axleReady()
+        || !capturedStore.selfEvidenceReady())
       io.execute(
           () -> {
             synchronized (Store.class) {
               if (!capturedStore.account().equals(capturedAccount)) return;
+              capturedStore.prepareSelfEvidence(capturedAccount, System.currentTimeMillis());
               capturedStore.prepareTravelState(capturedAccount, System.currentTimeMillis());
               if (!capturedStore.axleReady()) {
                 long now = System.currentTimeMillis();

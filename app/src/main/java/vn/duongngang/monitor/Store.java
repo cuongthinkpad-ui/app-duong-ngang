@@ -13,6 +13,7 @@ import org.json.*;
 public final class Store {
   private static final int TRAVEL_VERSION = 3;
   private static final int AXLE_VERSION = 3;
+  private static final int SELF_EVIDENCE_VERSION = 1;
   private final Context context;
   public final android.content.SharedPreferences prefs;
 
@@ -177,6 +178,56 @@ public final class Store {
 
   public boolean axleReady() {
     return prefs.getInt("axleVersion", 0) == AXLE_VERSION;
+  }
+
+  public boolean selfEvidenceReady() {
+    return prefs.getInt("selfEvidenceVersion", 0) == SELF_EVIDENCE_VERSION;
+  }
+
+  /** Reassess old inferred records once; never turn historical arrivals into new alarms. */
+  public void prepareSelfEvidence(String expected, long now) {
+    synchronized (Store.class) {
+      if (!account().equals(expected) || selfEvidenceReady()) return;
+      List<Rules.Event> saved = events(0, now + 1);
+      List<Rules.Event> original = new ArrayList<>();
+      Map<String, Rules.Event> rawById = new HashMap<>(), inferred = new HashMap<>();
+      for (var e : saved) {
+        if (!Rules.isGenerated(e)) {
+          original.add(e);
+          rawById.put(e.id(), e);
+        } else if (Rules.isSelfTrigger(e)) inferred.put(e.id(), e);
+      }
+      for (var e : activeFaults()) if (Rules.isSelfTrigger(e)) inferred.put(e.id(), e);
+      Set<String> candidates = new HashSet<>();
+      for (var e : Rules.suspectedSelfTriggers(route(), original, 0)) candidates.add(e.id());
+      List<String> disproved = new ArrayList<>();
+      boolean rebuildCheckpoint = false;
+      for (var e : inferred.values()) {
+        var raw = rawById.get(e.id().substring(5));
+        if (raw != null
+            && route().crossings().contains(Rules.km(raw.crossing()))
+            && !candidates.contains(raw.id())) {
+          disproved.add(e.id());
+          rebuildCheckpoint |= e.at() < prefs.getLong("travelCheckpointAt", 0);
+        }
+      }
+      Map<String, Long> pending = pendingSelf();
+      pending.keySet().retainAll(candidates);
+      if (!disproved.isEmpty()) {
+        discardInferences(expected, disproved);
+        var manager = context.getSystemService(android.app.NotificationManager.class);
+        if (manager != null)
+          for (String id : disproved) manager.cancel(100 + Math.floorMod(id.hashCode(), 1000000));
+        if (rebuildCheckpoint) prefs.edit().remove("travelVersion").apply();
+        long baseline = Rules.faultBaseline(prefs.getLong("baselineFrom", 0), now);
+        updateActiveFaults(expected, baseline, now, baseline, disproved);
+      }
+      prefs
+          .edit()
+          .putString("pendingSelf", new JSONObject(pending).toString())
+          .putInt("selfEvidenceVersion", SELF_EVIDENCE_VERSION)
+          .apply();
+    }
   }
 
   /** Remove only obsolete derived alerts, across all days; preserve original website records. */
@@ -415,6 +466,7 @@ public final class Store {
             .remove("faultDay")
             .remove("selfFrom")
             .remove("pendingSelf")
+            .remove("selfEvidenceVersion")
             .remove("activeFaults")
             .remove("occupiedPoints")
             .remove("travelState")

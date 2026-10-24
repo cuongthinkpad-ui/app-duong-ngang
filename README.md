@@ -1,4 +1,4 @@
-# Đường Ngang — Android 0.15
+# Đường Ngang — Android 0.16
 
 **Đổi phiên/tài khoản ChatGPT:** đọc [Bản bàn giao và cách tiếp tục](docs/BAN_GIAO.md) và [Nhật ký trao đổi, yêu cầu đã chốt](docs/LICH_SU_TRAO_DOI.md). [Sao lưu khóa ký APK](docs/SAO_LUU_KHOA_KY.md).
 
@@ -6,7 +6,15 @@
 
 Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt navy, xanh cyan và xanh lá. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
 
-## Thay đổi 0.15
+## Thay đổi 0.16
+
+- Bằng chứng tại đường ngang phía trước không chỉ là Tàu lẻ/Tàu chẵn: thêm **Cần chắn … đã hạ/đã nâng** (bất kỳ số cần) và **Tàu … đã qua đường ngang**. Bản tin đã qua vẫn phải đúng hướng. Chỉ nhận thông báo xác nhận hoạt động thành công, không dùng dòng đỏ/lỗi hoặc hoạt động tại chính điểm đang nghi tự kích.
+- Gộp các bản tin của một lượt thành một bằng chứng, dùng một lần cho một lượt tàu kế tiếp; không coi từng cần chắn là một tàu. Xét theo chu kỳ hoạt động, kết thúc ở khôi phục/nút phục hồi hoặc lượt mới; bằng chứng cùng lượt bổ sung sau sẽ gỡ riêng suy luận sai. Giữ đối chiếu theo hướng, ranh giới ga/đầu tuyến và chỉ suy luận ở chu kỳ 30 giây.
+- Khi cài đè, đánh giá lại các suy luận đã lưu theo bằng chứng có sẵn, hủy thông báo sai và cập nhật sơ đồ, giữ raw/lỗi đỏ thật/lịch sử còn đúng/tài khoản/cài đặt. Không phát lại cảnh báo lịch sử trong lúc chuyển cache. Giữ giao diện, chuông sáu hồi và sáu ngoại lệ trục của 0.15.
+
+[Kiểm tra bản 0.16](docs/UI_REVIEW_0.16.md).
+
+## Thay đổi 0.15 (lịch sử)
 
 - Thêm **307+507, 309+056, 280+500, 343+350, 338+900** vào danh sách không đối chiếu trục; giữ ngoại lệ cũ **320+445**. Cả sáu điểm không tạo ghi chú, thống kê, dữ liệu trục hiển thị hoặc cảnh báo lệch trục do app suy ra.
 - Nâng phiên bản cache trục lên 3 để lọc ngay và dọn các cảnh báo dẫn xuất cũ ở cả sáu điểm, kể cả ngày trước và thông báo chỉ còn trong cache. Giữ bản tin web gốc, dòng đỏ thật, theo dõi tàu, tự kích, tài khoản, phạm vi và dấu chống báo lặp của điểm khác.
@@ -90,7 +98,7 @@
 - Sơ đồ luôn giữ một đoạn sáng cho mỗi lượt tàu đang theo dõi: đoạn đến trước khi qua đường ngang, đoạn đi sau bản tin đã qua; nhiều đoạn/hai hướng đồng thời. Tàu lẻ đi tăng km, tàu chẵn đi giảm km. Đoạn giữa hai đường ngang không tắt khi điểm trước khôi phục hoặc điểm sau mới tiếp cận. Đoạn giáp ga tắt theo khôi phục của đường ngang đó. Trạng thái chiếm dụng thiết bị vẫn chỉ kết thúc theo “Khôi phục hệ thống”. Đây là biểu diễn từ bản tin, không phải vị trí GPS, danh tính hoặc số đoàn tàu.
 - Mọi lỗi đỏ giữ nguyên chữ trên web, gồm tên/số thiết bị. Khôi phục chỉ xóa lỗi tương ứng; khôi phục hệ thống không xóa lỗi phần cứng. Sáu nhóm chi tiết: Chuông, Đèn, Cần chắn, Cảm biến, Kết nối, Điện áp.
 - Lưu lỗi chưa khôi phục trong ngày; khối hiện tại reset ở 00:00 giờ Việt Nam, lịch sử ngày cũ vẫn tra cứu được. Chiếm dụng tàu giữ qua nửa đêm tới bản tin khôi phục đúng điểm. Sau gián đoạn qua ngày hoặc trên 24 giờ, mốc theo dõi lỗi có thể được đặt lại với “Chưa ghi nhận lỗi mới”; đây không phải bản tin thiết bị phục hồi.
-- Ở chu kỳ **30 giây**, suy luận “Nghi tự kích” từ lượt tàu mới thiếu lượt tương ứng ở đường ngang phía trước theo hướng chạy, có chờ ít nhất một chu kỳ. Không áp dụng qua ga hay đầu/cuối tuyến, không áp dụng chu kỳ 2 phút/5 phút. Bản tin phía trước tới muộn sẽ bỏ suy luận; bản tin gốc được giữ. Đây là suy luận theo dữ liệu web, cần đối chiếu hiện trường.
+- Ở chu kỳ **30 giây**, suy luận “Nghi tự kích” từ lượt tàu mới thiếu bằng chứng cùng lượt ở đường ngang phía trước theo hướng chạy (tiếp cận, cần chắn đã hạ/nâng hoặc tàu đã qua cùng hướng), có chờ ít nhất một chu kỳ. Không áp dụng qua ga hay đầu/cuối tuyến, không áp dụng chu kỳ 2 phút/5 phút. Bản tin phía trước tới muộn sẽ bỏ suy luận; bản tin gốc được giữ. Đây là suy luận theo dữ liệu web, cần đối chiếu hiện trường.
 - CB1–CB6 ở bản tin khôi phục hệ thống được đối chiếu số trục theo số xuất hiện nhiều nhất. Ghi chú thừa/thiếu riêng từng CB; hòa chuẩn ghi “cảm biến đếm trục không đồng nhất, lỗi”. Ghi chú dưới ngưỡng không phát chuông; hai ngưỡng bản 0.12 được cảnh báo như lỗi. Sáu điểm ngoại lệ nêu ở bản 0.15 không áp dụng phần đối chiếu trục. Không coi bản tin đo điện áp là số trục.
 
 ## Giao diện và thông báo

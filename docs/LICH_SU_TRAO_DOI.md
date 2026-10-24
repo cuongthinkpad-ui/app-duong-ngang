@@ -169,3 +169,9 @@ Chủ dự án hỏi về Google Stitch, muốn mang đặc tả sang thiết k�
 ## 19. Mở rộng ngoại lệ trục — 0.15
 
 Chủ dự án yêu cầu thêm 307+507, 309+056, 280+500, 343+350 và 338+900 vào danh sách không tính lệch trục. Đã áp dụng như ngoại lệ 320+445: không đối chiếu/ghi chú/thống kê/hiển thị dữ liệu trục hoặc cảnh báo trục suy ra; giữ toàn bộ dòng đỏ gốc, tàu và các tính năng khác. Nâng cache trục từ 2 lên 3 để dọn các cảnh báo trục cũ tại cả sáu điểm kể cả trước khi đọc web mới. Không xóa raw, cấu hình hoặc dấu chống báo lặp của điểm khác. Xem docs/UI_REVIEW_0.15.md cho kiểm chứng và APK.
+
+## 20. Đối chiếu báo tự kích và xác nhận quy trình mới — 0.16
+
+Chủ dự án báo một lượt nghi tự kích và yêu cầu chỉ xem web/phân tích trước. Đã đăng nhập bằng tài khoản được cung cấp, đọc đủ phân trang hai ngày và phát lại code cũ: thiếu dòng tiếp cận tại điểm phía trước làm sinh nghi vấn dù có hoạt động cần chắn và bản tin đã qua. Không lưu dữ liệu vận hành hoặc thông tin đăng nhập vào Git.
+
+Chủ dự án yêu cầu tính thêm cần chắn đã hạ/đã nâng hoặc tàu đã qua ở điểm phía trước làm bằng chứng. Đã xác nhận chỉ xét trong lượt đang xét, bản tin đã qua vẫn cùng hướng, bằng chứng bổ sung làm gỡ riêng nghi vấn. Chủ dự án giải thích cách gọi “cần chắn hạ/nâng” bao gồm các số cần khác nhau trên web và sau đó yêu cầu sửa app. Đồng thời chốt cách làm việc: trình bày lại cách hiểu, chờ xác nhận trước khi chỉnh app trong các cuộc trao đổi yêu cầu. Chi tiết triển khai/kiểm tra tại docs/UI_REVIEW_0.16.md.

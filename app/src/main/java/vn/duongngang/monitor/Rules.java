@@ -17,6 +17,9 @@ public final class Rules {
           "(cảm biến|cần chắn|chuông|đèn)(?:\\s+(?:điện|cảnh báo|tín hiệu|đỏ|số))*\\s*(\\d+)");
   private static final java.util.regex.Pattern DEVICE_STATE =
       java.util.regex.Pattern.compile("\\s+(?:hỏng|khôi phục|mất|bất thường|bị)\\b");
+  private static final java.util.regex.Pattern BARRIER_ACTIVITY =
+      java.util.regex.Pattern.compile(
+          "(?iu)^cần\\s+chắn(?:\\s+(?:số\\s+)?\\d+)?\\s+đã\\s+(hạ|nâng)$");
 
   /** Fixture only: operational routes must come from the authenticated page's full point list. */
   public static final Route DEMO_ROUTE =
@@ -665,12 +668,11 @@ public final class Rules {
     String previous = route.upstream(current.crossing(), d);
     if (d == 0 || previous == null || !complete || coverageStart > current.at() - travelWindow)
       return false;
-    for (Event e : history)
-      if (km(e.crossing()).equals(previous)
-          && direction(e.text()) == d
-          && e.at() <= current.at()
-          && e.at() >= current.at() - travelWindow) return false;
-    return true;
+    List<Event> window = new ArrayList<>();
+    for (Event e : history) if (e.at() >= current.at() - travelWindow) window.add(e);
+    window.add(current);
+    return suspectedSelfTriggers(route, window, coverageStart).stream()
+        .anyMatch(e -> e.id().equals(current.id()));
   }
 
   public static boolean selfTriggerEnabled(int intervalSeconds) {
@@ -691,28 +693,120 @@ public final class Rules {
             : faultKey(event.text());
   }
 
-  /** Each upstream report can justify one downstream arrival of the same direction. */
+  private static int barrierActivity(Event event) {
+    if (event.red() || isGenerated(event)) return 0;
+    var match = BARRIER_ACTIVITY.matcher(event.text().trim());
+    return !match.matches() ? 0 : match.group(1).equalsIgnoreCase("hạ") ? 1 : -1;
+  }
+
+  private static boolean evidenceReset(Event event) {
+    return event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+        || isManualRecovery(event.text());
+  }
+
+  /** One operating visit, irrespective of how many numbered barriers report movement. */
+  private static final class EvidenceVisit {
+    final long startedAt, previousStart;
+    final int previousArrivalDirection;
+    final String point;
+    final List<Event> signs = new ArrayList<>();
+    Event arrival;
+    int direction;
+    long passedAt = Long.MIN_VALUE, endExclusive = Long.MAX_VALUE;
+
+    EvidenceVisit(String point, long at, EvidenceVisit previous) {
+      this.point = point;
+      startedAt = at;
+      previousStart = previous == null ? Long.MIN_VALUE : previous.startedAt;
+      previousArrivalDirection =
+          previous == null || previous.arrival == null ? 0 : previous.direction;
+    }
+
+    boolean supports(EvidenceVisit target) {
+      if (direction != 0 && direction != target.direction) return false;
+      // Explicit arrival tokens keep the existing one-to-one continuity for trains in transit.
+      // Fallback activity must be from a new visit, not a late raise from an older train.
+      boolean queuedTrain = arrival != null && target.previousArrivalDirection == target.direction;
+      long evidenceStart = arrival == null ? startedAt : arrival.at();
+      if (!queuedTrain && evidenceStart <= target.previousStart) return false;
+      for (Event sign : signs) if (sign.at() < target.endExclusive) return true;
+      return false;
+    }
+  }
+
+  /** Match whole upstream visits, including late same-visit evidence, once per downstream train. */
   public static List<Event> suspectedSelfTriggers(
       Route route, List<Event> input, long coverageStart) {
     List<Event> ordered = new ArrayList<>(input);
-    ordered.sort(Comparator.comparingLong(Event::at).thenComparing(Event::id));
-    Map<String, ArrayDeque<Event>> evidence = new HashMap<>();
-    List<Event> suspects = new ArrayList<>();
+    ordered.sort(
+        Comparator.comparingLong(Event::at)
+            .thenComparingInt(e -> evidenceReset(e) ? 4 : reportPhase(e))
+            .thenComparing(Event::id));
+    Map<String, EvidenceVisit> open = new HashMap<>(), previous = new HashMap<>();
+    Map<String, List<EvidenceVisit>> evidence = new HashMap<>();
+    List<EvidenceVisit> arrivals = new ArrayList<>();
     Set<String> seen = new HashSet<>();
+    Set<String> crossings = new HashSet<>(route.crossings());
     for (Event event : ordered) {
-      int direction = direction(event.text());
       String point = km(event.crossing());
       if (event.at() < coverageStart
-          || direction == 0
-          || !route.crossings().contains(point)
+          || event.red()
+          || isGenerated(event)
+          || !crossings.contains(point)
           || !seen.add(event.id())) continue;
-      String upstream = route.upstream(point, direction);
-      if (upstream != null) {
-        var queue = evidence.get(upstream + "|" + direction);
-        if (queue == null || queue.isEmpty()) suspects.add(event);
-        else queue.removeFirst();
+      EvidenceVisit visit = open.get(point);
+      if (evidenceReset(event)) {
+        if (visit != null)
+          visit.endExclusive = event.at() == Long.MAX_VALUE ? Long.MAX_VALUE : event.at() + 1;
+        open.remove(point);
+        continue;
       }
-      evidence.computeIfAbsent(point + "|" + direction, k -> new ArrayDeque<>()).addLast(event);
+      int d = direction(event.text()),
+          passed = passedDirection(event.text()),
+          barrier = barrierActivity(event);
+      if (d == 0 && passed == 0 && barrier == 0) continue;
+      boolean split =
+          visit != null
+              && (d != 0
+                      && (visit.arrival != null
+                          || visit.passedAt != Long.MIN_VALUE
+                          || visit.direction != 0 && visit.direction != d)
+                  || passed != 0 && visit.direction != 0 && visit.direction != passed);
+      if (split) {
+        visit.endExclusive = event.at();
+        visit = null;
+      }
+      if (visit == null) {
+        EvidenceVisit old = previous.get(point);
+        visit = new EvidenceVisit(point, event.at(), old);
+        previous.put(point, visit);
+        open.put(point, visit);
+        evidence.computeIfAbsent(point, k -> new ArrayList<>()).add(visit);
+      }
+      visit.signs.add(event);
+      if (d != 0) {
+        visit.arrival = event;
+        visit.direction = d;
+        arrivals.add(visit);
+      } else if (passed != 0) {
+        visit.direction = passed;
+        visit.passedAt = event.at();
+      }
+    }
+    Set<EvidenceVisit> used = new HashSet<>();
+    List<Event> suspects = new ArrayList<>();
+    for (EvidenceVisit target : arrivals) {
+      String upstream = route.upstream(target.point, target.direction);
+      if (upstream != null) {
+        EvidenceVisit match = null;
+        for (EvidenceVisit candidate : evidence.getOrDefault(upstream, List.of()))
+          if (!used.contains(candidate) && candidate.supports(target)) {
+            match = candidate;
+            break;
+          }
+        if (match == null) suspects.add(target.arrival);
+        else used.add(match);
+      }
     }
     return suspects;
   }

@@ -174,6 +174,7 @@ public class MonitorService extends Service {
             new ArrayList<>(
                 store.saveForAccount(account, new WebSource.DayData(incoming, data.route())));
         long now = System.currentTimeMillis();
+        store.prepareSelfEvidence(account, now);
         long coverage = history ? previousStart : store.prefs.getLong("coverage", dayStart);
         if (history && !incoming.isEmpty()) coverage = Math.max(coverage, incoming.get(0).at());
         if (reset && !data.connected()) coverage = now;

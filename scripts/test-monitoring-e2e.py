@@ -54,7 +54,7 @@ def faults(state):
 AXLE_EXEMPT_POINTS = ('280+500', '307+507', '309+056', '320+445', '338+900', '343+350')
 
 phase = {'value': 0, 'at': int(time.time()), 'manual': False, 'pre_restore': False,
-         'axles': 0, 'axle_other': False, 'axle_large': False, 'axle_exact': False, 'bell_recovered': False,
+         'supplement': False, 'repeat_barrier': False, 'axles': 0, 'axle_other': False, 'axle_large': False, 'axle_exact': False, 'bell_recovered': False,
          'axle_at': int(time.time()), 'exempt_at': int(time.time())-30}
 
 class Fixture(BaseHTTPRequestHandler):
@@ -84,6 +84,10 @@ class Fixture(BaseHTTPRequestHandler):
         if selected == now.date() and current['value']:
             t1 = datetime.fromtimestamp(current['at'], timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
             rows += [('101+000', 'Tàu lẻ', t1, False), ('309+056', 'Chuông 2 hỏng', t1, True)]
+            if current['repeat_barrier']:
+                rows += [('100+000', 'Cần chắn 1 đã hạ', t1-timedelta(seconds=1), False)]
+            if current['supplement']:
+                rows += [('100+000', 'Tàu lẻ đã qua đường ngang', t1+timedelta(seconds=1), False)]
             if current['manual']:
                 rows += [('101+000', 'Ấn nút Phục hồi', t1+timedelta(seconds=3), False)]
             if current['pre_restore']:
@@ -168,6 +172,17 @@ def main():
             notes=adb('shell','dumpsys','notification','--noredact')
             assert re.search(r'Notification\(channel=faults_sound', notes), 'Expected sound-channel notification'
             print('PASS: active alerts use sound channel', flush=True)
+            before_proof_alarm = int(metadata().get('lastAlarm', '0'))
+            phase['supplement'] = True
+            proved = wait_for(lambda s: not any(row[3]=='Nghi tự kích' for row in faults(s))
+                             and any(row[3]=='Chuông 2 hỏng' for row in faults(s)),
+                             'late same-direction upstream passage removes inference while retaining original bell fault')
+            assert int(proved.get('lastAlarm','0')) == before_proof_alarm, 'Evidence correction must not sound a new fault'
+            assert not any(row[10] for row in json.loads(proved.get('travelState','[]'))), 'Disproved self classification must leave the diagram replay'
+            print('PASS: evidence correction cancels only inferred classification without replaying alarm',flush=True)
+            phase.update(supplement=False, repeat_barrier=True, at=int(time.time())-3)
+            wait_for(lambda s: any(row[3]=='Nghi tự kích' for row in faults(s)),
+                     'a new unsupported visit is still suspected despite repeated movement in the earlier used visit')
             phase['manual'] = True
             cleared = wait_for(lambda s: len(faults(s))==1 and faults(s)[0][3]=='Chuông 2 hỏng'
                                and all(row[7] for row in json.loads(s.get('travelState','[]'))),
@@ -276,7 +291,7 @@ def main():
             wait_for(lambda s: any(row[0].startswith('axle:3:') and 'thiếu 10 trục trong 1 lần' in row[3] for row in faults(s))
                      and int(s.get('lastAlarm','0')) > int(large['lastAlarm']),
                      'exactly ten missing axles create another audible alert on previously warned sensor')
-            print('22 monitoring checks passed', flush=True)
+            print('25 monitoring checks passed', flush=True)
         finally:
             stop_service();adb('shell','am','force-stop',PKG)
             install(folder/'original.xml','shared_prefs/monitor.xml')
