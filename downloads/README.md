@@ -1,6 +1,8 @@
-# Đường Ngang — bản thử 0.17
+# Đường Ngang — bản thử 0.18
 
-**[Tải APK 0.17](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.17.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
+**[Tải APK 0.18](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.18.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
+
+- Nhãn ga Nghi Long rút gọn thành **Ga NL** để không che mốc cạnh bên; cài đè giữ nguyên dữ liệu và cách hoạt động.
 
 - Bổ sung **ga Nghi Long tại Km 303+350 riêng cho ID Chosy** khi web chưa có mốc này. Tàu vào/ra ga và ranh giới đối chiếu tự kích hoạt động giống các ga hiện có. Cài đè cập nhật tuyến/sơ đồ đã lưu và đánh giá lại nghi tự kích liên quan, giữ tài khoản/cài đặt/lỗi thật. Không thêm ga vào số đường ngang hay phạm vi theo dõi; tài khoản khác giữ tuyến riêng.
 
@@ -26,4 +28,4 @@
 
 Có thể cài mới trực tiếp, không cần bản gốc. Nếu đã có app, cài đè bằng cùng chữ ký thử nghiệm để giữ cấu hình. Mở Cài đặt, nhập web/ID/mật khẩu rồi Lưu & theo dõi; chu kỳ 30 giây / 2 phút / 5 phút. Lượt đồng bộ đầu cần đọc hai ngày nên lâu hơn những lượt sau.
 
-Cần kiểm tra âm thanh, chạy nền và thông báo khi khóa màn hình lâu trên điện thoại thật, nhất là chế độ pin Xiaomi. Kiểm tra phát nhạc trên giả lập không chứng minh loa Xiaomi đã kêu. Bản thử không thay thế quy trình trực hiện có. Không nhúng mật khẩu thử nghiệm vào APK. [Chi tiết kiểm tra](../docs/UI_REVIEW_0.17.md).
+Cần kiểm tra âm thanh, chạy nền và thông báo khi khóa màn hình lâu trên điện thoại thật, nhất là chế độ pin Xiaomi. Kiểm tra phát nhạc trên giả lập không chứng minh loa Xiaomi đã kêu. Bản thử không thay thế quy trình trực hiện có. Không nhúng mật khẩu thử nghiệm vào APK. [Chi tiết kiểm tra](../docs/UI_REVIEW_0.18.md).

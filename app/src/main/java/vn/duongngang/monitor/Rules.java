@@ -53,6 +53,12 @@ public final class Rules {
     return !stationCode(raw).isEmpty();
   }
 
+  /** Compact display name only; preserve station keys in routes, reports and journey caches. */
+  public static String stationLabel(String raw) {
+    String code = stationCode(raw);
+    return code.equalsIgnoreCase("Nghi Long") && chainage(km(raw)) == 303350L ? "NL" : code;
+  }
+
   private static long chainage(String raw) {
     var match = POINT.matcher(raw);
     if (!match.matches()) throw new IllegalArgumentException("Lý trình không hợp lệ: " + raw);

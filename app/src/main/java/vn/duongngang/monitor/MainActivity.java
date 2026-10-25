@@ -1884,7 +1884,7 @@ public class MainActivity extends Activity {
                     0, Math.min(points.size() - 1, Math.round((event.getX() - dp(25)) / step)));
         String point = points.get(index);
         if (Rules.isStation(point)) {
-          Toast.makeText(MainActivity.this, "Ga " + Rules.stationCode(point), Toast.LENGTH_SHORT)
+          Toast.makeText(MainActivity.this, "Ga " + Rules.stationLabel(point), Toast.LENGTH_SHORT)
               .show();
         } else openCrossing(point);
         performClick();
@@ -1963,7 +1963,7 @@ public class MainActivity extends Activity {
         p.setTextSize(dp(station ? 9 : 8.5f));
         p.setColor(station ? WARNING : lit[i] ? reportColor : MUTED);
         if (station) {
-          String name = "Ga " + Rules.stationCode(km);
+          String name = "Ga " + Rules.stationLabel(km);
           c.drawText(name, x - p.measureText(name) / 2, y + dp(17), p);
         } else {
           c.save();

@@ -181,3 +181,7 @@ Chủ dự án yêu cầu tính thêm cần chắn đã hạ/đã nâng hoặc t
 Ngày 25/10/2026, chủ dự án xác nhận Km 303+350 là ga Nghi Long mới, chưa có trong danh sách website. Đã nhắc lại cách hiểu, hỏi rõ thiếu mốc hay chỉ thiếu nhãn ga; chủ dự án xác nhận web chưa cập nhật và yêu cầu thêm vào app, riêng ID Chosy. Xử lý như các ga hiện có: chèn đúng lý trình, đoạn tàu giáp ga tắt theo khôi phục đường ngang, xuất hiện khi tàu từ ga ra được đường ngang báo, ngắt đối chiếu tự kích qua ga. Không coi là đường ngang, không tạo dữ liệu vận hành ga giả hoặc thay đổi tài khoản khác.
 
 Bản 0.17 áp dụng bổ sung vào tuyến từ web sau khi hoàn thành kiểm tra phân trang và vào tuyến cache khi cài đè. Dựng lại sơ đồ theo topology mới, đánh giá lại nghi tự kích đã lưu, giữ dòng đỏ thật và các quy tắc khác. Nếu web có mốc cùng chainage thì ưu tiên website, tránh chèn trùng. ID Chosy trong cấu hình là khóa chọn ngoại lệ nghiệp vụ do chủ dự án yêu cầu, không phải tài khoản/mật khẩu đăng nhập được điền sẵn. Chi tiết kiểm tra và giới hạn tại docs/UI_REVIEW_0.17.md.
+
+## 22. Rút gọn nhãn Nghi Long thành NL — 0.18
+
+Chủ dự án xác nhận vị trí ga đúng nhưng tên dài che mốc bên cạnh, yêu cầu ghi tắt NL. Bản 0.18 chỉ đổi nhãn hiển thị thành Ga NL trên sơ đồ và khi chạm vào ga; giữ khóa tuyến/cache Nghi Long và toàn bộ quy tắc hiện có. Yêu cầu này đã có chỉ thị sửa rõ, không cần hỏi lại. Kiểm tra tại docs/UI_REVIEW_0.18.md.

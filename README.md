@@ -1,4 +1,4 @@
-# Đường Ngang — Android 0.17
+# Đường Ngang — Android 0.18
 
 **Đổi phiên/tài khoản ChatGPT:** đọc [Bản bàn giao và cách tiếp tục](docs/BAN_GIAO.md) và [Nhật ký trao đổi, yêu cầu đã chốt](docs/LICH_SU_TRAO_DOI.md). [Sao lưu khóa ký APK](docs/SAO_LUU_KHOA_KY.md).
 
@@ -6,7 +6,11 @@
 
 Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt navy, xanh cyan và xanh lá. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
 
-## Thay đổi 0.17
+## Thay đổi 0.18
+
+- Rút gọn nhãn ga Nghi Long tại Km 303+350 thành **Ga NL** trên sơ đồ và khi chạm vào ga, tránh che các mốc đường ngang cạnh bên. Giữ nguyên khóa tuyến/cache, tài khoản áp dụng và mọi quy tắc tàu/cảnh báo của 0.17. [Kiểm tra bản 0.18](docs/UI_REVIEW_0.18.md).
+
+## Thay đổi 0.17 (lịch sử)
 
 - Bổ sung **ga Nghi Long, Km 303+350**, riêng cho ID **Chosy**, theo xác nhận của chủ dự án vì web chưa cập nhật ga mới. Ga được chèn đúng thứ tự lý trình, xử lý đoạn tàu vào/ra và ngắt đối chiếu tự kích như ga hiện có; không tăng số đường ngang, không đưa ga vào chọn phạm vi hoặc đối chiếu trục.
 - Áp dụng cả tuyến đã lưu khi cài đè và kết quả đọc web đầy đủ/tăng thêm. Kiểm tra phân trang vẫn dùng danh sách web gốc; không tạo bản tin vận hành giả. Nếu website bổ sung cùng vị trí thì ưu tiên mốc từ website, không chèn trùng. ID khác giữ tuyến riêng.

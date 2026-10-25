@@ -5,14 +5,14 @@ Cập nhật: 25/10/2026, giờ Việt Nam. Tài liệu này ghi yêu cầu đã
 ## Bắt đầu ở phiên mới
 
 1. Kết nối cùng repository GitHub `cuongthinkpad-ui/app-duong-ngang`, lấy nhánh `main`; nếu không có công cụ GitHub, tải mã nguồn ZIP từ GitHub và cung cấp cho phiên mới.
-2. Đọc tài liệu này, `README.md`, `docs/LICH_SU_TRAO_DOI.md` và `docs/UI_REVIEW_0.17.md` trước khi thay đổi. Tài liệu 0.1–0.16 là lịch sử; yêu cầu mới nhất của chủ dự án được ưu tiên, các quy tắc không được sửa vẫn giữ.
-3. Kiểm tra mã nguồn/commit thực tế. Bản ứng dụng hiện tại là **0.17.0**, versionCode **17**, đã đóng gói và kiểm tra. Chủ dự án đã duyệt bổ sung ga Nghi Long riêng ID Chosy; tiếp tục phát hành thông thường trên cùng kho GitHub. Khi tiếp tục, kiểm tra commit/APK thực tế trên main; không nhầm commit chỉ sửa tài liệu với bản APK mới.
+2. Đọc tài liệu này, `README.md`, `docs/LICH_SU_TRAO_DOI.md` và `docs/UI_REVIEW_0.18.md` trước khi thay đổi. Tài liệu 0.1–0.17 là lịch sử; yêu cầu mới nhất của chủ dự án được ưu tiên, các quy tắc không được sửa vẫn giữ.
+3. Kiểm tra mã nguồn/commit thực tế. Bản ứng dụng hiện tại là **0.18.0**, versionCode **18**. Chủ dự án yêu cầu rút gọn nhãn ga Nghi Long thành NL; tiếp tục phát hành thông thường trên cùng kho GitHub. Khi tiếp tục, kiểm tra commit/APK thực tế trên main; không nhầm commit chỉ sửa tài liệu với bản APK mới.
 4. Tài khoản ChatGPT mới cần được cấp quyền truy cập GitHub riêng. Lịch sử chat, bộ nhớ ChatGPT, cache build và cấu hình cloud không tự chuyển theo repository.
 5. Tài khoản/mật khẩu website được chủ dự án nhập trực tiếp trong app hoặc cung cấp riêng khi cần kiểm thử. Không yêu cầu gửi lại toàn bộ cuộc trò chuyện và không chép mật khẩu vào mã nguồn.
 
 Tin nhắn chủ dự án có thể sao chép vào cuộc trò chuyện mới:
 
-> Tiếp tục app Android Đường Ngang tại https://github.com/cuongthinkpad-ui/app-duong-ngang, nhánh main. Hãy đọc AGENTS.md, docs/BAN_GIAO.md, docs/LICH_SU_TRAO_DOI.md, README.md và biên bản kiểm tra mới nhất trước. Điểm bàn giao hiện tại là bản 0.17. Giữ các yêu cầu đã chốt, kiểm tra mã nguồn hiện có và tiếp tục từ đó. Phân biệt rõ phần đã thử trên giả lập và phần chưa được xác minh trên Xiaomi thật. Yêu cầu tiếp theo của tôi là: [ghi việc muốn làm].
+> Tiếp tục app Android Đường Ngang tại https://github.com/cuongthinkpad-ui/app-duong-ngang, nhánh main. Hãy đọc AGENTS.md, docs/BAN_GIAO.md, docs/LICH_SU_TRAO_DOI.md, README.md và biên bản kiểm tra mới nhất trước. Điểm bàn giao hiện tại là bản 0.18. Giữ các yêu cầu đã chốt, kiểm tra mã nguồn hiện có và tiếp tục từ đó. Phân biệt rõ phần đã thử trên giả lập và phần chưa được xác minh trên Xiaomi thật. Yêu cầu tiếp theo của tôi là: [ghi việc muốn làm].
 
 ## Mục tiêu và trạng thái
 
@@ -20,7 +20,7 @@ Chủ dự án: Cao Xuân Cường, công tác theo dõi đường ngang cảnh 
 
 - Website đã thử: `http://visitec.vn:7447/`, trang báo cáo ASP.NET `Default.aspx`, cần đăng nhập. Không chỉ hỗ trợ một danh sách 13 điểm cố định.
 - Chủ dự án phản hồi bản 0.10 cơ bản đã chạy tốt; bản 0.11 bổ sung chuông sáu hồi và phục hồi tự kích theo yêu cầu. Đây là bản thử có chức năng thật. Đã đăng nhập/đọc web thật, thử service và UI trên giả lập; chưa được chủ dự án xác nhận đủ độ tin cậy để dùng trực chính thức trên Xiaomi 14T Pro.
-- APK: `downloads/DuongNgang-0.17.apk`; checksum: `downloads/SHA256SUMS`. Đây là bản cài đầy đủ: cài mới trực tiếp hoặc cài đè cùng chữ ký để giữ cấu hình. Giao file qua GitHub, chọn **Download raw file**. Người dùng từng không tải được artifact trực tiếp từ workspace, kể cả ZIP.
+- APK: `downloads/DuongNgang-0.18.apk`; checksum: `downloads/SHA256SUMS`. Đây là bản cài đầy đủ: cài mới trực tiếp hoặc cài đè cùng chữ ký để giữ cấu hình. Giao file qua GitHub, chọn **Download raw file**. Người dùng từng không tải được artifact trực tiếp từ workspace, kể cả ZIP.
 - Play Protect từng chặn bản APK ban đầu; sau đó người dùng cài được. Không coi cảnh báo đã được xử lý cho mọi máy, không hướng dẫn vô hiệu hóa bảo vệ như mặc định.
 
 ## Nguyên lý thiết bị đã chốt
@@ -113,7 +113,7 @@ source scripts/env.sh
 python3 scripts/test-monitoring-e2e.py
 ```
 
-Tăng versionCode lớn hơn 17 khi xuất APK cập nhật mới. Giữ applicationId và chữ ký nếu muốn cài đè. Không đưa URL/mật khẩu thử vào nguồn/APK, không đăng HTML đăng nhập hoặc ảnh dữ liệu vận hành vào repo. ID Chosy chỉ là khóa cấu hình bổ sung ga do chủ dự án yêu cầu, không được điền sẵn để đăng nhập.
+Tăng versionCode lớn hơn 18 khi xuất APK cập nhật mới. Giữ applicationId và chữ ký nếu muốn cài đè. Không đưa URL/mật khẩu thử vào nguồn/APK, không đăng HTML đăng nhập hoặc ảnh dữ liệu vận hành vào repo. ID Chosy chỉ là khóa cấu hình bổ sung ga do chủ dự án yêu cầu, không được điền sẵn để đăng nhập.
 
 ## Khóa ký APK cần sao lưu riêng
 
@@ -173,3 +173,9 @@ Chủ dự án xác nhận ga mới Km 303+350 chưa có trong web và yêu cầ
 `selfEvidenceVersion=2` đánh giá lại nghi tự kích đã lưu theo ranh giới mới, giữ raw/lỗi thật, không phát lại lịch sử. `travelReady` kiểm tra `travelRoute` khớp topology hiện tại, dựng lại checkpoint/sơ đồ khi cần. Giữ `travelVersion=3`, `axleVersion=3`, các quy tắc và khóa ký trước.
 
 Kiểm tra 0.17: **506 quy tắc, 12 parser, 15 đọc web fixture, 143 lưu trữ và 57 UI** đạt; build/Lint 0 lỗi, 15 cảnh báo. Không đăng nhập ID Chosy trên web thật hoặc chạy lại toàn bộ bộ service 25 ca trong lượt này; không có kiểm chứng Xiaomi mới. Xem docs/UI_REVIEW_0.17.md. Gói sao lưu phiên v0.14 vẫn là snapshot lịch sử; thay đổi mới nằm trên nhánh main, không tự cập nhật vào ZIP cũ.
+
+## Nhãn ga NL — 0.18
+
+Chủ dự án yêu cầu rút gọn Nghi Long thành NL để tránh che các mốc đường ngang. Sơ đồ và toast dùng `Rules.stationLabel` để hiện Ga NL, chỉ đổi nhãn tại Km 303+350 có tên Nghi Long. Giữ nguyên `stationCode`, khóa tuyến/cache `303+350 (Nghi Long)` và mọi quy tắc/cache version của 0.17; không đổi dữ liệu vận hành. Xem docs/UI_REVIEW_0.18.md cho kiểm chứng.
+
+Kiểm tra 0.18: 506 quy tắc và 57 UI đạt, build/Lint 0 lỗi, 15 cảnh báo; cùng chữ ký. Không chạy lại các bộ parser/storage/service hoặc kiểm tra web thật/Xiaomi trong lượt chỉ đổi nhãn này.
