@@ -732,6 +732,54 @@ final class UiRefreshChecks {
                 "incident tab distinguishes derived axle warning from hardware restoration");
           });
       UiPreview.shot(runner, activity, "axle-incidents-0.13.png");
+      store.credentials("https://rail.example.test/", "Chosy", "test-only");
+      var stationRoute = new Rules.Route(List.of("300+600", "305+888", "307+507"));
+      long stationNow = System.currentTimeMillis();
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "ui-station-arrival",
+                      stationNow - 1000,
+                      "305+888",
+                      "Tàu lẻ",
+                      false,
+                      List.of())),
+              stationRoute));
+      store.updateActiveFaults(
+          store.account(), stationNow - 2000, stationNow, stationNow - 2000, List.of());
+      store
+          .prefs
+          .edit()
+          .putString("rangeFrom", "305+888")
+          .putString("rangeTo", "307+507")
+          .putLong("lastSuccess", stationNow)
+          .commit();
+      ui(
+          () -> {
+            navigate("overview");
+            View canvas = (View) field(activity, "routeView");
+            check(
+                ((List<?>) field(canvas, "points")).equals(store.route().points())
+                    && ((List<?>) field(canvas, "points")).contains("303+350 (Nghi Long)"),
+                "overview retains full route and Nghi Long while monitoring a smaller scope");
+            check(
+                ((List<?>) field(canvas, "segments"))
+                    .equals(List.of(new Rules.TrackSegment("303+350 (Nghi Long)", "305+888", 1))),
+                "diagram shows only station-to-crossing interval for departing train");
+          });
+      UiPreview.shot(runner, activity, "nghi-long-overview-0.17.png");
+      ui(
+          () -> {
+            navigate("crossings");
+            String visible = labels((View) field(activity, "screen"));
+            check(
+                visible.contains("305+888")
+                    && visible.contains("307+507")
+                    && !visible.contains("Nghi Long"),
+                "station is not listed as a monitored road crossing");
+          });
       return checks;
     } finally {
       ui(() -> activity.finish());

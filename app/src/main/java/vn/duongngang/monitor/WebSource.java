@@ -286,7 +286,7 @@ public final class WebSource {
         }
         List<Rules.Event> result = new ArrayList<>(out.values());
         result.sort(Comparator.comparingLong(Rules.Event::at).reversed());
-        return new DayData(result, route, known.isEmpty() || connected);
+        return new DayData(result, Rules.accountRoute(user, route), known.isEmpty() || connected);
       }
       d = followPage(d, next);
     }

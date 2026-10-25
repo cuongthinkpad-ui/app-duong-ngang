@@ -97,14 +97,15 @@ public final class WebSourceReadTest {
                 form(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             if (values.containsKey("logout")
                 || !values.containsKey("login")
-                || !"fixture-user".equals(values.get("user"))
+                || !("fixture-user".equals(values.get("user"))
+                    || "Chosy".equals(values.get("user")))
                 || !"fixture-only".equals(values.get("password")))
               throw new AssertionError("login selected wrong button");
             exchange.getResponseHeaders().add("Set-Cookie", "session=" + mode + "; Path=/");
             body =
                 mode.equals("authfail")
                     ? "<form><input type='text' name='user'><input type='password'"
-                          + " name='password'></form>"
+                        + " name='password'></form>"
                     : report(1, mode, false);
           } else {
             posts.incrementAndGet();
@@ -178,6 +179,19 @@ public final class WebSourceReadTest {
         badLogin = true;
       }
       check(badLogin, "invalid login has a distinct non-retryable error");
+      var chosy = new WebSource(base + "normal", "Chosy", "fixture-only");
+      var supplemented = chosy.readDay(DAY);
+      check(
+          supplemented.route().points().contains("303+350 (Nghi Long)")
+              && supplemented.route().crossings().equals(complete.route().crossings())
+              && supplemented.events().equals(complete.events()),
+          "complete authenticated read adds station after validating original paginated inventory");
+      var supplementedDelta = chosy.readDelta(DAY, Set.of(supplemented.events().get(1).id()));
+      check(
+          supplementedDelta.connected()
+              && supplementedDelta.route().points().equals(supplemented.route().points())
+              && supplementedDelta.events().size() == 1,
+          "delta read retains account station without inventing events or breaking anchors");
       System.out.println(checks + " authenticated read scenarios passed (local web fixture)");
     } finally {
       server.stop(0);

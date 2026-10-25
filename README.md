@@ -1,4 +1,4 @@
-# Đường Ngang — Android 0.16
+# Đường Ngang — Android 0.17
 
 **Đổi phiên/tài khoản ChatGPT:** đọc [Bản bàn giao và cách tiếp tục](docs/BAN_GIAO.md) và [Nhật ký trao đổi, yêu cầu đã chốt](docs/LICH_SU_TRAO_DOI.md). [Sao lưu khóa ký APK](docs/SAO_LUU_KHOA_KY.md).
 
@@ -6,7 +6,13 @@
 
 Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt navy, xanh cyan và xanh lá. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
 
-## Thay đổi 0.16
+## Thay đổi 0.17
+
+- Bổ sung **ga Nghi Long, Km 303+350**, riêng cho ID **Chosy**, theo xác nhận của chủ dự án vì web chưa cập nhật ga mới. Ga được chèn đúng thứ tự lý trình, xử lý đoạn tàu vào/ra và ngắt đối chiếu tự kích như ga hiện có; không tăng số đường ngang, không đưa ga vào chọn phạm vi hoặc đối chiếu trục.
+- Áp dụng cả tuyến đã lưu khi cài đè và kết quả đọc web đầy đủ/tăng thêm. Kiểm tra phân trang vẫn dùng danh sách web gốc; không tạo bản tin vận hành giả. Nếu website bổ sung cùng vị trí thì ưu tiên mốc từ website, không chèn trùng. ID khác giữ tuyến riêng.
+- Tự dựng lại cache sơ đồ theo tuyến có ga và đánh giá lại nghi tự kích cũ, giữ bản tin gốc/lỗi đỏ thật/tài khoản/cài đặt. Giữ các quy tắc, giao diện và chuông của 0.16. [Kiểm tra bản 0.17](docs/UI_REVIEW_0.17.md).
+
+## Thay đổi 0.16 (lịch sử)
 
 - Bằng chứng tại đường ngang phía trước không chỉ là Tàu lẻ/Tàu chẵn: thêm **Cần chắn … đã hạ/đã nâng** (bất kỳ số cần) và **Tàu … đã qua đường ngang**. Bản tin đã qua vẫn phải đúng hướng. Chỉ nhận thông báo xác nhận hoạt động thành công, không dùng dòng đỏ/lỗi hoặc hoạt động tại chính điểm đang nghi tự kích.
 - Gộp các bản tin của một lượt thành một bằng chứng, dùng một lần cho một lượt tàu kế tiếp; không coi từng cần chắn là một tàu. Xét theo chu kỳ hoạt động, kết thúc ở khôi phục/nút phục hồi hoặc lượt mới; bằng chứng cùng lượt bổ sung sau sẽ gỡ riêng suy luận sai. Giữ đối chiếu theo hướng, ranh giới ga/đầu tuyến và chỉ suy luận ở chu kỳ 30 giây.

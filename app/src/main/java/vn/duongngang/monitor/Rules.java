@@ -21,7 +21,7 @@ public final class Rules {
       java.util.regex.Pattern.compile(
           "(?iu)^cần\\s+chắn(?:\\s+(?:số\\s+)?\\d+)?\\s+đã\\s+(hạ|nâng)$");
 
-  /** Fixture only: operational routes must come from the authenticated page's full point list. */
+  /** Fixture only: operational routes use the full account inventory and confirmed supplements. */
   public static final Route DEMO_ROUTE =
       new Route(
           List.of(
@@ -58,6 +58,17 @@ public final class Rules {
     if (!match.matches()) throw new IllegalArgumentException("Lý trình không hợp lệ: " + raw);
     return Math.addExact(
         Math.multiplyExact(Long.parseLong(match.group(1)), 1000), Integer.parseInt(match.group(2)));
+  }
+
+  /** Owner-confirmed new station absent from the website inventory; never invent report rows. */
+  public static Route accountRoute(String user, Route source) {
+    if (user == null || !user.trim().equalsIgnoreCase("Chosy") || source.points().isEmpty())
+      return source;
+    // Prefer the website's own point/name if it later publishes this location.
+    for (String point : source.points()) if (chainage(point) == 303350L) return source;
+    List<String> points = new ArrayList<>(source.points());
+    points.add("303+350 (Nghi Long)");
+    return new Route(points);
   }
 
   /** Immutable account-specific topology. A station breaks adjacency in both directions. */

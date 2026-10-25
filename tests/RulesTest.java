@@ -1530,6 +1530,78 @@ public class RulesTest {
             .isEmpty(),
         "a fresh explicit arrival still proves the train when earlier unpaired barrier status is"
             + " present");
+    var withoutNewStation = new Rules.Route(List.of("300+600", "305+888", "307+507"));
+    var withNewStation = Rules.accountRoute("Chosy", withoutNewStation);
+    String nghiLong = "303+350 (Nghi Long)";
+    check(
+        withNewStation.points().equals(List.of("300+600", nghiLong, "305+888", "307+507")),
+        "owner-confirmed Nghi Long inserted in chainage order for Chosy");
+    check(
+        withNewStation.crossings().equals(withoutNewStation.crossings()),
+        "new station does not count as a crossing or scope endpoint");
+    check(
+        withNewStation.upstream("305+888", 1) == null
+            && withNewStation.upstream("300+600", -1) == null,
+        "Nghi Long breaks self-trigger evidence across station in both directions");
+    check(
+        withNewStation.upstream("307+507", 1).equals("305+888"),
+        "other same-side crossing adjacency is preserved");
+    for (String user : List.of("Vinh", "other-account", "Chosy2", ""))
+      check(
+          Rules.accountRoute(user, withoutNewStation).points().equals(withoutNewStation.points()),
+          "station supplement cannot leak into other account: " + user);
+    check(
+        Rules.accountRoute(" chOSy ", withoutNewStation).points().equals(withNewStation.points()),
+        "station selector tolerates account case and outer whitespace");
+    check(
+        Rules.accountRoute("Chosy", new Rules.Route(List.of())).points().isEmpty(),
+        "no fabricated route before inventory has been loaded");
+    check(
+        Rules.accountRoute("Chosy", withNewStation).points().equals(withNewStation.points()),
+        "overlapping reads do not duplicate the new station");
+    var published = new Rules.Route(List.of("300+600", "303+350 (NL)", "305+888"));
+    check(
+        Rules.accountRoute("Chosy", published).points().equals(published.points()),
+        "future website station name takes precedence without duplicate chainage");
+    for (int direction : List.of(1, -1)) {
+      String from = direction == 1 ? "300+600" : "305+888";
+      String text = direction == 1 ? "Tàu lẻ" : "Tàu chẵn";
+      var approach = event(20000, from, text, false);
+      var passed = event(21000, from, text + " đã qua đường ngang", false);
+      var moving =
+          Rules.travelState(withNewStation, Rules.TravelState.empty(), List.of(approach, passed));
+      oneSegment(
+          withNewStation,
+          moving,
+          from,
+          nghiLong,
+          direction,
+          "passed train lights only the interval into Nghi Long: " + direction);
+      var released =
+          Rules.travelState(
+              withNewStation, moving, List.of(event(22000, from, "Khôi phục hệ thống", false)));
+      check(
+          Rules.trackSegments(withNewStation, released).isEmpty(),
+          "adjacent crossing recovery clears station-bound train: " + direction);
+      String outgoing = direction == 1 ? "305+888" : "300+600";
+      check(
+          Rules.suspectedSelfTriggers(
+                  withNewStation, List.of(event(23000, outgoing, text, false)), 0)
+              .isEmpty(),
+          "station-side arrival is exempt from self-trigger inference: " + direction);
+      var leaving =
+          Rules.travelState(
+              withNewStation,
+              Rules.TravelState.empty(),
+              List.of(event(23000, outgoing, text, false)));
+      oneSegment(
+          withNewStation,
+          leaving,
+          nghiLong,
+          outgoing,
+          direction,
+          "station exit appears at adjacent crossing report: " + direction);
+    }
     System.out.println(scenarios + " domain scenarios passed");
   }
 }

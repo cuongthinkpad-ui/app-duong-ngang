@@ -13,7 +13,7 @@ import org.json.*;
 public final class Store {
   private static final int TRAVEL_VERSION = 3;
   private static final int AXLE_VERSION = 3;
-  private static final int SELF_EVIDENCE_VERSION = 1;
+  private static final int SELF_EVIDENCE_VERSION = 2;
   private final Context context;
   public final android.content.SharedPreferences prefs;
 
@@ -47,7 +47,7 @@ public final class Store {
       var array = new JSONArray(prefs.getString("route", "[]"));
       List<String> points = new ArrayList<>();
       for (int i = 0; i < array.length(); i++) points.add(array.getString(i));
-      return new Rules.Route(points);
+      return Rules.accountRoute(prefs.getString("user", ""), new Rules.Route(points));
     } catch (Exception invalid) {
       return new Rules.Route(List.of());
     }
@@ -78,7 +78,8 @@ public final class Store {
       if (!account().equals(expected))
         throw new IllegalStateException("Tài khoản đã thay đổi; bỏ kết quả cũ");
       List<Rules.Event> added = save(data.events());
-      prefs.edit().putString("route", new JSONArray(data.route().points()).toString()).apply();
+      Rules.Route effective = Rules.accountRoute(prefs.getString("user", ""), data.route());
+      prefs.edit().putString("route", new JSONArray(effective.points()).toString()).apply();
       return added;
     }
   }
@@ -356,7 +357,9 @@ public final class Store {
   }
 
   public boolean travelReady() {
-    return prefs.getInt("travelVersion", 0) == TRAVEL_VERSION && prefs.contains("travelState");
+    return prefs.getInt("travelVersion", 0) == TRAVEL_VERSION
+        && prefs.contains("travelState")
+        && new JSONArray(route().points()).toString().equals(prefs.getString("travelRoute", ""));
   }
 
   /** Rebuild obsolete diagram caches from raw reports, without touching credentials or faults. */

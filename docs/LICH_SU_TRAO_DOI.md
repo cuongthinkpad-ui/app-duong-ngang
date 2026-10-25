@@ -175,3 +175,9 @@ Chủ dự án yêu cầu thêm 307+507, 309+056, 280+500, 343+350 và 338+900 v
 Chủ dự án báo một lượt nghi tự kích và yêu cầu chỉ xem web/phân tích trước. Đã đăng nhập bằng tài khoản được cung cấp, đọc đủ phân trang hai ngày và phát lại code cũ: thiếu dòng tiếp cận tại điểm phía trước làm sinh nghi vấn dù có hoạt động cần chắn và bản tin đã qua. Không lưu dữ liệu vận hành hoặc thông tin đăng nhập vào Git.
 
 Chủ dự án yêu cầu tính thêm cần chắn đã hạ/đã nâng hoặc tàu đã qua ở điểm phía trước làm bằng chứng. Đã xác nhận chỉ xét trong lượt đang xét, bản tin đã qua vẫn cùng hướng, bằng chứng bổ sung làm gỡ riêng nghi vấn. Chủ dự án giải thích cách gọi “cần chắn hạ/nâng” bao gồm các số cần khác nhau trên web và sau đó yêu cầu sửa app. Đồng thời chốt cách làm việc: trình bày lại cách hiểu, chờ xác nhận trước khi chỉnh app trong các cuộc trao đổi yêu cầu. Chi tiết triển khai/kiểm tra tại docs/UI_REVIEW_0.16.md.
+
+## 21. Ga Nghi Long cho khu vực Chosy — 0.17
+
+Ngày 25/10/2026, chủ dự án xác nhận Km 303+350 là ga Nghi Long mới, chưa có trong danh sách website. Đã nhắc lại cách hiểu, hỏi rõ thiếu mốc hay chỉ thiếu nhãn ga; chủ dự án xác nhận web chưa cập nhật và yêu cầu thêm vào app, riêng ID Chosy. Xử lý như các ga hiện có: chèn đúng lý trình, đoạn tàu giáp ga tắt theo khôi phục đường ngang, xuất hiện khi tàu từ ga ra được đường ngang báo, ngắt đối chiếu tự kích qua ga. Không coi là đường ngang, không tạo dữ liệu vận hành ga giả hoặc thay đổi tài khoản khác.
+
+Bản 0.17 áp dụng bổ sung vào tuyến từ web sau khi hoàn thành kiểm tra phân trang và vào tuyến cache khi cài đè. Dựng lại sơ đồ theo topology mới, đánh giá lại nghi tự kích đã lưu, giữ dòng đỏ thật và các quy tắc khác. Nếu web có mốc cùng chainage thì ưu tiên website, tránh chèn trùng. ID Chosy trong cấu hình là khóa chọn ngoại lệ nghiệp vụ do chủ dự án yêu cầu, không phải tài khoản/mật khẩu đăng nhập được điền sẵn. Chi tiết kiểm tra và giới hạn tại docs/UI_REVIEW_0.17.md.

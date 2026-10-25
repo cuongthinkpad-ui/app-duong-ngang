@@ -874,6 +874,72 @@ public final class RouteStoreChecks extends Instrumentation {
               && !store.prefs.contains("selfEvidenceVersion")
               && store.events(axleDay, axleDay + 86400000).isEmpty(),
           "changing account clears axle counters and generated alerts");
+      store.credentials("https://rail.example.test/", "Chosy", "test-only");
+      check(
+          store.route().points().isEmpty(), "Chosy has no route before successful inventory read");
+      var oldChosyRoute = new Rules.Route(List.of("300+600", "305+888", "307+507"));
+      String station = "303+350 (Nghi Long)";
+      long stationNow = System.currentTimeMillis();
+      long stationAt = stationNow - 10000;
+      var stationArrival =
+          new Rules.Event("station-arrival", stationAt, "305+888", "Tàu lẻ", false, List.of());
+      var wrongInference =
+          new Rules.Event(
+              "self:station-arrival", stationAt, "305+888", "Nghi tự kích", true, List.of());
+      var stationBell =
+          new Rules.Event("station-bell", stationAt, "305+888", "Chuông 2 hỏng", true, List.of());
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(stationArrival, wrongInference, stationBell), oldChosyRoute));
+      check(
+          store.route().points().contains(station), "successful save supplements Chosy inventory");
+      check(
+          store.route().crossings().equals(oldChosyRoute.crossings()),
+          "station does not increase crossing count or monitoring choices");
+      store.updateActiveFaults(store.account(), stationAt, stationNow, stationAt, List.of());
+      // Simulate the previous APK: bare cached web inventory and a ready old-topology diagram.
+      store
+          .prefs
+          .edit()
+          .putString("route", new org.json.JSONArray(oldChosyRoute.points()).toString())
+          .putString("travelRoute", new org.json.JSONArray(oldChosyRoute.points()).toString())
+          .putInt("selfEvidenceVersion", 1)
+          .putString(
+              "pendingSelf",
+              new org.json.JSONObject(java.util.Map.of("station-arrival", stationAt)).toString())
+          .commit();
+      check(
+          store.route().points().contains(station),
+          "install-over cached inventory gains station without waiting for network");
+      check(!store.travelReady(), "old topology cannot be drawn as if it includes the station");
+      check(!store.selfEvidenceReady(), "new station requires reassessing old self-trigger cache");
+      store.prepareSelfEvidence(store.account(), stationNow);
+      store.prepareTravelState(store.account(), stationNow);
+      check(
+          store.selfEvidenceReady() && store.travelReady(),
+          "station migration completes both inference and diagram caches");
+      check(
+          store.activeFaults().size() == 1
+              && store.activeFaults().get(0).id().equals(stationBell.id()),
+          "station removes cross-station inference while preserving real website fault");
+      check(store.pendingSelf().isEmpty(), "cross-station pending inference is removed");
+      check(
+          store.events(stationAt, stationNow + 1).size() == 2,
+          "migration preserves original reports and does not create station events");
+      check(
+          Rules.trackSegments(store.route(), store.travelState())
+              .equals(List.of(new Rules.TrackSegment(station, "305+888", 1))),
+          "replayed diagram shows train leaving Nghi Long rather than crossing through station");
+      store.saveForAccount(store.account(), new WebSource.DayData(List.of(), oldChosyRoute));
+      check(
+          store.route().points().stream().filter(station::equals).count() == 1,
+          "later polls retain one station even while website omits it");
+      store.credentials("https://rail.example.test/", "unrelated-account", "test-only");
+      store.saveForAccount(store.account(), new WebSource.DayData(List.of(), oldChosyRoute));
+      check(
+          store.route().points().equals(oldChosyRoute.points()),
+          "changing ID removes Chosy-only supplement");
       result.putString("stream", checks + " account storage checks passed\n");
 
     } catch (Throwable failure) {
