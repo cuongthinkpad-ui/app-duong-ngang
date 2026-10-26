@@ -1,6 +1,9 @@
-# Đường Ngang — bản thử 0.18
+# Đường Ngang — bản thử 0.19
 
-**[Tải APK 0.18](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.18.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
+**[Tải APK 0.19](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.19.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
+
+- Sửa sơ đồ giữ đoạn cũ khi thiếu bản tin tàu: đối chiếu hoạt động cần chắn và khôi phục với tàu đang đi tới. Nếu mất cả một lượt, lượt thật kế tiếp có bằng chứng đi qua giúp đồng bộ lại đúng đoạn. Giữ các tàu khác và lỗi đỏ thiết bị/đường truyền; không tự xóa tàu theo thời gian.
+- Cài đè tự dựng lại sơ đồ đã lưu theo quy tắc mới, giữ tài khoản/cài đặt/lịch sử. Không tạo bản tin tàu giả trong dữ liệu gốc.
 
 - Nhãn ga Nghi Long rút gọn thành **Ga NL** để không che mốc cạnh bên; cài đè giữ nguyên dữ liệu và cách hoạt động.
 
@@ -28,4 +31,4 @@
 
 Có thể cài mới trực tiếp, không cần bản gốc. Nếu đã có app, cài đè bằng cùng chữ ký thử nghiệm để giữ cấu hình. Mở Cài đặt, nhập web/ID/mật khẩu rồi Lưu & theo dõi; chu kỳ 30 giây / 2 phút / 5 phút. Lượt đồng bộ đầu cần đọc hai ngày nên lâu hơn những lượt sau.
 
-Cần kiểm tra âm thanh, chạy nền và thông báo khi khóa màn hình lâu trên điện thoại thật, nhất là chế độ pin Xiaomi. Kiểm tra phát nhạc trên giả lập không chứng minh loa Xiaomi đã kêu. Bản thử không thay thế quy trình trực hiện có. Không nhúng mật khẩu thử nghiệm vào APK. [Chi tiết kiểm tra](../docs/UI_REVIEW_0.18.md).
+Cần kiểm tra âm thanh, chạy nền và thông báo khi khóa màn hình lâu trên điện thoại thật, nhất là chế độ pin Xiaomi. Kiểm tra phát nhạc trên giả lập không chứng minh loa Xiaomi đã kêu. Bản thử không thay thế quy trình trực hiện có. Không nhúng mật khẩu thử nghiệm vào APK. [Chi tiết kiểm tra](../docs/UI_REVIEW_0.19.md).

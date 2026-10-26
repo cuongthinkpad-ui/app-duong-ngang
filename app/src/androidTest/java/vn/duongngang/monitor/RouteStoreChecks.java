@@ -940,6 +940,175 @@ public final class RouteStoreChecks extends Instrumentation {
       check(
           store.route().points().equals(oldChosyRoute.points()),
           "changing ID removes Chosy-only supplement");
+      store.credentials("https://rail.example.test/", "diagram-sparse", "test-only");
+      var sparseRoute =
+          new Rules.Route(List.of("199+000 (A)", "200+000", "201+000", "202+000 (B)"));
+      long replayNow = System.currentTimeMillis();
+      long replayBoundary =
+          java.time.Instant.ofEpochMilli(replayNow)
+              .atZone(WebSource.ZONE)
+              .toLocalDate()
+              .minusDays(1)
+              .atStartOfDay(WebSource.ZONE)
+              .toInstant()
+              .toEpochMilli();
+      long originAt = replayBoundary - 60000;
+      var originalArrival =
+          new Rules.Event("sparse-origin", originAt, "200+000", "Tàu lẻ", false, List.of());
+      var originalConnection =
+          new Rules.Event(
+              "sparse-network",
+              replayNow - 1000,
+              "201+000",
+              "Mất kết nối giám sát",
+              true,
+              List.of());
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  originalArrival,
+                  new Rules.Event(
+                      "sparse-pass",
+                      originAt + 10000,
+                      "200+000",
+                      "Tàu lẻ đã qua đường ngang",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "sparse-source-reset",
+                      originAt + 20000,
+                      "200+000",
+                      "Khôi phục hệ thống",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "sparse-motion",
+                      replayBoundary - 10000,
+                      "201+000",
+                      "Cần chắn 1 đã hạ",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "sparse-destination-reset",
+                      replayBoundary + 10000,
+                      "201+000",
+                      "Khôi phục hệ thống",
+                      false,
+                      List.of()),
+                  originalConnection),
+              sparseRoute));
+      store.updateActiveFaults(store.account(), originAt, replayNow, 0, List.of());
+      String preservedConnection = store.prefs.getString("activeFaults", "[]");
+      int sparseRawCount = store.events(0, replayNow + 1).size();
+      var obsolete =
+          new org.json.JSONArray()
+              .put(
+                  new org.json.JSONArray()
+                      .put(originalArrival.id())
+                      .put("200+000")
+                      .put("201+000")
+                      .put(1)
+                      .put(originAt)
+                      .put(true)
+                      .put(true)
+                      .put(false)
+                      .put(org.json.JSONObject.NULL)
+                      .put(originAt + 20000)
+                      .put(false))
+              .toString();
+      store
+          .prefs
+          .edit()
+          .putInt("travelVersion", 3)
+          .putString("travelCheckpoint", obsolete)
+          .putString("travelState", obsolete)
+          .putLong("travelCheckpointAt", replayBoundary)
+          .commit();
+      check(
+          !store.travelReady(), "version-three diagram is withheld during sparse-visit migration");
+      store.prepareTravelState(store.account(), replayNow);
+      check(
+          store.travelReady()
+              && store.prefs.getInt("travelVersion", 0) == 4
+              && Rules.trackSegments(store.route(), store.travelState()).isEmpty(),
+          "upgrade replays source and motion before checkpoint and restoration after checkpoint");
+      check(
+          store.prefs.getString("travelCheckpoint", "").contains("travel:motion:"),
+          "motion-derived visit persists at checkpoint when restoration belongs to later replay"
+              + " window");
+      check(
+          Rules.trackSegments(store.route(), new Store(context).travelState()).isEmpty(),
+          "restarting after sparse migration cannot resurrect the old interval");
+      check(
+          store.events(0, replayNow + 1).size() == sparseRawCount
+              && store.prefs.getString("activeFaults", "[]").equals(preservedConnection),
+          "diagram migration preserves every raw report and original network fault");
+      long lostAt = replayNow - 600000, nextAt = replayNow - 300000;
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event("lost-start", lostAt, "200+000", "Tàu lẻ", false, List.of()),
+                  new Rules.Event(
+                      "lost-pass",
+                      lostAt + 1000,
+                      "200+000",
+                      "Tàu lẻ đã qua đường ngang",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "lost-reset",
+                      lostAt + 2000,
+                      "200+000",
+                      "Khôi phục hệ thống",
+                      false,
+                      List.of()),
+                  new Rules.Event("next-start", nextAt, "200+000", "Tàu lẻ", false, List.of()),
+                  new Rules.Event(
+                      "next-destination", nextAt + 1000, "201+000", "Tàu lẻ", false, List.of()),
+                  new Rules.Event(
+                      "next-pass",
+                      nextAt + 2000,
+                      "200+000",
+                      "Tàu lẻ đã qua đường ngang",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "next-destination-pass",
+                      nextAt + 3000,
+                      "201+000",
+                      "Tàu lẻ đã qua đường ngang",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "next-reset",
+                      nextAt + 4000,
+                      "200+000",
+                      "Khôi phục hệ thống",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "next-destination-reset",
+                      nextAt + 5000,
+                      "201+000",
+                      "Khôi phục hệ thống",
+                      false,
+                      List.of())),
+              sparseRoute));
+      store.updateActiveFaults(store.account(), lostAt, replayNow, 0, List.of());
+      check(
+          Rules.trackSegments(store.route(), new Store(context).travelState()).isEmpty(),
+          "next complete train heals a wholly missing destination visit and persists across"
+              + " restart");
+      check(
+          store.activeFaults().size() == 1
+              && store.activeFaults().get(0).id().equals(originalConnection.id()),
+          "new-train diagram recovery never pretends that network hardware has recovered");
+      check(
+          store.password().equals("test-only")
+              && store.prefs.getString("user", "").equals("diagram-sparse"),
+          "cache migration and replay preserve credentials");
       result.putString("stream", checks + " account storage checks passed\n");
 
     } catch (Throwable failure) {

@@ -185,3 +185,11 @@ Bản 0.17 áp dụng bổ sung vào tuyến từ web sau khi hoàn thành kiể
 ## 22. Rút gọn nhãn Nghi Long thành NL — 0.18
 
 Chủ dự án xác nhận vị trí ga đúng nhưng tên dài che mốc bên cạnh, yêu cầu ghi tắt NL. Bản 0.18 chỉ đổi nhãn hiển thị thành Ga NL trên sơ đồ và khi chạm vào ga; giữ khóa tuyến/cache Nghi Long và toàn bộ quy tắc hiện có. Yêu cầu này đã có chỉ thị sửa rõ, không cần hỏi lại. Kiểm tra tại docs/UI_REVIEW_0.18.md.
+
+## 23. Thiếu lượt tàu gây treo sơ đồ và đồng bộ lại theo lượt sau — 0.19
+
+Ngày 26/10/2026, chủ dự án gửi ảnh đoạn 320+957–320+445 giữ sáng và yêu cầu xem web, tìm nguyên nhân, trao đổi phương án trước khi sửa. Đã đọc đủ hai ngày báo cáo thật và tái hiện: một lượt thiếu tiếp cận/đã qua tại điểm sau dù có cần chắn và khôi phục; hàng chờ cũ sau đó lấy mất bản tin của lượt mới. Dữ liệu vận hành chỉ giữ riêng ngoài Git, không đưa vào ví dụ công khai.
+
+Chủ dự án bổ sung trường hợp lỗi thiết bị/đường truyền làm mất cả lượt: lượt thật kế tiếp có bằng chứng đi qua phải giúp sơ đồ tự đồng bộ lại, không treo cả buổi. Đã diễn đạt lại và nhận xác nhận, sau đó tổng hợp bốn phần và được trả lời OK triển khai: dùng hoạt động/khôi phục phù hợp khi thiếu bản tin tàu; ghép đúng lượt cũ/mới; hồi phục sau một lượt thiếu hoàn toàn nhờ lượt kế tiếp; dựng lại cache cũ khi cài đè. Giữ tàu đang giữa hai điểm không hết hạn theo giờ, giữ tàu khác và các lỗi đỏ thật tới khôi phục đúng thiết bị.
+
+Bản 0.19 dùng lượt nội bộ từ cần chắn khi có tàu đi tới từ đúng điểm kế cận, không tạo raw giả hoặc tự tạo tàu từ thao tác bảo dưỡng. Khi có bản tin tiếp cận rõ ràng trong lượt đó thì chuyển sang ID bản tin gốc, không tạo tàu thứ hai. Bằng chứng đã qua/khôi phục xác nhận mới đồng bộ các dấu cũ cùng đoạn/hướng, giữ các lượt phía sau. Nâng `travelVersion=4`; giữ cache tự kích/trục, giao diện và chữ ký. Kiểm chứng tại docs/UI_REVIEW_0.19.md.

@@ -1,4 +1,4 @@
-# Đường Ngang — Android 0.18
+# Đường Ngang — Android 0.19
 
 **Đổi phiên/tài khoản ChatGPT:** đọc [Bản bàn giao và cách tiếp tục](docs/BAN_GIAO.md) và [Nhật ký trao đổi, yêu cầu đã chốt](docs/LICH_SU_TRAO_DOI.md). [Sao lưu khóa ký APK](docs/SAO_LUU_KHOA_KY.md).
 
@@ -6,7 +6,14 @@
 
 Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt navy, xanh cyan và xanh lá. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
 
-## Thay đổi 0.18
+## Thay đổi 0.19
+
+- Sửa đoạn tàu treo khi điểm tiếp theo thiếu bản tin tàu tiếp cận/đã qua: nhận hoạt động cần chắn hạ/nâng thành lượt nội bộ chỉ khi có tàu đang đi tới từ đường ngang kế cận, cùng hướng và không qua ga. Khôi phục của lượt đó chuyển/khép đúng đoạn sáng. Thao tác cần chắn riêng lẻ không tạo tàu; không sửa bản tin web gốc.
+- Khi mất cả dữ liệu một lượt, lượt sau có bằng chứng đi qua hoặc khôi phục phù hợp sẽ đồng bộ lại các dấu vết cũ trên đúng đoạn/hướng. Bản tin tiếp cận đơn lẻ không gỡ cả hàng chờ; giữ tàu nối tiếp bắt đầu sau lượt đang xét, các tàu ở đoạn khác và trạng thái lỗi phần cứng thật.
+- Cache sơ đồ phiên bản 4 dựng lại từ dữ liệu đã lưu khi cài đè, gồm chuyển checkpoint có hoạt động cần chắn sang phần phát lại ngày sau. Giữ tài khoản, phạm vi, lịch sử, khóa ký; không dùng thời gian chờ để tự xóa tàu giữa hai đường ngang.
+- Giữ giao diện, nhãn Ga NL và các quy tắc tự kích/trục/chuông hiện có. [Kiểm tra bản 0.19](docs/UI_REVIEW_0.19.md).
+
+## Thay đổi 0.18 (lịch sử)
 
 - Rút gọn nhãn ga Nghi Long tại Km 303+350 thành **Ga NL** trên sơ đồ và khi chạm vào ga, tránh che các mốc đường ngang cạnh bên. Giữ nguyên khóa tuyến/cache, tài khoản áp dụng và mọi quy tắc tàu/cảnh báo của 0.17. [Kiểm tra bản 0.18](docs/UI_REVIEW_0.18.md).
 

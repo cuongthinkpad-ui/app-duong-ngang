@@ -11,7 +11,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import org.json.*;
 
 public final class Store {
-  private static final int TRAVEL_VERSION = 3;
+  private static final int TRAVEL_VERSION = 4;
   private static final int AXLE_VERSION = 3;
   private static final int SELF_EVIDENCE_VERSION = 2;
   private final Context context;

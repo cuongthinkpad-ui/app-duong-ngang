@@ -1602,6 +1602,323 @@ public class RulesTest {
           direction,
           "station exit appears at adjacent crossing report: " + direction);
     }
+    missingDiagramVisits();
     System.out.println(scenarios + " domain scenarios passed");
+  }
+
+  static void missingDiagramVisits() {
+    var route = new Rules.Route(List.of("99+000 (A)", "100+000", "101+000", "102+000 (B)"));
+    for (int d : List.of(1, -1)) {
+      String source = d == 1 ? "100+000" : "101+000";
+      String target = d == 1 ? "101+000" : "100+000";
+      String text = d == 1 ? "Tàu lẻ" : "Tàu chẵn";
+      var sparse =
+          List.of(
+              event(1000, source, text, false),
+              event(2000, target, "Cần chắn 2 đã hạ", false),
+              event(2000, target, "Cần chắn 1 đã hạ", false),
+              event(2100, source, text + " đã qua đường ngang", false),
+              event(3000, source, "Khôi phục hệ thống", false),
+              event(4000, target, "Khôi phục hệ thống", false),
+              event(5000, target, "Khôi phục hệ thống", false));
+      check(
+          Rules.trackSegments(route, Rules.travelState(route, Rules.TravelState.empty(), sparse))
+              .isEmpty(),
+          "barrier activity and restore close missing destination train messages: " + d);
+      var history = new ArrayList<>(sparse);
+      history.addAll(
+          List.of(
+              event(10000, source, text, false),
+              event(11000, target, text, false),
+              event(12000, source, text + " đã qua đường ngang", false),
+              event(13000, target, text + " đã qua đường ngang", false),
+              event(14000, source, "Khôi phục hệ thống", false),
+              event(15000, target, "Khôi phục hệ thống", false)));
+      var state = Rules.travelState(route, Rules.TravelState.empty(), history);
+      check(
+          Rules.trackSegments(route, state).isEmpty(),
+          "old missing visit cannot steal next train's arrival: " + d);
+      var lost =
+          List.of(
+              event(1000, source, text, false),
+              event(2000, source, text + " đã qua đường ngang", false),
+              event(3000, source, "Khôi phục hệ thống", false),
+              event(10000, source, text, false),
+              event(11000, target, text, false),
+              event(12000, source, text + " đã qua đường ngang", false),
+              event(13000, target, text + " đã qua đường ngang", false));
+      var afterPass = Rules.travelState(route, Rules.TravelState.empty(), lost);
+      oneSegment(
+          route,
+          afterPass,
+          target,
+          d == 1 ? "102+000 (B)" : "99+000 (A)",
+          d,
+          "next confirmed passage heals an entirely missing destination visit: " + d);
+      afterPass =
+          Rules.travelState(
+              route, afterPass, List.of(event(14000, target, "Khôi phục hệ thống", false)));
+      check(
+          Rules.trackSegments(route, afterPass).isEmpty(),
+          "restored next train leaves no old interval: " + d);
+      var noProof = Rules.travelState(route, Rules.TravelState.empty(), lost.subList(0, 3));
+      oneSegment(
+          route,
+          Rules.travelState(route, noProof, List.of()),
+          source,
+          target,
+          d,
+          "missing downstream data never expires train by a timer: " + d);
+      oneSegment(
+          route,
+          Rules.travelState(
+              route, noProof, List.of(event(5000, target, "Khôi phục hệ thống", false))),
+          source,
+          target,
+          d,
+          "unrelated bare restore is not enough to invent a downstream visit: " + d);
+      var byPoll = Rules.TravelState.empty();
+      for (var e : history) byPoll = Rules.travelState(route, byPoll, List.of(e));
+      check(
+          Rules.trackSegments(route, byPoll).isEmpty(),
+          "sparse visit and next train converge across individual poll boundaries: " + d);
+      var shuffled = new ArrayList<>(history);
+      Collections.reverse(shuffled);
+      check(
+          Rules.trackSegments(route, Rules.travelState(route, Rules.TravelState.empty(), shuffled))
+              .isEmpty(),
+          "backfilled/shuffled sparse history converges without ghosts: " + d);
+      var promoted =
+          Rules.travelState(
+              route,
+              Rules.TravelState.empty(),
+              List.of(
+                  event(1000, source, text, false),
+                  event(1500, target, "Cần chắn 12 đã hạ", false),
+                  event(2000, target, text, false),
+                  event(2100, source, text + " đã qua đường ngang", false),
+                  event(3000, source, "Khôi phục hệ thống", false),
+                  event(4000, target, text + " đã qua đường ngang", false),
+                  event(5000, target, "Khôi phục hệ thống", false)));
+      check(
+          Rules.trackSegments(route, promoted).isEmpty(),
+          "explicit approach promotes its prior movement without duplicating a train: " + d);
+      check(
+          promoted.journeys().stream().noneMatch(j -> j.id().startsWith("travel:motion:")),
+          "promoted movement identity is replaced by original approach identity: " + d);
+      for (String invalid :
+          List.of(
+              "Cần chắn 1 không hạ", "Cần chắn 1 mất trạng thái", "Cần chắn 1 đã nâng không hết"))
+        oneSegment(
+            route,
+            Rules.travelState(
+                route,
+                noProof,
+                List.of(
+                    event(4000, target, invalid, false),
+                    event(5000, target, "Khôi phục hệ thống", false))),
+            source,
+            target,
+            d,
+            "failed or incomplete movement cannot close a pending train: " + invalid + ":" + d);
+      oneSegment(
+          route,
+          Rules.travelState(
+              route,
+              noProof,
+              List.of(
+                  event(4000, target, "Cần chắn 1 đã hạ", true),
+                  event(5000, target, "Khôi phục hệ thống", false))),
+          source,
+          target,
+          d,
+          "red motion row is not successful destination evidence: " + d);
+      var afterApproach = Rules.travelState(route, Rules.TravelState.empty(), lost.subList(0, 5));
+      check(
+          Rules.trackSegments(route, afterApproach)
+              .contains(new Rules.TrackSegment(source, target, d)),
+          "new approach alone does not clear a missing old interval: " + d);
+      var beforeNextRestore = new ArrayList<>(lost);
+      beforeNextRestore.remove(beforeNextRestore.size() - 1);
+      beforeNextRestore.add(event(13000, target, "Khôi phục hệ thống", false));
+      check(
+          Rules.trackSegments(
+                  route, Rules.travelState(route, Rules.TravelState.empty(), beforeNextRestore))
+              .isEmpty(),
+          "explicit new approach and completed restoration also heal missing old visit: " + d);
+      var passageOnly = new ArrayList<>(lost);
+      passageOnly.removeIf(e -> e.at() == 11000);
+      var passageOnlyState = Rules.travelState(route, Rules.TravelState.empty(), passageOnly);
+      oneSegment(
+          route,
+          passageOnlyState,
+          target,
+          d == 1 ? "102+000 (B)" : "99+000 (A)",
+          d,
+          "next passage without approach can recover an entirely missing visit: " + d);
+      check(
+          Rules.trackSegments(
+                  route,
+                  Rules.travelState(
+                      route,
+                      passageOnlyState,
+                      List.of(event(15000, target, "Khôi phục hệ thống", false))))
+              .isEmpty(),
+          "next passage-only train closes correctly at station boundary: " + d);
+    }
+    check(
+        Rules.trackSegments(
+                route,
+                Rules.travelState(
+                    route,
+                    Rules.TravelState.empty(),
+                    List.of(
+                        event(1000, "100+000", "Cần chắn 1 đã hạ", false),
+                        event(2000, "100+000", "Cần chắn 1 đã nâng", false),
+                        event(3000, "100+000", "Khôi phục hệ thống", false))))
+            .isEmpty(),
+        "isolated maintenance barrier cycle never creates a train");
+    var line = new Rules.Route(List.of("100+000", "101+000", "102+000", "103+000"));
+    var following =
+        List.of(
+            event(1000, "100+000", "Tàu lẻ", false),
+            event(2000, "101+000", "Tàu lẻ", false),
+            event(3000, "100+000", "Tàu lẻ đã qua đường ngang", false),
+            event(4000, "100+000", "Khôi phục hệ thống", false),
+            event(5000, "100+000", "Tàu lẻ", false),
+            event(6000, "100+000", "Tàu lẻ đã qua đường ngang", false),
+            event(7000, "101+000", "Tàu lẻ đã qua đường ngang", false));
+    check(
+        Rules.trackSegments(line, Rules.travelState(line, Rules.TravelState.empty(), following))
+                .size()
+            == 2,
+        "confirmed passage preserves following train that started after current destination"
+            + " arrival");
+    var ambiguous =
+        Rules.travelState(
+            line,
+            Rules.TravelState.empty(),
+            List.of(
+                event(1000, "100+000", "Tàu lẻ", false),
+                event(1100, "100+000", "Tàu lẻ đã qua đường ngang", false),
+                event(1200, "102+000", "Tàu chẵn", false),
+                event(1300, "102+000", "Tàu chẵn đã qua đường ngang", false),
+                event(2000, "101+000", "Cần chắn 1 đã hạ", false),
+                event(3000, "101+000", "Khôi phục hệ thống", false)));
+    check(
+        ambiguous.journeys().stream().noneMatch(j -> j.id().startsWith("travel:motion:")),
+        "opposite incoming directions are ambiguous and do not guess movement direction");
+    var middle =
+        Rules.travelState(
+            line,
+            Rules.TravelState.empty(),
+            List.of(
+                event(1000, "100+000", "Tàu lẻ", false),
+                event(1100, "100+000", "Tàu lẻ đã qua đường ngang", false),
+                event(1200, "100+000", "Khôi phục hệ thống", false),
+                event(2000, "101+000", "Cần chắn 1 đã nâng", false),
+                event(3000, "101+000", "Khôi phục hệ thống", false)));
+    oneSegment(
+        line,
+        middle,
+        "101+000",
+        "102+000",
+        1,
+        "motion and restore switch a middle crossing interval instead of deleting the train");
+    var independent =
+        Rules.travelState(line, middle, List.of(event(4000, "103+000", "Tàu chẵn", false)));
+    check(
+        Rules.trackSegments(line, independent).size() == 2,
+        "sparse recovery preserves independent train in another section");
+    var future =
+        Rules.travelState(
+            line, Rules.TravelState.empty(), List.of(event(10000, "101+000", "Tàu lẻ", false)));
+    oneSegment(
+        line,
+        Rules.travelState(
+            line, future, List.of(event(1000, "101+000", "Khôi phục hệ thống", false))),
+        "100+000",
+        "101+000",
+        1,
+        "older restoration cannot release a newer visit in an incremental replay");
+    var missingSourcePhases =
+        List.of(
+            event(1000, "100+000", "Tàu lẻ", false),
+            event(2000, "100+000", "Tàu lẻ đã qua đường ngang", false),
+            event(3000, "100+000", "Khôi phục hệ thống", false),
+            event(10000, "100+000", "Tàu lẻ", false),
+            event(11000, "101+000", "Tàu lẻ", false),
+            event(12000, "101+000", "Tàu lẻ đã qua đường ngang", false));
+    oneSegment(
+        line,
+        Rules.travelState(line, Rules.TravelState.empty(), missingSourcePhases),
+        "101+000",
+        "102+000",
+        1,
+        "confirmed destination passage heals old visit even when new source passage and restore are"
+            + " absent");
+    var missingRestore =
+        List.of(
+            event(1000, "100+000", "Tàu lẻ", false),
+            event(1100, "101+000", "Tàu lẻ", false),
+            event(1200, "100+000", "Tàu lẻ đã qua đường ngang", false),
+            event(1300, "101+000", "Tàu lẻ đã qua đường ngang", false),
+            event(1400, "100+000", "Khôi phục hệ thống", false),
+            event(10000, "100+000", "Tàu lẻ", false),
+            event(11000, "100+000", "Tàu lẻ đã qua đường ngang", false),
+            event(12000, "101+000", "Tàu lẻ đã qua đường ngang", false));
+    check(
+        Rules.travelState(line, Rules.TravelState.empty(), missingRestore).journeys().stream()
+                .filter(j -> j.from().equals("100+000") && !j.reached())
+                .count()
+            == 0,
+        "missing prior destination restore does not attach next passage to a completed old"
+            + " traversal");
+    var lateApproach =
+        List.of(
+            event(1000, "100+000", "Tàu lẻ", false),
+            event(2000, "101+000", "Cần chắn 1 đã hạ", false),
+            event(2100, "100+000", "Tàu lẻ đã qua đường ngang", false),
+            event(2500, "102+000", "Tàu lẻ", false));
+    var beforeLateApproach = Rules.travelState(line, Rules.TravelState.empty(), lateApproach);
+    oneSegment(
+        line,
+        Rules.travelState(
+            line, beforeLateApproach, List.of(event(2200, "101+000", "Tàu lẻ", false))),
+        "101+000",
+        "102+000",
+        1,
+        "late explicit approach preserves a movement visit already owned by the next crossing");
+    var lateAfterPass =
+        List.of(
+            event(1000, "100+000", "Tàu lẻ", false),
+            event(2000, "101+000", "Cần chắn 1 đã hạ", false),
+            event(2100, "100+000", "Tàu lẻ đã qua đường ngang", false),
+            event(2500, "101+000", "Tàu lẻ đã qua đường ngang", false));
+    oneSegment(
+        line,
+        Rules.travelState(
+            line,
+            Rules.travelState(line, Rules.TravelState.empty(), lateAfterPass),
+            List.of(event(2200, "101+000", "Tàu lẻ", false))),
+        "101+000",
+        "102+000",
+        1,
+        "late approach preserves confirmed passage instead of lighting incoming interval again");
+    var newApproach = event(3000, "101+000", "Tàu lẻ", false);
+    check(
+        Rules.travelState(line, beforeLateApproach, List.of(newApproach)).journeys().stream()
+            .anyMatch(j -> j.id().equals(newApproach.id()) && !j.reached()),
+        "an approach timestamped after the previous traversal is a new visit rather than a hidden"
+            + " old one");
+    var completeLateHistory = new ArrayList<>(lateApproach);
+    completeLateHistory.add(event(2200, "101+000", "Tàu lẻ", false));
+    oneSegment(
+        line,
+        Rules.travelState(line, Rules.TravelState.empty(), completeLateHistory),
+        "101+000",
+        "102+000",
+        1,
+        "incremental late approach agrees with chronological archive replay");
   }
 }

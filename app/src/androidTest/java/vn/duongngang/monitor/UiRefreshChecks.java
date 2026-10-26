@@ -780,6 +780,162 @@ final class UiRefreshChecks {
                     && !visible.contains("Nghi Long"),
                 "station is not listed as a monitored road crossing");
           });
+      store.credentials("https://rail.example.test/", "diagram-ui", "test-only");
+      var sparseRoute =
+          new Rules.Route(List.of("199+000 (A)", "200+000", "201+000", "202+000 (B)"));
+      long sparseNow = System.currentTimeMillis();
+      var network =
+          new Rules.Event(
+              "ui-sparse-network",
+              sparseNow - 15000,
+              "201+000",
+              "Mất kết nối giám sát",
+              true,
+              List.of());
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "ui-sparse-start", sparseNow - 60000, "200+000", "Tàu lẻ", false, List.of()),
+                  new Rules.Event(
+                      "ui-sparse-pass",
+                      sparseNow - 50000,
+                      "200+000",
+                      "Tàu lẻ đã qua đường ngang",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "ui-sparse-reset",
+                      sparseNow - 40000,
+                      "200+000",
+                      "Khôi phục hệ thống",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "ui-sparse-motion",
+                      sparseNow - 30000,
+                      "201+000",
+                      "Cần chắn 1 đã hạ",
+                      false,
+                      List.of()),
+                  network),
+              sparseRoute));
+      store.updateActiveFaults(store.account(), sparseNow - 60000, sparseNow, 0, List.of());
+      store
+          .prefs
+          .edit()
+          .putLong("lastSuccess", sparseNow)
+          .putString("status", "Đã cập nhật")
+          .commit();
+      ui(
+          () -> {
+            navigate("overview");
+            check(
+                ((List<?>) field(field(activity, "routeView"), "segments"))
+                    .equals(List.of(new Rules.TrackSegment("200+000", "201+000", 1))),
+                "sparse destination movement retains one incoming interval until restoration");
+          });
+      Object sparseRoot = field(activity, "screen"), sparseCanvas = field(activity, "routeView");
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "ui-sparse-end",
+                      sparseNow - 10000,
+                      "201+000",
+                      "Khôi phục hệ thống",
+                      false,
+                      List.of())),
+              sparseRoute));
+      store.updateActiveFaults(store.account(), sparseNow - 10000, sparseNow, 0, List.of());
+      store.prefs.edit().putLong("lastSuccess", sparseNow + 1).commit();
+      ui(
+          () -> {
+            ((Runnable) field(activity, "refresh")).run();
+            check(
+                field(activity, "screen") == sparseRoot
+                    && field(activity, "routeView") == sparseCanvas
+                    && ((List<?>) field(sparseCanvas, "segments")).isEmpty(),
+                "sparse restoration clears diagram within existing root and canvas");
+            check(
+                labels((View) sparseRoot).contains("Mất kết nối giám sát"),
+                "clearing old train interval keeps actual network fault visible");
+          });
+      UiPreview.shot(runner, activity, "diagram-sparse-cleared-0.19.png");
+      long nextStart = sparseNow - 9000;
+      store.saveForAccount(
+          store.account(),
+          new WebSource.DayData(
+              List.of(
+                  new Rules.Event(
+                      "ui-lost-start", nextStart, "200+000", "Tàu lẻ", false, List.of()),
+                  new Rules.Event(
+                      "ui-lost-pass",
+                      nextStart + 1000,
+                      "200+000",
+                      "Tàu lẻ đã qua đường ngang",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "ui-lost-reset",
+                      nextStart + 2000,
+                      "200+000",
+                      "Khôi phục hệ thống",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "ui-next-start", nextStart + 3000, "200+000", "Tàu lẻ", false, List.of()),
+                  new Rules.Event(
+                      "ui-next-destination",
+                      nextStart + 4000,
+                      "201+000",
+                      "Tàu lẻ",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "ui-next-pass",
+                      nextStart + 5000,
+                      "200+000",
+                      "Tàu lẻ đã qua đường ngang",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "ui-next-destination-pass",
+                      nextStart + 6000,
+                      "201+000",
+                      "Tàu lẻ đã qua đường ngang",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "ui-next-reset",
+                      nextStart + 7000,
+                      "200+000",
+                      "Khôi phục hệ thống",
+                      false,
+                      List.of()),
+                  new Rules.Event(
+                      "ui-next-destination-reset",
+                      nextStart + 8000,
+                      "201+000",
+                      "Khôi phục hệ thống",
+                      false,
+                      List.of())),
+              sparseRoute));
+      store.updateActiveFaults(
+          store.account(), nextStart, System.currentTimeMillis(), 0, List.of());
+      store.prefs.edit().putLong("lastSuccess", sparseNow + 2).commit();
+      ui(
+          () -> {
+            ((Runnable) field(activity, "refresh")).run();
+            check(
+                field(activity, "screen") == sparseRoot
+                    && ((List<?>) field(sparseCanvas, "segments")).isEmpty()
+                    && labels((View) sparseRoot).contains("Mất kết nối giám sát"),
+                "next confirmed train heals wholly missing visit without clearing hardware or"
+                    + " replacing window");
+          });
       return checks;
     } finally {
       ui(() -> activity.finish());

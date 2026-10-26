@@ -4,7 +4,7 @@
 Preserves/restores the emulator app's data and proxy. Never contacts the company web,
 never prints credentials. Build/install the debug APK and start an emulator first.
 """
-import json, os, pathlib, re, subprocess, tempfile, threading, time
+import json, os, pathlib, re, subprocess, sys, tempfile, threading, time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -56,6 +56,7 @@ AXLE_EXEMPT_POINTS = ('280+500', '307+507', '309+056', '320+445', '338+900', '34
 phase = {'value': 0, 'at': int(time.time()), 'manual': False, 'pre_restore': False,
          'supplement': False, 'repeat_barrier': False, 'axles': 0, 'axle_other': False, 'axle_large': False, 'axle_exact': False, 'bell_recovered': False,
          'axle_at': int(time.time()), 'exempt_at': int(time.time())-30}
+phase.update(diagram=0, diagram_at=0, diagram_lost_at=0)
 
 class Fixture(BaseHTTPRequestHandler):
     def log_message(self, *args):
@@ -72,7 +73,8 @@ class Fixture(BaseHTTPRequestHandler):
         # The emulator uses Asia/Ho_Chi_Minh timestamps, independent of the host timezone.
         now = datetime.fromtimestamp(time.time(), timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
         point_options = "<select name='route'><option value='all' selected>-- Tất cả --</option>" + ''.join(
-            '<option>Km '+point+'</option>' for point in ('100+000', '101+000')+AXLE_EXEMPT_POINTS) + '</select>'
+            '<option>Km '+point+'</option>' for point in ('100+000', '101+000')+AXLE_EXEMPT_POINTS+
+            ('399+000 (D0)', '400+000', '401+000', '402+000 (D1)')) + '</select>'
         rows = []
         current = dict(phase)
         if selected == now.date():
@@ -110,6 +112,26 @@ class Fixture(BaseHTTPRequestHandler):
                 rows.append(('100+000','Khôi phục hệ thống',ta+timedelta(seconds=30),False,[40,40,28,40,40,40]))
             if current['axle_exact']:
                 rows.append(('100+000','Khôi phục hệ thống',ta+timedelta(seconds=40),False,[40,40,30,40,40,40]))
+        if selected == now.date() and current['diagram']:
+            td = datetime.fromtimestamp(current['diagram_at'], timezone.utc).replace(tzinfo=None)+timedelta(hours=7)
+            rows += [('400+000', 'Tàu lẻ', td, False),
+                     ('400+000', 'Tàu lẻ đã qua đường ngang', td+timedelta(seconds=1), False),
+                     ('400+000', 'Khôi phục hệ thống', td+timedelta(seconds=2), False),
+                     ('401+000', 'Cần chắn 1 đã hạ', td+timedelta(seconds=3), False),
+                     ('401+000', 'Khôi phục hệ thống', td+timedelta(seconds=4), False),
+                     ('401+000', 'Mất kết nối giám sát', td, True)]
+            if current['diagram'] >= 2:
+                tl = datetime.fromtimestamp(current['diagram_lost_at'], timezone.utc).replace(tzinfo=None)+timedelta(hours=7)
+                rows += [('400+000', 'Tàu lẻ', tl, False),
+                         ('400+000', 'Tàu lẻ đã qua đường ngang', tl+timedelta(seconds=1), False),
+                         ('400+000', 'Khôi phục hệ thống', tl+timedelta(seconds=2), False)]
+                if current['diagram'] >= 3:
+                    rows += [('400+000', 'Tàu lẻ', tl+timedelta(seconds=10), False),
+                             ('401+000', 'Tàu lẻ', tl+timedelta(seconds=11), False),
+                             ('400+000', 'Tàu lẻ đã qua đường ngang', tl+timedelta(seconds=12), False),
+                             ('401+000', 'Tàu lẻ đã qua đường ngang', tl+timedelta(seconds=13), False),
+                             ('400+000', 'Khôi phục hệ thống', tl+timedelta(seconds=14), False),
+                             ('401+000', 'Khôi phục hệ thống', tl+timedelta(seconds=15), False)]
         table = "<table id='FixtureGdata'>"
         for entry in reversed(rows):
             point, text, at, red = entry[:4]
@@ -122,6 +144,26 @@ class Fixture(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+
+def run_diagram_checks():
+    def diagram_visits(state):
+        return [row for row in json.loads(state.get('travelState','[]')) if row[1] in ('400+000','401+000')]
+    phase.update(diagram=1, diagram_at=int(time.time())-10)
+    sparse = wait_for(lambda s: diagram_visits(s) and all(row[7] for row in diagram_visits(s))
+                      and any(row[0].startswith('travel:motion:') for row in diagram_visits(s))
+                      and any(row[2].removeprefix('Km ').strip()=='401+000' and row[3]=='Mất kết nối giám sát' for row in faults(s)),
+                      'sparse barrier and restoration clear diagram while keeping actual network fault')
+    diagram_alarm = int(sparse.get('lastAlarm','0'))
+    phase.update(diagram=2, diagram_lost_at=int(time.time())-10)
+    wait_for(lambda s: any(not row[7] and row[1]=='400+000' for row in diagram_visits(s)),
+             'wholly missing destination remains visible until another confirmed train')
+    phase['diagram'] = 3
+    recovered = wait_for(lambda s: diagram_visits(s) and all(row[7] for row in diagram_visits(s))
+                         and any(row[2].removeprefix('Km ').strip()=='401+000' and row[3]=='Mất kết nối giám sát' for row in faults(s)),
+                         'next complete train heals lost visit and retains original network fault')
+    assert int(recovered.get('lastAlarm','0')) == diagram_alarm, 'Diagram resync alone must not sound again'
+    print('PASS: diagram recovery does not replay hardware alarm',flush=True)
 
 
 def main():
@@ -166,6 +208,10 @@ def main():
             assert int(empty.get('lastAlarm', '0')) == 0, 'Empty snapshot must not sound'
             assert not faults(empty), 'Exempt axle reports must not create faults'
             print('PASS: six qualifying errors and one large deviation at all six exempt points remain silent', flush=True)
+            if '--diagram-only' in sys.argv:
+                run_diagram_checks()
+                print('4 diagram monitoring checks passed', flush=True)
+                return
             phase.update(value=1, at=int(time.time())-3)
             wait_for(lambda s: any(row[3]=='Chuông 2 hỏng' for row in faults(s)) and int(s.get('lastAlarm','0'))>0, 'original red bell message becomes active with app-owned audible playback')
             wait_for(lambda s: any(row[3]=='Nghi tự kích' for row in faults(s)), 'self-trigger confirmed after elapsed grace')
@@ -175,7 +221,8 @@ def main():
             before_proof_alarm = int(metadata().get('lastAlarm', '0'))
             phase['supplement'] = True
             proved = wait_for(lambda s: not any(row[3]=='Nghi tự kích' for row in faults(s))
-                             and any(row[3]=='Chuông 2 hỏng' for row in faults(s)),
+                             and any(row[3]=='Chuông 2 hỏng' for row in faults(s))
+                             and not any(row[10] for row in json.loads(s.get('travelState','[]'))),
                              'late same-direction upstream passage removes inference while retaining original bell fault')
             assert int(proved.get('lastAlarm','0')) == before_proof_alarm, 'Evidence correction must not sound a new fault'
             assert not any(row[10] for row in json.loads(proved.get('travelState','[]'))), 'Disproved self classification must leave the diagram replay'
@@ -291,7 +338,8 @@ def main():
             wait_for(lambda s: any(row[0].startswith('axle:3:') and 'thiếu 10 trục trong 1 lần' in row[3] for row in faults(s))
                      and int(s.get('lastAlarm','0')) > int(large['lastAlarm']),
                      'exactly ten missing axles create another audible alert on previously warned sensor')
-            print('25 monitoring checks passed', flush=True)
+            run_diagram_checks()
+            print('29 monitoring checks passed', flush=True)
         finally:
             stop_service();adb('shell','am','force-stop',PKG)
             install(folder/'original.xml','shared_prefs/monitor.xml')

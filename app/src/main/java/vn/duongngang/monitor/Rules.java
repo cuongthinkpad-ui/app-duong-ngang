@@ -203,8 +203,12 @@ public final class Rules {
   private static int reportPhase(Event event) {
     if (direction(event.text()) != 0) return 0;
     if (event.red()) return 1;
-    return passedDirection(event.text()) != 0 ? 2 : 3;
+    if (barrierActivity(event) != 0) return 2;
+    if (passedDirection(event.text()) != 0) return 3;
+    return evidenceReset(event) ? 4 : 5;
   }
+
+  private static final String MOTION_JOURNEY = "travel:motion:";
 
   /** One source arrival, kept until both source release and downstream arrival are known. */
   public record Journey(
@@ -356,6 +360,92 @@ public final class Rules {
               previous, previous.passed(), previous.released(), true, current.id(), current.at()));
   }
 
+  /** Barrier activity may locate an existing incoming train; it cannot create one on its own. */
+  private static Journey movementJourney(Route route, Map<String, Journey> journeys, Event event) {
+    String point = km(event.crossing());
+    if (latestJourney(journeys, point, 0, true) != null) return null;
+    Journey local = latestJourney(journeys, point, 0, false), incoming = null;
+    int direction = 0;
+    for (Journey j : journeys.values()) {
+      if (j.reached()
+          || j.selfTriggered()
+          || !point.equals(j.to())
+          || j.at() > event.at()
+          || local != null && j.at() <= local.at()
+          || !j.from().equals(route.upstream(point, j.direction()))) continue;
+      if (direction != 0 && direction != j.direction()) return null;
+      direction = j.direction();
+      if (incoming == null || j.at() < incoming.at()) incoming = j;
+    }
+    return incoming == null
+        ? null
+        : new Journey(
+            MOTION_JOURNEY + event.id(),
+            point,
+            route.upstream(point, -direction),
+            direction,
+            event.at(),
+            false,
+            false,
+            false);
+  }
+
+  /** A later explicit approach in the same unfinished motion visit keeps its existing owner. */
+  private static boolean promoteMovement(
+      Map<String, Journey> journeys, Event event, int direction) {
+    String point = km(event.crossing());
+    Journey motion = latestJourney(journeys, point, direction, true);
+    if (motion == null
+        || !motion.id().startsWith(MOTION_JOURNEY)
+        || motion.at() > event.at()
+        || (motion.passed() || motion.reached()) && event.at() > motion.lastAt()
+        || freshUpstream(journeys, point, direction, motion.at(), event.at())) return false;
+    journeys.remove(motion.id());
+    Journey current =
+        new Journey(
+            event.id(),
+            point,
+            motion.to(),
+            direction,
+            event.at(),
+            motion.passed(),
+            motion.released(),
+            motion.reached(),
+            motion.successorId(),
+            Math.max(event.at(), motion.lastAt()),
+            motion.selfTriggered());
+    journeys.put(current.id(), current);
+    for (Journey j : new ArrayList<>(journeys.values()))
+      if (motion.id().equals(j.successorId()))
+        journeys.put(
+            j.id(), progress(j, j.passed(), j.released(), j.reached(), current.id(), event.at()));
+    return true;
+  }
+
+  /**
+   * Confirmed traversal supersedes older missing visits on this same directed interval. Approach
+   * alone retains one-to-one matching; later following trains remain pending.
+   */
+  private static void reconcileTraversal(Map<String, Journey> journeys, Journey current, long at) {
+    if (current.selfTriggered()) return;
+    Journey evidence = null;
+    for (Journey j : journeys.values())
+      if (current.from().equals(j.to())
+          && j.direction() == current.direction()
+          && !j.selfTriggered()
+          && j.at() <= current.at()
+          && j.lastAt() <= at
+          && (!j.reached() || current.id().equals(j.successorId()))
+          && (evidence == null || j.at() > evidence.at())) evidence = j;
+    if (evidence == null) return;
+    for (Journey j : new ArrayList<>(journeys.values()))
+      if (!j.reached()
+          && current.from().equals(j.to())
+          && j.direction() == current.direction()
+          && j.at() <= evidence.at())
+        journeys.put(j.id(), progress(j, j.passed(), true, true, current.id(), at));
+  }
+
   /** Neighboring approach sensors can report in the reverse order while both zones overlap. */
   private static void linkEarlierDownstream(Map<String, Journey> journeys, Journey current) {
     if (current.to() == null || current.reached()) return;
@@ -457,8 +547,16 @@ public final class Rules {
         for (Journey j : new ArrayList<>(journeys.values()))
           if (j.from().equals(point) && j.selfTriggered() && !j.reached() && j.at() <= e.at())
             journeys.put(j.id(), progress(j, j.passed(), true, true, j.successorId(), e.at()));
+      } else if (barrierActivity(e) != 0) {
+        Journey movement = movementJourney(route, journeys, e);
+        if (movement != null) {
+          journeys.put(movement.id(), movement);
+          linkPredecessor(journeys, movement);
+          linkEarlierDownstream(journeys, movement);
+        }
       } else if (d != 0) {
         retireContradictions(route, journeys, point, d, e.at());
+        if (promoteMovement(journeys, e, d)) continue;
         for (Journey j : new ArrayList<>(journeys.values()))
           if (j.from().equals(point) && !j.released()) {
             if (j.reached() || !j.passed() || j.direction() != d)
@@ -472,9 +570,10 @@ public final class Rules {
         linkEarlierDownstream(journeys, current);
       } else if (passed != 0 || e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")) {
         Journey current = latestJourney(journeys, point, passed, passed == 0);
+        if (current != null && current.at() > e.at()) continue;
         if (passed != 0
             && current != null
-            && current.released()
+            && (current.released() || current.passed() || current.reached())
             && freshUpstream(journeys, point, passed, current.at(), e.at())) current = null;
         if (current == null && passed != 0) {
           Journey latest = latestJourney(journeys, point, 0, false);
@@ -494,10 +593,11 @@ public final class Rules {
           journeys.put(current.id(), current);
         }
         if (current == null) continue;
-        if (passed != 0 && !current.released() && !current.reached()) {
-          retireContradictions(route, journeys, point, passed, e.at());
+        if (!current.released() && !current.reached()) {
+          if (passed != 0) retireContradictions(route, journeys, point, passed, e.at());
           linkPredecessor(journeys, current);
           linkEarlierDownstream(journeys, current);
+          reconcileTraversal(journeys, current, e.at());
           current = journeys.get(current.id());
         }
         boolean released = current.released() || passed == 0;
