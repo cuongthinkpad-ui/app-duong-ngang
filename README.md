@@ -1,4 +1,4 @@
-# Đường Ngang — Android 0.19
+# Đường Ngang — Android 0.20
 
 **Đổi phiên/tài khoản ChatGPT:** đọc [Bản bàn giao và cách tiếp tục](docs/BAN_GIAO.md) và [Nhật ký trao đổi, yêu cầu đã chốt](docs/LICH_SU_TRAO_DOI.md). [Sao lưu khóa ký APK](docs/SAO_LUU_KHOA_KY.md).
 
@@ -6,7 +6,14 @@
 
 Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt navy, xanh cyan và xanh lá. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
 
-## Thay đổi 0.19
+## Thay đổi 0.20
+
+- Sửa báo nhầm nghi tự kích khi người kiểm tra thử hạ/nâng cần và khôi phục tại điểm hiện tại, trong khi có lượt tàu thật cùng hướng ở đường ngang phía trước. Chuỗi thao tác chưa có hướng tàu không loại bỏ lượt tiếp cận rõ ràng còn tiếp diễn ở phía trước; bằng chứng đã kết thúc trước lượt cũ vẫn không được dùng lại.
+- Ghép tàu nối tiếp dựa trên bằng chứng đã ghép cho lượt trước, mỗi bằng chứng chỉ dùng một lần. Giữ suy luận chỉ ở 30 giây, ranh giới ga/tuyến và các lỗi thiết bị gốc.
+- Khi cài đè, đánh giá lại suy luận đã lưu (`selfEvidenceVersion=3`), bỏ riêng cảnh báo không còn căn cứ và phân loại sai trên sơ đồ. Giữ tài khoản, lịch sử gốc, trục và khóa ký.
+- Đoạn tàu và mũi tên luôn xanh. Khi dữ liệu cũ vẫn giữ cảnh báo/thời điểm cập nhật và bỏ LIVE; các mốc ga giữ màu vàng. [Kiểm tra bản 0.20](docs/UI_REVIEW_0.20.md).
+
+## Thay đổi 0.19 (lịch sử)
 
 - Sửa đoạn tàu treo khi điểm tiếp theo thiếu bản tin tàu tiếp cận/đã qua: nhận hoạt động cần chắn hạ/nâng thành lượt nội bộ chỉ khi có tàu đang đi tới từ đường ngang kế cận, cùng hướng và không qua ga. Khôi phục của lượt đó chuyển/khép đúng đoạn sáng. Thao tác cần chắn riêng lẻ không tạo tàu; không sửa bản tin web gốc.
 - Khi mất cả dữ liệu một lượt, lượt sau có bằng chứng đi qua hoặc khôi phục phù hợp sẽ đồng bộ lại các dấu vết cũ trên đúng đoạn/hướng. Bản tin tiếp cận đơn lẻ không gỡ cả hàng chờ; giữ tàu nối tiếp bắt đầu sau lượt đang xét, các tàu ở đoạn khác và trạng thái lỗi phần cứng thật.
@@ -124,7 +131,7 @@ Tổng quan gồm sơ đồ, tàu gần nhất và sự cố, tự chia chiều 
 
 Foreground service đọc theo chu kỳ 30 giây / 2 phút / 5 phút, có thông báo thường trực. Khi mới kết nối, tải ngày trước và ngày hiện tại, đọc hết phân trang rồi kiểm tra lại đầu trang; sau đó đọc chồng tới bản tin đã biết và làm mới toàn bộ định kỳ. Phiên hết hạn được đăng nhập lại; sai tài khoản/mật khẩu dừng dịch vụ để tránh thử liên tục. Tải lịch sử riêng không phát cảnh báo.
 
-Khi dữ liệu gián đoạn/cũ, sơ đồ giữ trạng thái cuối và đổi màu cảnh báo kèm thời điểm cập nhật. Chu kỳ đọc web không phải dữ liệu liên tục tại hiện trường. Các bản ghi hoàn toàn giống nhau cùng giây được gộp do web không cung cấp ID sự kiện độc lập.
+Khi dữ liệu gián đoạn/cũ, sơ đồ giữ trạng thái cuối và đoạn tàu màu xanh, kèm nhãn cảnh báo dữ liệu cũ/thời điểm cập nhật; không giữ nhãn LIVE. Chu kỳ đọc web không phải dữ liệu liên tục tại hiện trường. Các bản ghi hoàn toàn giống nhau cùng giây được gộp do web không cung cấp ID sự kiện độc lập.
 
 ## Kiểm chứng và giới hạn
 

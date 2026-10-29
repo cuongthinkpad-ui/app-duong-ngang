@@ -835,6 +835,40 @@ public final class RouteStoreChecks extends Instrumentation {
           store.events(0, proofNow).size() == proofRows,
           "migration is idempotent and creates no historic alarms");
       selfManager.deleteNotificationChannel("self-proof-test");
+      store.credentials("https://rail.example.test/", "overlap-self-proof", "test-only");
+      var overlapSource = new Rules.Event("overlap-source", axleDay + 1000,
+          "102+000", "Tàu chẵn", false, List.of());
+      var overlapArrival = new Rules.Event("overlap-arrival", axleDay + 5000,
+          "101+000", "Tàu chẵn", false, List.of());
+      var overlapFalse = new Rules.Event("self:" + overlapArrival.id(), overlapArrival.at(),
+          "101+000", "Nghi tự kích", true, List.of());
+      var overlapHardware = new Rules.Event("overlap-hardware", axleDay + 6000,
+          "101+000", "Chuông 2 hỏng", true, List.of());
+      var overlapRows = List.of(overlapSource,
+          new Rules.Event("local-down", axleDay + 2000, "101+000",
+              "Cần chắn 1 đã hạ", false, List.of()),
+          new Rules.Event("local-reset", axleDay + 3000, "101+000",
+              "Khôi phục hệ thống", false, List.of()),
+          new Rules.Event("local-up", axleDay + 4000, "101+000",
+              "Cần chắn 2 đã nâng", false, List.of()),
+          overlapArrival, overlapFalse, overlapHardware);
+      store.saveForAccount(store.account(), new WebSource.DayData(overlapRows, proofRoute));
+      store.updateActiveFaults(store.account(), axleDay, proofNow, axleDay, List.of());
+      store.prefs.edit().putInt("selfEvidenceVersion", 2).commit();
+      check(!store.selfEvidenceReady(), "0.19 self-trigger cache requires the overlap migration");
+      store.prepareSelfEvidence(store.account(), proofNow);
+      check(store.selfEvidenceReady()
+              && store.events(axleDay, proofNow).stream().noneMatch(Rules::isSelfTrigger),
+          "overlap upgrade removes false self-trigger history from version 2");
+      check(store.activeFaults().size() == 1
+              && store.activeFaults().get(0).id().equals(overlapHardware.id()),
+          "overlap upgrade retains original equipment fault");
+      check(store.events(axleDay, proofNow).stream().filter(e -> !Rules.isGenerated(e)).count()
+              == overlapRows.size() - 1,
+          "overlap upgrade retains every original report");
+      check(store.travelState().journeys().stream()
+              .noneMatch(j -> j.id().equals(overlapArrival.id()) && j.selfTriggered()),
+          "overlap upgrade removes the wrong diagram classification");
       store.credentials("https://rail.example.test/", "older-self-proof", "test-only");
       long archiveAt = axleDay - 172800000;
       var oldProof =

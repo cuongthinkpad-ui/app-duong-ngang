@@ -1493,6 +1493,35 @@ public class RulesTest {
               == 1,
           "barrier activity from a later visit cannot explain an already ended target: " + motion);
     }
+    // Synthetic reproducer: local unlabelled barrier/reset activity overlaps a real approach.
+    for (int d : List.of(1, -1)) {
+      String upstream = d == 1 ? "100+000" : "102+000";
+      String train = d == 1 ? "Tàu lẻ" : "Tàu chẵn";
+      var realArrival = event(15000, "101+000", train, false);
+      var localOverlap = new ArrayList<Rules.Event>(List.of(
+          event(1000, upstream, train, false),
+          event(2000, "101+000", "Cần chắn 1 đã hạ", false),
+          event(3000, "101+000", "Khôi phục hệ thống", false),
+          event(4000, "101+000", "Cần chắn 2 đã nâng", false),
+          realArrival));
+      check(Rules.suspectedSelfTriggers(activityLine, localOverlap, 0).isEmpty(),
+          "unlabelled local cycle does not reject an ongoing explicit upstream train: " + d);
+      localOverlap.add(event(16000, upstream, train + " đã qua đường ngang", false));
+      localOverlap.add(event(17000, upstream, "Khôi phục hệ thống", false));
+      Collections.reverse(localOverlap);
+      check(Rules.suspectedSelfTriggers(activityLine, localOverlap, 0).isEmpty(),
+          "later upstream passage and unordered pages preserve valid matching: " + d);
+      localOverlap.add(event(18000, "101+000", train, false));
+      check(Rules.suspectedSelfTriggers(activityLine, localOverlap, 0).size() == 1,
+          "localOverlap upstream visit still supports only one explicit downstream train: " + d);
+      localOverlap.removeIf(e -> e.crossing().equals(upstream));
+      check(Rules.suspectedSelfTriggers(activityLine, localOverlap, 0).size() == 2,
+          "local movement alone cannot justify either explicit arrival: " + d);
+      localOverlap.add(event(1000, upstream, train, false));
+      localOverlap.add(event(1500, upstream, "Khôi phục hệ thống", false));
+      check(Rules.suspectedSelfTriggers(activityLine, localOverlap, 0).size() == 2,
+          "upstream visit completed before the unlabelled local cycle is not recycled: " + d);
+    }
     var duplicates =
         List.of(
             event(1000, "100+000", "Cần chắn 1 đã hạ", false),

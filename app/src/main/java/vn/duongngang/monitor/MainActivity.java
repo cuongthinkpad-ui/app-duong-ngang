@@ -1916,7 +1916,7 @@ public class MainActivity extends Activity {
       p.setStrokeWidth(dp(3));
       p.setColor(LINE);
       c.drawLine(left - dp(20), y, right + dp(20), y, p);
-      int reportColor = staleData() ? WARNING : GREEN;
+      int reportColor = GREEN;
       Arrays.fill(lit, false);
       List<float[]> labels = new ArrayList<>();
       p.setColor(reportColor);

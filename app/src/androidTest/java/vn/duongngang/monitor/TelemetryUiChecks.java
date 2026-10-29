@@ -245,6 +245,23 @@ final class TelemetryUiChecks {
             check(
                 !((TextView) get("liveBadge")).getText().toString().equals("LIVE"),
                 "stale data loses LIVE badge");
+            View staleRoute = (View) get("routeView");
+            var staleBitmap = android.graphics.Bitmap.createBitmap(
+                staleRoute.getWidth(), staleRoute.getHeight(),
+                android.graphics.Bitmap.Config.ARGB_8888);
+            try {
+              staleRoute.draw(new android.graphics.Canvas(staleBitmap));
+              int[] pixels = new int[staleBitmap.getWidth() * staleBitmap.getHeight()];
+              staleBitmap.getPixels(pixels, 0, staleBitmap.getWidth(), 0, 0,
+                  staleBitmap.getWidth(), staleBitmap.getHeight());
+              int trainGreen = (Integer) get("GREEN");
+              long greenPixels = Arrays.stream(pixels).filter(v -> v == trainGreen).count();
+              check(greenPixels > 20
+                      && ((TextView) get("routeNote")).getText().toString().contains("Dữ liệu cũ"),
+                  "stale train remains green while update warning stays visible");
+            } finally {
+              staleBitmap.recycle();
+            }
             store
                 .prefs
                 .edit()

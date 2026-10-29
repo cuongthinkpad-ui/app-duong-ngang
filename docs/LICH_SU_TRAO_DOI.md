@@ -193,3 +193,11 @@ Ngày 26/10/2026, chủ dự án gửi ảnh đoạn 320+957–320+445 giữ sá
 Chủ dự án bổ sung trường hợp lỗi thiết bị/đường truyền làm mất cả lượt: lượt thật kế tiếp có bằng chứng đi qua phải giúp sơ đồ tự đồng bộ lại, không treo cả buổi. Đã diễn đạt lại và nhận xác nhận, sau đó tổng hợp bốn phần và được trả lời OK triển khai: dùng hoạt động/khôi phục phù hợp khi thiếu bản tin tàu; ghép đúng lượt cũ/mới; hồi phục sau một lượt thiếu hoàn toàn nhờ lượt kế tiếp; dựng lại cache cũ khi cài đè. Giữ tàu đang giữa hai điểm không hết hạn theo giờ, giữ tàu khác và các lỗi đỏ thật tới khôi phục đúng thiết bị.
 
 Bản 0.19 dùng lượt nội bộ từ cần chắn khi có tàu đi tới từ đúng điểm kế cận, không tạo raw giả hoặc tự tạo tàu từ thao tác bảo dưỡng. Khi có bản tin tiếp cận rõ ràng trong lượt đó thì chuyển sang ID bản tin gốc, không tạo tàu thứ hai. Bằng chứng đã qua/khôi phục xác nhận mới đồng bộ các dấu cũ cùng đoạn/hướng, giữ các lượt phía sau. Nâng `travelVersion=4`; giữ cache tự kích/trục, giao diện và chữ ký. Kiểm chứng tại docs/UI_REVIEW_0.19.md.
+
+## 29/10/2026 — Thử thiết bị trước lượt tàu và màu sơ đồ
+
+Chủ dự án gửi ảnh báo nhầm tự kích. Phát lại cục bộ đúng chuỗi bản tin trong ảnh tái hiện lỗi: thao tác hạ/khôi phục/nâng không có hướng ở điểm hiện tại loại mất bằng chứng tiếp cận thật phía trước. Chủ dự án OK sửa, sau đó xác nhận thao tác đó do người kiểm tra ấn nút thử. Bản 0.20 giữ bằng chứng tiếp cận rõ ràng còn tiếp diễn qua chuỗi thử, giữ chặn bằng chứng cũ đã kết thúc và dùng một lần. Đánh giá lại cache suy luận phiên bản 3, giữ lỗi gốc/lịch sử thật và khóa ký.
+
+Chủ dự án yêu cầu tàu trên sơ đồ luôn xanh: chỉ đổi màu đoạn tàu/mũi tên khi dữ liệu cũ thành xanh; mốc ga vẫn vàng. Cảnh báo dữ liệu cũ/thời điểm cập nhật và trạng thái LIVE vẫn phản ánh độ mới. Không đăng nhập web trong lượt này; ảnh và công cụ phát lại riêng không nằm trong Git. Xem docs/UI_REVIEW_0.20.md.
+
+Kiểm tra 0.20: 564 quy tắc, 156 lưu trữ, 61 UI cập nhật, 21 telemetry UI đạt; build/Lint 0 lỗi, 15 cảnh báo. Cài đè từ cache suy luận phiên bản 2 gỡ đúng cảnh báo sai và giữ raw/lỗi thiết bị. Kiểm tra bitmap xác nhận tàu xanh khi dữ liệu cũ, vẫn có nhãn cảnh báo. Giữ khóa ký cũ; chưa có kiểm chứng Xiaomi mới.

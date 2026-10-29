@@ -823,9 +823,11 @@ public final class Rules {
 
   /** One operating visit, irrespective of how many numbered barriers report movement. */
   private static final class EvidenceVisit {
-    final long startedAt, previousStart;
-    final int previousArrivalDirection;
+    final long startedAt, previousStart, previousEndExclusive;
+    final int previousArrivalDirection, previousDirection;
     final String point;
+    final EvidenceVisit previousVisit;
+    EvidenceVisit supportedBy;
     final List<Event> signs = new ArrayList<>();
     Event arrival;
     int direction;
@@ -833,8 +835,11 @@ public final class Rules {
 
     EvidenceVisit(String point, long at, EvidenceVisit previous) {
       this.point = point;
+      previousVisit = previous;
       startedAt = at;
       previousStart = previous == null ? Long.MIN_VALUE : previous.startedAt;
+      previousEndExclusive = previous == null ? Long.MIN_VALUE : previous.endExclusive;
+      previousDirection = previous == null ? 0 : previous.direction;
       previousArrivalDirection =
           previous == null || previous.arrival == null ? 0 : previous.direction;
     }
@@ -843,9 +848,26 @@ public final class Rules {
       if (direction != 0 && direction != target.direction) return false;
       // Explicit arrival tokens keep the existing one-to-one continuity for trains in transit.
       // Fallback activity must be from a new visit, not a late raise from an older train.
-      boolean queuedTrain = arrival != null && target.previousArrivalDirection == target.direction;
+      EvidenceVisit precedingSource =
+          target.previousVisit == null ? null : target.previousVisit.supportedBy;
+      boolean queuedTrain =
+          arrival != null
+              && target.previousArrivalDirection == target.direction
+              && precedingSource != null
+              && arrival.at()
+                  > (precedingSource.arrival == null
+                      ? precedingSource.startedAt : precedingSource.arrival.at());
       long evidenceStart = arrival == null ? startedAt : arrival.at();
-      if (!queuedTrain && evidenceStart <= target.previousStart) return false;
+      // An unlabelled local barrier/reset cycle may be maintenance, not a preceding train.
+      // Do not discard an explicit upstream train still in progress after that cycle ended.
+      // A source already completed before the cycle remains excluded; used visits are also
+      // consumed once by the matcher, so this cannot turn one train into multiple tokens.
+      boolean continuingExplicitTrain =
+          arrival != null
+              && target.previousDirection == 0
+              && endExclusive > target.previousEndExclusive;
+      if (!queuedTrain && !continuingExplicitTrain && evidenceStart <= target.previousStart)
+        return false;
       for (Event sign : signs) if (sign.at() < target.endExclusive) return true;
       return false;
     }
@@ -922,7 +944,10 @@ public final class Rules {
             break;
           }
         if (match == null) suspects.add(target.arrival);
-        else used.add(match);
+        else {
+          target.supportedBy = match;
+          used.add(match);
+        }
       }
     }
     return suspects;
