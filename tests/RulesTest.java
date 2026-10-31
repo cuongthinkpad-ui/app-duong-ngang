@@ -1472,9 +1472,8 @@ public class RulesTest {
                         event(4000, "101+000", "Khôi phục hệ thống", false),
                         downstream),
                     0)
-                .size()
-            == 1,
-        "an unmatched old arrival belonging to an earlier unnamed target visit is not recycled");
+                .isEmpty(),
+        "an unused completed source is not invalidated by an unnamed local activity cycle");
     for (String motion : List.of("Cần chắn 1 đã hạ", "Cần chắn 2 đã nâng")) {
       check(
           Rules.suspectedSelfTriggers(
@@ -1519,8 +1518,8 @@ public class RulesTest {
           "local movement alone cannot justify either explicit arrival: " + d);
       localOverlap.add(event(1000, upstream, train, false));
       localOverlap.add(event(1500, upstream, "Khôi phục hệ thống", false));
-      check(Rules.suspectedSelfTriggers(activityLine, localOverlap, 0).size() == 2,
-          "upstream visit completed before the unlabelled local cycle is not recycled: " + d);
+      check(Rules.suspectedSelfTriggers(activityLine, localOverlap, 0).size() == 1,
+          "completed source survives local actions but supports only the first real arrival: " + d);
     }
     var duplicates =
         List.of(
@@ -1633,6 +1632,7 @@ public class RulesTest {
     }
     missingDiagramVisits();
     historyGrouping();
+    nonTrainActions();
     System.out.println(scenarios + " domain scenarios passed");
   }
 
@@ -2016,6 +2016,49 @@ public class RulesTest {
     check(Rules.crossingHistory(List.of(a, event(day + 2000, "100+000", "Ấn nút Phục hồi", false),
             b), "100+000").get(1).completed(),
         "manual recovery bounds a train frame without changing raw text");
+  }
+
+  static void nonTrainActions() {
+    var line = new Rules.Route(List.of("100+000", "101+000", "102+000"));
+    var actions = List.of("Ấn nút Duy tu", "Ấn nút cảnh báo", "Ấn nút Phục hồi",
+        "Cần chắn 1 đã hạ", "Cần chắn 2 đã nâng", "Khôi phục hệ thống");
+    for (int d : List.of(1, -1)) {
+      String source = d == 1 ? "100+000" : "102+000";
+      String train = d == 1 ? "Tàu lẻ" : "Tàu chẵn";
+      var arrival = event(20000, "101+000", train, false);
+      for (String action : actions) {
+        var rows = new ArrayList<Rules.Event>(List.of(
+            event(1000, source, train, false),
+            event(2000, source, train + " đã qua đường ngang", false),
+            event(3000, source, "Khôi phục hệ thống", false),
+            event(4000, "101+000", action, false),
+            event(5000, "101+000", "Khôi phục hệ thống", false), arrival));
+        check(Rules.suspectedSelfTriggers(line, rows, 0).isEmpty(),
+            "single local action never invalidates an unused completed upstream train: " + d + action);
+        rows.add(event(21000, "101+000", train, false));
+        check(Rules.suspectedSelfTriggers(line, rows, 0).equals(List.of(rows.get(rows.size()-1))),
+            "a preserved source can still support only one real target train: " + d + action);
+      }
+      var series = new ArrayList<Rules.Event>(List.of(
+          event(1000, source, train, false),
+          event(2000, source, train + " đã qua đường ngang", false),
+          event(3000, source, "Khôi phục hệ thống", false)));
+      long at = 4000;
+      for (String action : actions) series.add(event(at += 1000, "101+000", action, false));
+      series.add(event(12000, "101+000", "Cần chắn 1 đã nâng", false));
+      series.add(event(13000, "101+000", "Ấn nút Phục hồi", false));
+      check(Rules.suspectedSelfTriggers(line, series, 0).isEmpty(),
+          "an entire local action series is not itself a train: " + d);
+      series.add(arrival);
+      check(Rules.suspectedSelfTriggers(line, series, 0).isEmpty(),
+          "a whole action series leaves the incoming source train available: " + d);
+      Collections.reverse(series);
+      check(Rules.suspectedSelfTriggers(line, series, 0).isEmpty(),
+          "reordered pages retain the same action-series matching: " + d);
+      series.removeIf(e -> e.crossing().equals(source));
+      check(Rules.suspectedSelfTriggers(line, series, 0).equals(List.of(arrival)),
+          "local actions cannot justify a real arrival with no upstream proof: " + d);
+    }
   }
 
 }

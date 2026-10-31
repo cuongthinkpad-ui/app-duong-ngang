@@ -209,3 +209,11 @@ Chủ dự án hỏi thời hạn lưu; bản 0.20 chưa tự dọn. Chủ dự 
 Trong lúc thực hiện, chủ dự án yêu cầu gom những bản tin thiếu kết thúc gần nhau. Đã hỏi rõ và nhận xác nhận: chỉ gom bản tin rời chưa rõ lượt; vẫn tách theo bản tin Tàu lẻ/Tàu chẵn mới. Cụm rời tối đa cách nhau 5 phút, tổng dài tối đa 15 phút. Giữ 15 ngày theo ngày Việt Nam tính cả hôm nay, checkpoint tàu trước khi xóa và thu hồi dung lượng tệp; tải bù không nhập lại bản tin cũ hơn mốc. Chi tiết triển khai/kiểm tra tại docs/UI_REVIEW_0.21.md.
 
 Kiểm tra 0.21: 579 quy tắc; 168 lưu trữ và 21 telemetry UI trên APK phát hành; 69 UI cập nhật trên cùng mã giao diện trước bổ sung đồng bộ checkpoint trong Store. Smoke service đồng bộ đầu xác nhận mốc 15 ngày và không phát lỗi giả; không chạy lại toàn bộ 25/29 ca. Build/Lint 0 lỗi, 15 cảnh báo; chữ ký giữ nguyên. Đã xem ảnh khung lịch sử bằng dữ liệu tổng hợp; chưa có kiểm chứng Xiaomi mới.
+
+## 31/10/2026 — Loại mốc thao tác khỏi lượt tàu thật, chỉ sửa trường hợp thử thiết bị
+
+Chủ dự án gửi ảnh báo nhầm. Môi trường đọc Visitec bị chặn 403 Domain forbidden; không vượt chặn, dùng ảnh và phát lại cục bộ. Tái hiện hai tình huống khác nhau, nhưng chủ dự án yêu cầu để nguyên trường hợp phía trước mất kết nối, chỉ sửa việc thử thiết bị làm loại mất bằng chứng nguồn đã khôi phục. Sau nhiều lần làm rõ, chốt một thao tác hay cả loạt nút bấm/hạ-nâng cần/khôi phục không tự là một đoàn tàu hoặc mốc chia lượt thực. Chủ dự án yêu cầu sửa và test.
+
+Bản 0.22 giữ mốc lượt có hướng riêng khỏi hoạt động thiết bị, giữ nguồn tàu rõ hướng chưa sử dụng dù đã khôi phục; đúng hướng và một nguồn chỉ dùng một lần. Không thay xử lý mất kết nối hay tự sinh tàu từ thao tác. Nâng cache suy luận lên 4, giữ lỗi gốc và checkpoint của lượt có raw đã quá 15 ngày khi phát lại suy luận. Công cụ phát lại thật ngoài Git, các test công khai dùng số liệu tổng hợp. Xem docs/UI_REVIEW_0.22.md.
+
+Kiểm tra 0.22: 611 quy tắc, 171 lưu trữ, 69 UI cập nhật đạt; 2 ca dịch vụ mới trên chu kỳ 30 giây xác nhận không báo/chuông giả khi chuỗi thử xen giữa, nguồn chỉ dùng một lần và cảnh báo mới vẫn phát âm. Đợi lastSuccess trước kiểm tra lastAlarm để tránh đọc giữa lượt cập nhật; giữ cùng APK. Build/Lint 0 lỗi, 15 cảnh báo; cùng chữ ký, chưa có kiểm chứng Xiaomi mới. Chủ dự án yêu cầu giữ nguyên phần mất kết nối, ca canary vẫn cho kết quả cũ.

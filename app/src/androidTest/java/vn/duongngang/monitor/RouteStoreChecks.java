@@ -845,6 +845,10 @@ public final class RouteStoreChecks extends Instrumentation {
       var overlapHardware = new Rules.Event("overlap-hardware", axleDay + 6000,
           "101+000", "Chuông 2 hỏng", true, List.of());
       var overlapRows = List.of(overlapSource,
+          new Rules.Event("source-passed", axleDay + 1100, "102+000",
+              "Tàu chẵn đã qua đường ngang", false, List.of()),
+          new Rules.Event("source-restored", axleDay + 1200, "102+000",
+              "Khôi phục hệ thống", false, List.of()),
           new Rules.Event("local-down", axleDay + 2000, "101+000",
               "Cần chắn 1 đã hạ", false, List.of()),
           new Rules.Event("local-reset", axleDay + 3000, "101+000",
@@ -854,12 +858,12 @@ public final class RouteStoreChecks extends Instrumentation {
           overlapArrival, overlapFalse, overlapHardware);
       store.saveForAccount(store.account(), new WebSource.DayData(overlapRows, proofRoute));
       store.updateActiveFaults(store.account(), axleDay, proofNow, axleDay, List.of());
-      store.prefs.edit().putInt("selfEvidenceVersion", 2).commit();
-      check(!store.selfEvidenceReady(), "0.19 self-trigger cache requires the overlap migration");
+      store.prefs.edit().putInt("selfEvidenceVersion", 3).commit();
+      check(!store.selfEvidenceReady(), "0.21 self-trigger cache requires operation-boundary migration");
       store.prepareSelfEvidence(store.account(), proofNow);
       check(store.selfEvidenceReady()
               && store.events(axleDay, proofNow).stream().noneMatch(Rules::isSelfTrigger),
-          "overlap upgrade removes false self-trigger history from version 2");
+          "upgrade removes false self-trigger from version 3 after the source already restored");
       check(store.activeFaults().size() == 1
               && store.activeFaults().get(0).id().equals(overlapHardware.id()),
           "overlap upgrade retains original equipment fault");
@@ -1200,6 +1204,41 @@ public final class RouteStoreChecks extends Instrumentation {
       check(Rules.trackSegments(retainedRoute, store.travelState()).equals(
               List.of(new Rules.TrackSegment("101+000", "102+000", 1))),
           "train can progress after its original reports have been pruned");
+      // An obsolete inference inside retained history must not wipe a pending train
+      // whose original records have already been deleted by the 15-date policy.
+      store.credentials("https://rail.example.test/", "retained-self-upgrade", "test-only");
+      long migrateNow = System.currentTimeMillis();
+      long migrateFloor = Rules.historyCutoff(migrateNow);
+      var migrateRoute = new Rules.Route(List.of("100+000", "101+000", "150+000 (T)",
+          "200+000", "201+000", "202+000"));
+      var migrationArrival = new Rules.Event("retained-target", migrateFloor + 5000,
+          "201+000", "Tàu lẻ", false, List.of());
+      var migrationSelf = new Rules.Event("self:" + migrationArrival.id(), migrationArrival.at(),
+          "201+000", "Nghi tự kích", true, List.of());
+      store.saveForAccount(store.account(), new WebSource.DayData(List.of(
+          new Rules.Event("expired-source", migrateFloor - 60000, "100+000", "Tàu lẻ", false, List.of()),
+          new Rules.Event("expired-pass", migrateFloor - 30000, "100+000", "Tàu lẻ đã qua đường ngang", false, List.of())), migrateRoute));
+      store.saveForAccount(store.account(), new WebSource.DayData(List.of(
+          new Rules.Event("retained-source", migrateFloor + 1000, "200+000", "Tàu lẻ", false, List.of()),
+          new Rules.Event("retained-pass", migrateFloor + 1100, "200+000", "Tàu lẻ đã qua đường ngang", false, List.of()),
+          new Rules.Event("retained-reset", migrateFloor + 1200, "200+000", "Khôi phục hệ thống", false, List.of()),
+          new Rules.Event("retained-operation", migrateFloor + 2000, "201+000", "Cần chắn 1 đã hạ", false, List.of()),
+          new Rules.Event("retained-operation-reset", migrateFloor + 3000, "201+000", "Khôi phục hệ thống", false, List.of()),
+          migrationArrival, migrationSelf), migrateRoute));
+      // Seed the legacy state without running the new inference reassessment yet.
+      store.prefs.edit().putInt("selfEvidenceVersion", 4).commit();
+      store.updateActiveFaults(store.account(), migrateFloor, migrateNow, 0, List.of());
+      store.maintainHistory(store.account(), migrateNow);
+      store.prefs.edit().putInt("selfEvidenceVersion", 3).commit();
+      check(store.events(0, migrateFloor).isEmpty()
+              && store.travelState().journeys().stream().anyMatch(j -> j.id().equals(migrationArrival.id()) && j.selfTriggered()),
+          "legacy classification exists after original old train rows have expired");
+      store.prepareSelfEvidence(store.account(), migrateNow);
+      check(store.events(migrateFloor, migrateNow).stream().noneMatch(Rules::isSelfTrigger),
+          "upgrade reassesses an archived operation-boundary false inference");
+      check(Rules.trackSegments(migrateRoute, new Store(context).travelState())
+              .contains(new Rules.TrackSegment("100+000", "101+000", 1)),
+          "retained-history inference migration preserves expired pending train checkpoint");
       store.credentials("https://rail.example.test/", "retention-new-account", "test-only");
       check(!store.prefs.contains("retentionCutoff"), "new account has no previous import floor");
       result.putString("stream", checks + " account storage checks passed\n");

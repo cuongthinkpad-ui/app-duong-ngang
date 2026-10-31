@@ -882,8 +882,8 @@ public final class Rules {
 
   /** One operating visit, irrespective of how many numbered barriers report movement. */
   private static final class EvidenceVisit {
-    final long startedAt, previousStart, previousEndExclusive;
-    final int previousArrivalDirection, previousDirection;
+    final long startedAt, previousStart, previousActivityStart;
+    final int previousArrivalDirection;
     final String point;
     final EvidenceVisit previousVisit;
     EvidenceVisit supportedBy;
@@ -892,15 +892,17 @@ public final class Rules {
     int direction;
     long passedAt = Long.MIN_VALUE, endExclusive = Long.MAX_VALUE;
 
-    EvidenceVisit(String point, long at, EvidenceVisit previous) {
+    EvidenceVisit(String point, long at, EvidenceVisit previousTrain, EvidenceVisit previousActivity) {
       this.point = point;
-      previousVisit = previous;
+      previousVisit = previousTrain;
       startedAt = at;
-      previousStart = previous == null ? Long.MIN_VALUE : previous.startedAt;
-      previousEndExclusive = previous == null ? Long.MIN_VALUE : previous.endExclusive;
-      previousDirection = previous == null ? 0 : previous.direction;
+      // Only a directional train report defines the preceding train boundary. Unnamed
+      // barrier/button/reset operations cannot make a completed incoming train obsolete.
+      previousStart = previousTrain == null ? Long.MIN_VALUE
+          : previousTrain.arrival == null ? previousTrain.passedAt : previousTrain.arrival.at();
+      previousActivityStart = previousActivity == null ? Long.MIN_VALUE : previousActivity.startedAt;
       previousArrivalDirection =
-          previous == null || previous.arrival == null ? 0 : previous.direction;
+          previousTrain == null || previousTrain.arrival == null ? 0 : previousTrain.direction;
     }
 
     boolean supports(EvidenceVisit target) {
@@ -916,17 +918,14 @@ public final class Rules {
               && arrival.at()
                   > (precedingSource.arrival == null
                       ? precedingSource.startedAt : precedingSource.arrival.at());
-      long evidenceStart = arrival == null ? startedAt : arrival.at();
-      // An unlabelled local barrier/reset cycle may be maintenance, not a preceding train.
-      // Do not discard an explicit upstream train still in progress after that cycle ended.
-      // A source already completed before the cycle remains excluded; used visits are also
-      // consumed once by the matcher, so this cannot turn one train into multiple tokens.
-      boolean continuingExplicitTrain =
-          arrival != null
-              && target.previousDirection == 0
-              && endExclusive > target.previousEndExclusive;
-      if (!queuedTrain && !continuingExplicitTrain && evidenceStart <= target.previousStart)
-        return false;
+      long evidenceStart = arrival != null ? arrival.at()
+          : passedAt != Long.MIN_VALUE ? passedAt : startedAt;
+      // A barrier-only source remains fallback evidence under the existing cautious rule;
+      // it is not promoted to an additional directional train. Explicit arrival/passage
+      // evidence is compared with real trains only, never with an unnamed local operation.
+      long boundary = arrival == null && passedAt == Long.MIN_VALUE
+          ? target.previousActivityStart : target.previousStart;
+      if (!queuedTrain && evidenceStart <= boundary) return false;
       for (Event sign : signs) if (sign.at() < target.endExclusive) return true;
       return false;
     }
@@ -941,6 +940,7 @@ public final class Rules {
             .thenComparingInt(e -> evidenceReset(e) ? 4 : reportPhase(e))
             .thenComparing(Event::id));
     Map<String, EvidenceVisit> open = new HashMap<>(), previous = new HashMap<>();
+    Map<String, EvidenceVisit> previousTrains = new HashMap<>();
     Map<String, List<EvidenceVisit>> evidence = new HashMap<>();
     List<EvidenceVisit> arrivals = new ArrayList<>();
     Set<String> seen = new HashSet<>();
@@ -976,7 +976,7 @@ public final class Rules {
       }
       if (visit == null) {
         EvidenceVisit old = previous.get(point);
-        visit = new EvidenceVisit(point, event.at(), old);
+        visit = new EvidenceVisit(point, event.at(), previousTrains.get(point), old);
         previous.put(point, visit);
         open.put(point, visit);
         evidence.computeIfAbsent(point, k -> new ArrayList<>()).add(visit);
@@ -986,9 +986,11 @@ public final class Rules {
         visit.arrival = event;
         visit.direction = d;
         arrivals.add(visit);
+        previousTrains.put(point, visit);
       } else if (passed != 0) {
         visit.direction = passed;
         visit.passedAt = event.at();
+        previousTrains.put(point, visit);
       }
     }
     Set<EvidenceVisit> used = new HashSet<>();

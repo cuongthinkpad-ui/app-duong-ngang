@@ -13,7 +13,7 @@ import org.json.*;
 public final class Store {
   private static final int TRAVEL_VERSION = 4;
   private static final int AXLE_VERSION = 3;
-  private static final int SELF_EVIDENCE_VERSION = 3;
+  private static final int SELF_EVIDENCE_VERSION = 4;
   private final Context context;
   public final android.content.SharedPreferences prefs;
 
@@ -267,7 +267,18 @@ public final class Store {
         var manager = context.getSystemService(android.app.NotificationManager.class);
         if (manager != null)
           for (String id : disproved) manager.cancel(100 + Math.floorMod(id.hashCode(), 1000000));
-        if (rebuildCheckpoint) prefs.edit().remove("travelVersion").apply();
+        if (rebuildCheckpoint) {
+          long floor = prefs.getLong("retentionCutoff", 0);
+          if (floor > 0 && floor < prefs.getLong("travelCheckpointAt", 0) && travelReady()) {
+            // Expired raw reports are gone. Preserve their pending journeys, then replay
+            // retained history without the disproved inference instead of clearing the seed.
+            List<Rules.Journey> expired = new ArrayList<>();
+            for (var journey : readTravelState("travelCheckpoint").journeys())
+              if (journey.at() < floor) expired.add(journey);
+            prefs.edit().putLong("travelCheckpointAt", floor)
+                .putString("travelCheckpoint", travelJson(new Rules.TravelState(expired))).apply();
+          } else prefs.edit().remove("travelVersion").apply();
+        }
         long baseline = Rules.faultBaseline(prefs.getLong("baselineFrom", 0), now);
         updateActiveFaults(expected, baseline, now, baseline, disproved);
       }

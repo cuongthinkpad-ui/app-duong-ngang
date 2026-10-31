@@ -132,6 +132,22 @@ class Fixture(BaseHTTPRequestHandler):
                              ('401+000', 'Tàu lẻ đã qua đường ngang', tl+timedelta(seconds=13), False),
                              ('400+000', 'Khôi phục hệ thống', tl+timedelta(seconds=14), False),
                              ('401+000', 'Khôi phục hệ thống', tl+timedelta(seconds=15), False)]
+        if selected == now.date() and current.get('nontrain'):
+            tn = datetime.fromtimestamp(current['nontrain_at'], timezone.utc).replace(tzinfo=None)+timedelta(hours=7)
+            rows += [('100+000', 'Tàu lẻ', tn, False),
+                     ('100+000', 'Tàu lẻ đã qua đường ngang', tn+timedelta(seconds=1), False),
+                     ('100+000', 'Khôi phục hệ thống', tn+timedelta(seconds=2), False),
+                     ('101+000', 'Ấn nút Duy tu', tn+timedelta(seconds=3), False),
+                     ('101+000', 'Ấn nút cảnh báo', tn+timedelta(seconds=4), False),
+                     ('101+000', 'Cần chắn 1 đã hạ', tn+timedelta(seconds=5), False),
+                     ('101+000', 'Khôi phục hệ thống', tn+timedelta(seconds=6), False),
+                     ('101+000', 'Cần chắn 1 đã nâng', tn+timedelta(seconds=7), False),
+                     ('101+000', 'Cần chắn 2 đã nâng', tn+timedelta(seconds=7), False),
+                     ('101+000', 'Ấn nút Phục hồi', tn+timedelta(seconds=8), False),
+                     ('101+000', 'Tàu lẻ', tn+timedelta(seconds=10), False)]
+            if current.get('nontrain_next'):
+                tn2 = datetime.fromtimestamp(current['nontrain_next'], timezone.utc).replace(tzinfo=None)+timedelta(hours=7)
+                rows += [('101+000', 'Tàu lẻ', tn2, False)]
         table = "<table id='FixtureGdata'>"
         for entry in reversed(rows):
             point, text, at, red = entry[:4]
@@ -208,6 +224,25 @@ def main():
             assert int(empty.get('lastAlarm', '0')) == 0, 'Empty snapshot must not sound'
             assert not faults(empty), 'Exempt axle reports must not create faults'
             print('PASS: six qualifying errors and one large deviation at all six exempt points remain silent', flush=True)
+            if '--nontrain-only' in sys.argv:
+                operator_start = int(time.time())+1
+                phase.update(nontrain=True, nontrain_at=operator_start)
+                accepted = wait_for(lambda s: int(s.get('lastSuccess','0')) > (operator_start+40)*1000,
+                                    'completed upstream proof survives a whole local operation series over two polls')
+                assert not faults(accepted), 'Local actions must not create a false self-trigger'
+                assert json.loads(accepted.get('pendingSelf','{}')) == {}, 'No delayed false candidate may remain'
+                assert int(accepted.get('lastAlarm','0')) == 0, 'Valid train must not cause false audible alarm'
+                print('PASS: operator actions do not discard the completed incoming train, including after the grace poll',flush=True)
+                next_train = int(time.time())+1
+                phase.update(nontrain_next=next_train)
+                unsupported = wait_for(lambda s: int(s.get('lastSuccess','0')) > (next_train+30)*1000
+                                       and any(row[3]=='Nghi tự kích' and int(row[1])==next_train*1000
+                                               for row in faults(s)),
+                                       'the next unsupported real arrival cannot reuse the earlier source')
+                assert all(int(row[1]) != (operator_start+10)*1000 for row in faults(unsupported)), 'The first valid arrival must remain supported'
+                assert int(unsupported.get('lastAlarm','0')) > 0, 'A new real unsupported arrival must retain incident sound'
+                print('PASS: one proof supports only one real arrival; a later unsupported train is still warned',flush=True)
+                return
             if '--retention-only' in sys.argv:
                 local_day = (datetime.now(timezone.utc) + timedelta(hours=7)).date()
                 retention_start = datetime.combine(local_day - timedelta(days=14), datetime.min.time(),

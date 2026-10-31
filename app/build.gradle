@@ -2,7 +2,7 @@ plugins { id 'com.android.application' }
 android {
     namespace 'vn.duongngang.monitor'
     compileSdk 35
-    defaultConfig { applicationId 'vn.duongngang.monitor'; minSdk 26; targetSdk 34; versionCode 21; versionName '0.21.0'; testInstrumentationRunner 'vn.duongngang.monitor.RouteStoreChecks' }
+    defaultConfig { applicationId 'vn.duongngang.monitor'; minSdk 26; targetSdk 34; versionCode 22; versionName '0.22.0'; testInstrumentationRunner 'vn.duongngang.monitor.RouteStoreChecks' }
     compileOptions { coreLibraryDesugaringEnabled true; sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 dependencies { coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'; implementation 'org.jsoup:jsoup:1.18.3' }
