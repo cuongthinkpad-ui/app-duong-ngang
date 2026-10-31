@@ -1,6 +1,10 @@
-# Đường Ngang — bản thử 0.20
+# Đường Ngang — bản thử 0.21
 
-**[Tải APK 0.20](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.20.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
+**[Tải APK 0.21](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.21.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
+
+- Lưu lịch sử 15 ngày tính cả hôm nay, tự dọn nền và thu hồi dung lượng tệp. Giữ trạng thái tàu trước khi xóa, không làm mất đoạn sáng đang chờ; không nhập lại dữ liệu đã hết hạn.
+- Trong màn hình từng đường ngang, bấm **Chi tiết** dưới Lịch sử sự kiện gần nhất để xem toàn bộ sự kiện trong ngày. Từng lượt tàu có khung viền nhẹ riêng; lượt mới không nhập vào lượt cũ thiếu kết thúc. Bản tin rời gần nhau được gom riêng, giữ nguyên văn và màu đỏ của lỗi.
+- Bỏ nút **Thử chuông báo lỗi** trong Cài đặt; chuông báo sự cố sáu hồi và bật/tắt chung vẫn giữ.
 
 - Sửa báo nhầm nghi tự kích khi thử hạ/nâng cần và khôi phục trước lượt tàu: giữ bằng chứng tàu thật còn tiếp diễn ở đường ngang phía trước, đúng hướng và không dùng lại lượt cũ. Cài đè tự đánh giá lại suy luận đã lưu, giữ lỗi đỏ thật và dữ liệu gốc.
 - Đoạn tàu và mũi tên luôn xanh. Dữ liệu cũ vẫn có nhãn cảnh báo và thời điểm cập nhật; mốc ga giữ màu vàng.
@@ -34,4 +38,4 @@
 
 Có thể cài mới trực tiếp, không cần bản gốc. Nếu đã có app, cài đè bằng cùng chữ ký thử nghiệm để giữ cấu hình. Mở Cài đặt, nhập web/ID/mật khẩu rồi Lưu & theo dõi; chu kỳ 30 giây / 2 phút / 5 phút. Lượt đồng bộ đầu cần đọc hai ngày nên lâu hơn những lượt sau.
 
-Cần kiểm tra âm thanh, chạy nền và thông báo khi khóa màn hình lâu trên điện thoại thật, nhất là chế độ pin Xiaomi. Kiểm tra phát nhạc trên giả lập không chứng minh loa Xiaomi đã kêu. Bản thử không thay thế quy trình trực hiện có. Không nhúng mật khẩu thử nghiệm vào APK. [Chi tiết kiểm tra](../docs/UI_REVIEW_0.20.md).
+Cần kiểm tra âm thanh, chạy nền và thông báo khi khóa màn hình lâu trên điện thoại thật, nhất là chế độ pin Xiaomi. Kiểm tra phát nhạc trên giả lập không chứng minh loa Xiaomi đã kêu. Bản thử không thay thế quy trình trực hiện có. Không nhúng mật khẩu thử nghiệm vào APK. [Chi tiết kiểm tra](../docs/UI_REVIEW_0.21.md).

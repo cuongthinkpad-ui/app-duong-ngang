@@ -1143,6 +1143,65 @@ public final class RouteStoreChecks extends Instrumentation {
           store.password().equals("test-only")
               && store.prefs.getString("user", "").equals("diagram-sparse"),
           "cache migration and replay preserve credentials");
+      store.credentials("https://rail.example.test/", "retention-checks", "test-only");
+      long retentionNow = System.currentTimeMillis();
+      long cutoff = Rules.historyCutoff(retentionNow);
+      var retainedRoute = new Rules.Route(List.of("100+000", "101+000", "102+000"));
+      var oldApproach = new Rules.Event("retention-train", cutoff - 60000,
+          "100+000", "Tàu lẻ", false, List.of());
+      var oldPassed = new Rules.Event("retention-pass", cutoff - 30000,
+          "100+000", "Tàu lẻ đã qua đường ngang", false, List.of());
+      var exactBoundary = new Rules.Event("boundary", cutoff, "Km 101+000",
+          "Nguồn xoay chiều 220VAC khôi phục tốt", false, List.of());
+      var retainedFault = new Rules.Event("retained-fault", retentionNow - 1000,
+          "Km 101+000", "Chuông 1 hỏng", true, List.of());
+      var filler = new Rules.Event("old-filler", cutoff - 1,
+          "100+000", "ghi chú ".repeat(3000), false, List.of());
+      store.saveForAccount(store.account(), new WebSource.DayData(
+          List.of(oldApproach, oldPassed, exactBoundary, retainedFault, filler), retainedRoute));
+      store.updateActiveFaults(store.account(), retentionNow - 2000, retentionNow, 0, List.of());
+      var beforePrune = Rules.trackSegments(retainedRoute, store.travelState());
+      long beforeBytes = context.getDatabasePath("events.db").length();
+      check(store.historyCleanupDue(retentionNow), "old install needs history retention cleanup");
+      check(store.maintainHistory(store.account(), retentionNow) == 3,
+          "retention deletes only rows before the inclusive 15-date boundary");
+      check(store.events(0, retentionNow + 1).size() == 2
+              && store.events(cutoff, cutoff + 1).get(0).id().equals(exactBoundary.id()),
+          "retention keeps boundary and current rows");
+      check(context.getDatabasePath("events.db").length() < beforeBytes,
+          "retention reclaims database file space after deletion");
+      check(beforePrune.equals(Rules.trackSegments(retainedRoute, new Store(context).travelState()))
+              && !beforePrune.isEmpty(),
+          "checkpoint preserves a train whose source reports are older than retention");
+      check(store.activeFaults().stream().anyMatch(e -> e.id().equals(retainedFault.id()))
+              && store.password().equals("test-only"),
+          "cleanup preserves current equipment fault and credentials");
+      check(!store.historyCleanupDue(retentionNow)
+              && store.maintainHistory(store.account(), retentionNow) == 0,
+          "cleanup is idempotent within the same Vietnamese day");
+      check(store.saveForAccount(store.account(), new WebSource.DayData(
+              List.of(filler), retainedRoute)).isEmpty()
+              && store.events(0, cutoff).isEmpty(),
+          "import floor prevents old history downloads from rebuilding deleted data");
+      check(store.crossingEvents("101+000", cutoff, retentionNow + 1).size() == 2
+              && store.crossingEvents("102+000", cutoff, retentionNow + 1).isEmpty(),
+          "history query isolates selected crossing and accepts web Km prefix");
+      store.maintainHistory(store.account(), retentionNow + 86400000L);
+      check(store.events(0, cutoff + 1).isEmpty()
+              && beforePrune.equals(Rules.trackSegments(retainedRoute, store.travelState())),
+          "next day advances retention without losing an old pending train");
+      var nextApproach = new Rules.Event("retention-next", retentionNow + 1000,
+          "101+000", "Tàu lẻ", false, List.of());
+      var nextPassed = new Rules.Event("retention-next-pass", retentionNow + 2000,
+          "101+000", "Tàu lẻ đã qua đường ngang", false, List.of());
+      store.saveForAccount(store.account(), new WebSource.DayData(
+          List.of(nextApproach, nextPassed), retainedRoute));
+      store.updateActiveFaults(store.account(), retentionNow, retentionNow + 3000, 0, List.of());
+      check(Rules.trackSegments(retainedRoute, store.travelState()).equals(
+              List.of(new Rules.TrackSegment("101+000", "102+000", 1))),
+          "train can progress after its original reports have been pruned");
+      store.credentials("https://rail.example.test/", "retention-new-account", "test-only");
+      check(!store.prefs.contains("retentionCutoff"), "new account has no previous import floor");
       result.putString("stream", checks + " account storage checks passed\n");
 
     } catch (Throwable failure) {

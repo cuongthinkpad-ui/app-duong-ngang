@@ -18,3 +18,8 @@ Read `docs/BAN_GIAO.md`, `docs/LICH_SU_TRAO_DOI.md` and `README.md` before editi
 
 - 0.20 self-trigger repair approved 29/10: an unlabelled local barrier/reset test cycle must not reject an explicit upstream train still continuing beyond that cycle. Keep old completed sources excluded and consume each source once; queued matching refers to the prior successfully matched source. `selfEvidenceVersion=3` reassesses legacy inferences, preserving original faults/raw events.
 - Owner requires diagram train segments/arrows always green, even with stale data. Keep stale-data text/timestamp and remove LIVE when stale; station markers remain amber.
+
+- 0.21 approved 31/10: retain 15 Vietnamese calendar dates including today. Checkpoint and synchronously persist train state before deleting expired raw records; reclaim database space, block reimport older than cutoff, and clear retention namespace on account change. Keep active diagram continuity and original faults. Run cleanup off the UI thread at startup/day change and polling, including failed-network sessions.
+- Crossing detail replaces the map action with Chi tiết, showing all selected crossing events for a selected retained day. Frame each explicit arrival separately even when the previous visit never ended; grouping never repairs hardware faults. Group only unassigned nearby events (5-minute maximum gap, 15-minute maximum span), never merge explicit train arrivals. Remove settings trial sound action/player while preserving service alarm and global toggle.
+
+- Retention means expired raw train reports are no longer available for a full historical rebuild. Future diagram migrations must carry forward valid pending checkpoint state rather than assuming the entire archive still exists.

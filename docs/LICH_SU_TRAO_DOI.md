@@ -201,3 +201,11 @@ Chủ dự án gửi ảnh báo nhầm tự kích. Phát lại cục bộ đúng
 Chủ dự án yêu cầu tàu trên sơ đồ luôn xanh: chỉ đổi màu đoạn tàu/mũi tên khi dữ liệu cũ thành xanh; mốc ga vẫn vàng. Cảnh báo dữ liệu cũ/thời điểm cập nhật và trạng thái LIVE vẫn phản ánh độ mới. Không đăng nhập web trong lượt này; ảnh và công cụ phát lại riêng không nằm trong Git. Xem docs/UI_REVIEW_0.20.md.
 
 Kiểm tra 0.20: 564 quy tắc, 156 lưu trữ, 61 UI cập nhật, 21 telemetry UI đạt; build/Lint 0 lỗi, 15 cảnh báo. Cài đè từ cache suy luận phiên bản 2 gỡ đúng cảnh báo sai và giữ raw/lỗi thiết bị. Kiểm tra bitmap xác nhận tàu xanh khi dữ liệu cũ, vẫn có nhãn cảnh báo. Giữ khóa ký cũ; chưa có kiểm chứng Xiaomi mới.
+
+## 31/10/2026 — Lưu 15 ngày, khung lịch sử từng lượt và bỏ thử chuông
+
+Chủ dự án hỏi thời hạn lưu; bản 0.20 chưa tự dọn. Chủ dự án chọn 15 ngày, yêu cầu thay Xem trên sơ đồ tuyến bằng Chi tiết để đọc toàn bộ sự kiện của đường ngang trong ngày; mỗi lượt khung có viền nhẹ, lượt mới tách riêng dù lượt trước lỗi/thiếu kết thúc. Tách khung không xóa lỗi thiết bị thật. Bỏ nút Thử chuông báo lỗi trong Cài đặt. Đã nhắc lại và nhận OK triển khai/phát hành thông thường.
+
+Trong lúc thực hiện, chủ dự án yêu cầu gom những bản tin thiếu kết thúc gần nhau. Đã hỏi rõ và nhận xác nhận: chỉ gom bản tin rời chưa rõ lượt; vẫn tách theo bản tin Tàu lẻ/Tàu chẵn mới. Cụm rời tối đa cách nhau 5 phút, tổng dài tối đa 15 phút. Giữ 15 ngày theo ngày Việt Nam tính cả hôm nay, checkpoint tàu trước khi xóa và thu hồi dung lượng tệp; tải bù không nhập lại bản tin cũ hơn mốc. Chi tiết triển khai/kiểm tra tại docs/UI_REVIEW_0.21.md.
+
+Kiểm tra 0.21: 579 quy tắc; 168 lưu trữ và 21 telemetry UI trên APK phát hành; 69 UI cập nhật trên cùng mã giao diện trước bổ sung đồng bộ checkpoint trong Store. Smoke service đồng bộ đầu xác nhận mốc 15 ngày và không phát lỗi giả; không chạy lại toàn bộ 25/29 ca. Build/Lint 0 lỗi, 15 cảnh báo; chữ ký giữ nguyên. Đã xem ảnh khung lịch sử bằng dữ liệu tổng hợp; chưa có kiểm chứng Xiaomi mới.

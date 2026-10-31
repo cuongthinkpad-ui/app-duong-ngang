@@ -1632,6 +1632,7 @@ public class RulesTest {
           "station exit appears at adjacent crossing report: " + direction);
     }
     missingDiagramVisits();
+    historyGrouping();
     System.out.println(scenarios + " domain scenarios passed");
   }
 
@@ -1950,4 +1951,71 @@ public class RulesTest {
         1,
         "incremental late approach agrees with chronological archive replay");
   }
+  static void historyGrouping() {
+    var day = java.time.LocalDate.of(2026, 10, 31).atStartOfDay(
+        java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant().toEpochMilli();
+    check(Rules.historyCutoff(day + 12 * 3600000L) == day - 14 * 86400000L,
+        "retention includes today and fourteen preceding Vietnamese dates");
+    check(Rules.historyCutoff(day - 1) == day - 15 * 86400000L,
+        "retention cutoff changes at Vietnamese midnight");
+    var a = event(day + 1000, "100+000", "Tàu lẻ", false);
+    var b = event(day + 10000, "100+000", "Tàu chẵn", false);
+    var rows = List.of(a,
+        event(day + 2000, "100+000", "Cần chắn 1 đã hạ", false),
+        event(day + 3000, "100+000", "Chuông 2 hỏng", true),
+        b, event(day + 11000, "100+000", "Tàu chẵn đã qua đường ngang", false),
+        event(day + 12000, "100+000", "Khôi phục hệ thống", false),
+        event(day + 42000, "100+000", "Khôi phục hệ thống", false),
+        event(day + 43000, "100+000", "Nguồn xoay chiều 220VAC khôi phục tốt", false),
+        event(day + 45000, "101+000", "Tàu lẻ", false));
+    var grouped = Rules.crossingHistory(rows, "Km 100+000");
+    check(grouped.size() == 3, "missing old train ending never absorbs a new explicit train");
+    check(grouped.get(0).direction() == 0 && grouped.get(0).events().size() == 1,
+        "non-train activity after completed train gets a separate frame");
+    check(grouped.get(1).direction() == -1 && grouped.get(1).completed()
+            && grouped.get(1).events().size() == 4,
+        "same-visit repeated restores stay in the completed train frame");
+    check(grouped.get(2).direction() == 1 && !grouped.get(2).completed()
+            && grouped.get(2).events().size() == 3,
+        "incomplete old frame retains its original equipment fault");
+    check(grouped.stream().flatMap(g -> g.events().stream())
+            .noneMatch(e -> Rules.km(e.crossing()).equals("101+000")),
+        "another crossing never enters a train frame");
+    check(Rules.activeFaults(rows).stream().anyMatch(e -> e.text().equals("Chuông 2 hỏng")),
+        "display grouping and later train restoration never clear original bell fault");
+    var scrambled = new ArrayList<>(rows);
+    Collections.reverse(scrambled);
+    scrambled.add(a);
+    check(Rules.crossingHistory(scrambled, "100+000").equals(grouped),
+        "duplicate pages and reversed input produce the same ordered frames");
+    check(Rules.crossingHistory(List.of(a, event(a.at() + 1, "100+000", "Tàu lẻ", false)),
+            "100+000").size() == 2,
+        "each new arrival starts a frame even when direction is unchanged");
+    var loose = List.of(
+        event(day + 1000, "100+000", "Cần chắn 1 đã hạ", false),
+        event(day + 2000, "100+000", "Khôi phục hệ thống", false),
+        event(day + 3000, "100+000", "Cần chắn 1 đã nâng", false),
+        event(day + 310000, "100+000", "Mất kết nối giám sát", true));
+    var looseGroups = Rules.crossingHistory(loose, "100+000");
+    check(looseGroups.size() == 2 && looseGroups.get(1).events().size() == 3,
+        "nearby loose barrier/reset reports cluster; a long gap opens a new frame");
+    var chain = new ArrayList<Rules.Event>();
+    for (int i = 0; i < 7; i++) chain.add(event(day + i * 300000L, "100+000", "Đo điện áp", false));
+    check(Rules.crossingHistory(chain, "100+000").size() == 2,
+        "a stream of loose reports cannot chain an entire day into one frame");
+    var passageOnly = Rules.crossingHistory(List.of(
+        event(day + 1, "100+000", "Tàu chẵn đã qua đường ngang", false),
+        event(day + 2, "100+000", "Khôi phục hệ thống", false)), "100+000");
+    check(passageOnly.size() == 1 && passageOnly.get(0).direction() == -1
+            && passageOnly.get(0).completed(),
+        "passage and recovery remain readable when the approach report was missing");
+    check(Rules.crossingHistory(List.of(a,
+        event(day + 2000, "100+000", "Khôi phục hệ thống", false),
+        event(day + 3600000, "100+000", "Khôi phục hệ thống", false)), "100+000").size() == 2,
+        "a distant restore is not appended to an earlier completed train");
+    check(Rules.crossingHistory(List.of(a, event(day + 2000, "100+000", "Ấn nút Phục hồi", false),
+            b), "100+000").get(1).completed(),
+        "manual recovery bounds a train frame without changing raw text");
+  }
+
 }

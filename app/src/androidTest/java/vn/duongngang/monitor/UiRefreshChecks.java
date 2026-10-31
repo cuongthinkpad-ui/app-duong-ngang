@@ -31,6 +31,16 @@ final class UiRefreshChecks {
     return f.get(target);
   }
 
+  private View findLabel(View view, String text) {
+    if (view instanceof TextView label && label.getText().toString().equals(text)) return view;
+    if (view instanceof ViewGroup group)
+      for (int i = 0; i < group.getChildCount(); i++) {
+        View match = findLabel(group.getChildAt(i), text);
+        if (match != null) return match;
+      }
+    return null;
+  }
+
   private void invoke(String name) throws Exception {
     Method method = MainActivity.class.getDeclaredMethod(name);
     method.setAccessible(true);
@@ -936,6 +946,53 @@ final class UiRefreshChecks {
                 "next confirmed train heals wholly missing visit without clearing hardware or"
                     + " replacing window");
           });
+      store.credentials("https://rail.example.test/", "history-ui", "test-only");
+      long historyNow = System.currentTimeMillis();
+      var historyRoute = new Rules.Route(List.of("100+000", "101+000"));
+      var historyEvents = List.of(
+          new Rules.Event("history-first", historyNow - 60000, "Km 100+000", "Tàu lẻ", false, List.of()),
+          new Rules.Event("history-bell", historyNow - 59000, "Km 100+000", "Chuông 2 hỏng", true, List.of()),
+          new Rules.Event("history-second", historyNow - 30000, "Km 100+000", "Tàu chẵn", false, List.of()),
+          new Rules.Event("history-restore", historyNow - 10000, "Km 100+000", "Khôi phục hệ thống", false, List.of()),
+          new Rules.Event("history-other", historyNow - 20000, "Km 101+000", "Đèn 2 hỏng", true, List.of()));
+      store.saveForAccount(store.account(), new WebSource.DayData(historyEvents, historyRoute));
+      store.updateActiveFaults(store.account(), historyNow - 60000, historyNow, 0, List.of());
+      ui(() -> {
+        Field chosen = MainActivity.class.getDeclaredField("selectedCrossing");
+        chosen.setAccessible(true);
+        chosen.set(activity, "100+000");
+        navigate("detail");
+        String visible = labels((View) field(activity, "content"));
+        check(visible.contains("Chi tiết") && !visible.contains("Xem trên sơ đồ tuyến"),
+            "crossing detail replaces map action with history details");
+        View detailsAction = findLabel((View) field(activity, "content"), "Chi tiết");
+        check(detailsAction != null && ((View) detailsAction.getParent()).performClick(), "history details action is usable");
+        check(field(activity, "page").equals("crossingHistory"), "history details opens a dedicated page");
+        String historyVisible = labels((View) field(activity, "content"));
+        check(historyVisible.contains("15 ngày") && historyVisible.contains("Tàu lẻ")
+                && historyVisible.contains("Tàu chẵn") && !historyVisible.contains("Đèn 2 hỏng"),
+            "day history shows selected crossing only and retention period");
+        LinearLayout groups = (LinearLayout) field(activity, "content");
+        check(labels(groups.getChildAt(1)).contains("Tàu chẵn")
+                && labels(groups.getChildAt(1)).contains("Đã ghi nhận kết thúc lượt tàu")
+                && !labels(groups.getChildAt(1)).contains("Chuông 2 hỏng"),
+            "newest train has a separate completed frame without previous train fault");
+        check(labels(groups.getChildAt(2)).contains("Chuông 2 hỏng")
+                && labels(groups.getChildAt(2)).contains("Chưa ghi nhận kết thúc")
+                && groups.getChildAt(2).getBackground() != null,
+            "old incomplete train has its own bordered frame with original fault");
+        View oldHistoryRoot = (View) field(activity, "screen");
+        invoke("refreshContent");
+        check(field(activity, "screen") == oldHistoryRoot,
+            "history updates preserve window and header");
+        navigate("settings");
+        String settingsVisible = labels((View) field(activity, "content"));
+        check(!settingsVisible.contains("Thử chuông báo lỗi")
+                && settingsVisible.contains("Chuông sự cố"),
+            "settings removes trial playback and retains actual incident sound toggle");
+      });
+      ui(() -> navigate("crossingHistory"));
+      UiPreview.shot(runner, activity, "crossing-history-0.21.png");
       return checks;
     } finally {
       ui(() -> activity.finish());

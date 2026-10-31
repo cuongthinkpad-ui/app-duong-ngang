@@ -128,6 +128,7 @@ public class MonitorService extends Service {
     try {
       synchronized (Store.class) {
         if (!store.account().equals(account) || Thread.currentThread().isInterrupted()) return;
+        store.maintainHistory(account, System.currentTimeMillis());
         if (source == null || !sourceAccount.equals(account)) {
           source =
               new WebSource(

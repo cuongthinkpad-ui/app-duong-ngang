@@ -33,7 +33,6 @@ public class MainActivity extends Activity {
       BUTTON_TEXT = 0xFF071724,
       WARNING = 0xFFFBBF24;
   private Store store;
-  private final AlarmSound testAlarm = new AlarmSound();
   private LinearLayout screen, content;
   private TextView status, routeNote, summaryTitle, summaryDetail, summaryTime;
   private LinearLayout summaryCard;
@@ -55,6 +54,8 @@ public class MainActivity extends Activity {
       incidentFilter = "Tất cả";
   private boolean demo = false, expanded = false, followToday = true;
   private LocalDate selected = LocalDate.now(WebSource.ZONE);
+  private LocalDate historyDay = LocalDate.now(WebSource.ZONE);
+  private boolean historyFollowToday = true, preparingLocalData;
   private final long demoClock = System.currentTimeMillis();
   private final ExecutorService io = Executors.newSingleThreadExecutor();
   private final Handler handler = new Handler(Looper.getMainLooper());
@@ -67,6 +68,8 @@ public class MainActivity extends Activity {
       new Runnable() {
         public void run() {
           if (followToday) selected = LocalDate.now(WebSource.ZONE);
+          if (historyFollowToday) historyDay = LocalDate.now(WebSource.ZONE);
+          prepareLocalData();
           String state =
               store.prefs.getString("status", "")
                   + store.prefs.getLong("lastSuccess", 0)
@@ -97,34 +100,41 @@ public class MainActivity extends Activity {
         && !store.prefs.getString("url", "").isEmpty())
       startForegroundService(new Intent(this, MonitorService.class));
     render();
+    prepareLocalData();
+  }
+
+  private void prepareLocalData() {
+    if (preparingLocalData || io.isShutdown()) return;
     Store capturedStore = store;
     String capturedAccount = capturedStore.account();
-    if (!capturedStore.travelReady()
-        || !capturedStore.axleReady()
-        || !capturedStore.selfEvidenceReady())
-      io.execute(
-          () -> {
-            synchronized (Store.class) {
-              if (!capturedStore.account().equals(capturedAccount)) return;
-              capturedStore.prepareSelfEvidence(capturedAccount, System.currentTimeMillis());
-              capturedStore.prepareTravelState(capturedAccount, System.currentTimeMillis());
-              if (!capturedStore.axleReady()) {
-                long now = System.currentTimeMillis();
-                capturedStore.updateActiveFaults(
-                    capturedAccount,
-                    Rules.faultBaseline(0, now),
-                    now,
-                    Rules.faultBaseline(capturedStore.prefs.getLong("baselineFrom", 0), now),
-                    List.of());
-              }
-            }
-            runOnUiThread(
-                () -> {
-                  if (!isFinishing()
-                      && store == capturedStore
-                      && store.account().equals(capturedAccount)) refreshContent();
-                });
-          });
+    long now = System.currentTimeMillis();
+    if (capturedStore.travelReady() && capturedStore.axleReady()
+        && capturedStore.selfEvidenceReady() && !capturedStore.historyCleanupDue(now)) return;
+    preparingLocalData = true;
+    io.execute(() -> {
+      boolean prepared = false;
+      try {
+        synchronized (Store.class) {
+          if (!capturedStore.account().equals(capturedAccount)) return;
+          capturedStore.prepareSelfEvidence(capturedAccount, now);
+          capturedStore.prepareTravelState(capturedAccount, now);
+          if (!capturedStore.axleReady())
+            capturedStore.updateActiveFaults(capturedAccount, Rules.faultBaseline(0, now), now,
+                Rules.faultBaseline(capturedStore.prefs.getLong("baselineFrom", 0), now), List.of());
+          capturedStore.maintainHistory(capturedAccount, now);
+          prepared = true;
+        }
+      } catch (RuntimeException failure) {
+        android.util.Log.w("RailHistory", "Chưa chuẩn bị được dữ liệu cục bộ", failure);
+      } finally {
+        boolean refreshReady = prepared;
+        runOnUiThread(() -> {
+          preparingLocalData = false;
+          if (refreshReady && !isFinishing() && store == capturedStore
+              && store.account().equals(capturedAccount)) refreshContent();
+        });
+      }
+    });
   }
 
   @Override
@@ -146,7 +156,6 @@ public class MainActivity extends Activity {
   @Override
   protected void onDestroy() {
     stopEffects();
-    testAlarm.stop();
     io.shutdownNow();
     super.onDestroy();
   }
@@ -548,7 +557,9 @@ public class MainActivity extends Activity {
                 ? "Sự cố đường ngang"
                 : page.equals("settings")
                     ? "Cài đặt"
-                    : page.equals("detail")
+                    : page.equals("crossingHistory")
+                        ? "Lịch sử đường ngang"
+                        : page.equals("detail")
                         ? "Chi tiết đường ngang"
                         : page.equals("trains") ? "Các lượt tàu" : "Danh sách đường ngang";
     LinearLayout headingRow = row();
@@ -566,7 +577,7 @@ public class MainActivity extends Activity {
     titleRow.addView(titles, new LinearLayout.LayoutParams(0, -2, 1));
     titleRow.addView(
         iconButton(
-            page.equals("detail") || page.equals("trains")
+            page.equals("detail") || page.equals("crossingHistory") || page.equals("trains")
                 ? "back"
                 : page.equals("settings") ? "close" : "settings",
             page.equals("settings") ? "Về tổng quan" : "Cài đặt",
@@ -574,6 +585,8 @@ public class MainActivity extends Activity {
                 navigate(
                     page.equals("trains")
                         ? "overview"
+                        : page.equals("crossingHistory")
+                            ? "detail"
                         : page.equals("detail")
                             ? "crossings"
                             : page.equals("settings") ? "overview" : "settings")));
@@ -605,6 +618,7 @@ public class MainActivity extends Activity {
       if (page.equals("incidents")) incidents();
       else if (page.equals("crossings")) crossingList();
       else if (page.equals("detail")) crossingDetail();
+      else if (page.equals("crossingHistory")) crossingHistory();
       else if (page.equals("trains")) trainList();
       else settings();
     }
@@ -668,6 +682,7 @@ public class MainActivity extends Activity {
       if (page.equals("incidents")) incidents();
       else if (page.equals("crossings")) crossingList();
       else if (page.equals("detail")) crossingDetail();
+      else if (page.equals("crossingHistory")) crossingHistory();
       else if (page.equals("trains")) trainList();
       content.addView(status);
       updateStatusLine();
@@ -842,7 +857,6 @@ public class MainActivity extends Activity {
     store.prefs.edit().putBoolean("sound", enabled).apply();
     if (!enabled) {
       NotificationManager manager = getSystemService(NotificationManager.class);
-      testAlarm.stop();
       if (store.prefs.getBoolean("running", false))
         startService(new Intent(this, MonitorService.class).setAction("MUTE_ALARM"));
       for (var notification : manager.getActiveNotifications())
@@ -1133,20 +1147,7 @@ public class MainActivity extends Activity {
     TextView fetch = pill("Tải dữ liệu", BLUE, TINT);
     touch(fetch, this::loadHistory);
     date.addView(fetch);
-    touch(
-        day,
-        () ->
-            new DatePickerDialog(
-                    this,
-                    (v, y, m, d) -> {
-                      selected = LocalDate.of(y, m + 1, d);
-                      followToday = selected.equals(LocalDate.now(WebSource.ZONE));
-                      render();
-                    },
-                    selected.getYear(),
-                    selected.getMonthValue() - 1,
-                    selected.getDayOfMonth())
-                .show());
+    touch(day, () -> chooseHistoryDate(false));
     controls.addView(date);
     gap(controls, 10);
     LinearLayout filters = row();
@@ -1245,7 +1246,12 @@ public class MainActivity extends Activity {
   }
 
   private void loadHistory() {
-    LocalDate day = selected;
+    LocalDate day = page.equals("crossingHistory") ? historyDay : selected;
+    if (day.isBefore(LocalDate.now(WebSource.ZONE).minusDays(14))
+        || day.isAfter(LocalDate.now(WebSource.ZONE))) {
+      Toast.makeText(this, "Chọn ngày trong 15 ngày gần nhất", Toast.LENGTH_SHORT).show();
+      return;
+    }
     if (demo) {
       Toast.makeText(this, "Dữ liệu minh họa không kết nối website", Toast.LENGTH_SHORT).show();
       return;
@@ -1265,6 +1271,7 @@ public class MainActivity extends Activity {
                     store.prefs.getString("url", ""),
                     store.prefs.getString("user", ""),
                     store.password());
+            store.maintainHistory(account, System.currentTimeMillis());
             var data = source.readDay(day);
             store.saveForAccount(account, data);
             long now = System.currentTimeMillis();
@@ -1474,23 +1481,6 @@ public class MainActivity extends Activity {
             store.prefs.getBoolean("sound", true),
             options);
     sound.setOnCheckedChangeListener((b, on) -> setAlarmSound(on));
-    gap(options, 10);
-    options.addView(
-        action(
-            "Thử chuông báo lỗi",
-            "bell",
-            false,
-            () -> {
-              setVolumeControlStream(android.media.AudioManager.STREAM_ALARM);
-              boolean played = testAlarm.play(this);
-              Toast.makeText(
-                      this,
-                      played
-                          ? "Đang thử chuông · Dùng phím âm lượng để chỉnh Báo thức"
-                          : "Chưa phát được chuông trên thiết bị",
-                      Toast.LENGTH_LONG)
-                  .show();
-            }));
     gap(options, 7);
     options.addView(text("Âm lượng chuông dùng mức Báo thức của điện thoại", 10, MUTED, false));
     gap(options, 10);
@@ -1785,8 +1775,91 @@ public class MainActivity extends Activity {
       }
     }
     content.addView(history);
-    content.addView(action("Xem trên sơ đồ tuyến", "direction", true, () -> navigate("overview")));
+    history.addView(action("Chi tiết", "history", true, () -> {
+      historyDay = LocalDate.now(WebSource.ZONE);
+      historyFollowToday = true;
+      navigate("crossingHistory");
+    }));
     gap(content, 17);
+  }
+
+  private void chooseHistoryDate(boolean crossing) {
+    LocalDate initial = crossing ? historyDay : selected;
+    LocalDate first = LocalDate.now(WebSource.ZONE).minusDays(14);
+    if (initial.isBefore(first)) initial = first;
+    DatePickerDialog picker = new DatePickerDialog(this, (v, year, month, day) -> {
+      LocalDate chosen = LocalDate.of(year, month + 1, day);
+      if (crossing) {
+        historyDay = chosen;
+        historyFollowToday = chosen.equals(LocalDate.now(WebSource.ZONE));
+      } else {
+        selected = chosen;
+        followToday = chosen.equals(LocalDate.now(WebSource.ZONE));
+      }
+      render();
+    }, initial.getYear(), initial.getMonthValue() - 1, initial.getDayOfMonth());
+    picker.getDatePicker().setMinDate(Rules.historyCutoff(System.currentTimeMillis()));
+    picker.getDatePicker().setMaxDate(System.currentTimeMillis());
+    picker.show();
+  }
+
+  private void crossingHistory() {
+    LinearLayout controls = card(SURFACE);
+    controls.addView(text("Km " + selectedCrossing, 18, INK, true));
+    gap(controls, 10);
+    LinearLayout date = row();
+    TextView day = text(historyDay.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), 13, BLUE, true);
+    date.addView(day, new LinearLayout.LayoutParams(0, -2, 1));
+    touch(day, () -> chooseHistoryDate(true));
+    TextView load = pill("Tải dữ liệu", BLUE, TINT);
+    touch(load, this::loadHistory);
+    date.addView(load);
+    controls.addView(date);
+    gap(controls, 7);
+    controls.addView(text("Lưu lịch sử 15 ngày, tính cả hôm nay", 10, MUTED, false));
+    content.addView(controls);
+    long from = historyDay.atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
+    long to = historyDay.plusDays(1).atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
+    List<Rules.Event> records = demo ? samples() : store.crossingEvents(selectedCrossing, from, to);
+    List<Rules.EventGroup> groups = Rules.crossingHistory(records, selectedCrossing);
+    for (var group : groups) {
+      LinearLayout frame = card(SURFACE);
+      frame.setBackground(panel(SURFACE, LINE));
+      String title = group.direction() > 0 ? "Tàu lẻ →"
+          : group.direction() < 0 ? "Tàu chẵn ←" : "Sự kiện ngoài lượt tàu";
+      frame.addView(text("Km " + group.crossing() + " · " + title, 13,
+          group.direction() == 0 ? INK : GREEN, true));
+      var rows = group.events();
+      gap(frame, 5);
+      frame.addView(text(time(rows.get(0).at()) + " – " + time(rows.get(rows.size() - 1).at()),
+          10, MUTED, false));
+      if (group.direction() != 0) {
+        gap(frame, 5);
+        frame.addView(text(group.completed() ? "Đã ghi nhận kết thúc lượt tàu" : "Chưa ghi nhận kết thúc",
+            10, group.completed() ? GREEN : MUTED, false));
+      }
+      for (var event : rows) {
+        divider(frame);
+        LinearLayout line = row();
+        line.setGravity(Gravity.TOP);
+        line.addView(text(time(event.at()), 10, MUTED, false),
+            new LinearLayout.LayoutParams(dp(66), -2));
+        line.addView(text(event.text(), 11, event.red() ? RED : INK, false),
+            new LinearLayout.LayoutParams(0, -2, 1));
+        frame.addView(line);
+        String note = Rules.axleNote(event);
+        if (!note.isEmpty()) {
+          gap(frame, 5);
+          frame.addView(text(note, 10, MUTED, false));
+        }
+      }
+      content.addView(frame);
+    }
+    if (groups.isEmpty()) {
+      LinearLayout none = card(SURFACE);
+      empty(none, "Chưa có sự kiện trong ngày", "Chọn Tải dữ liệu để đọc từ website.", "history");
+      content.addView(none);
+    }
   }
 
   private void axleFaultSummary(List<Rules.Event> events, List<Rules.Event> faults) {
@@ -1830,7 +1903,7 @@ public class MainActivity extends Activity {
       String target = pages[i];
       boolean active =
           page.equals(target)
-              || (page.equals("detail") && target.equals("crossings"))
+              || ((page.equals("detail") || page.equals("crossingHistory")) && target.equals("crossings"))
               || (page.equals("trains") && target.equals("overview"));
       LinearLayout tab = column();
       tab.setGravity(Gravity.CENTER);

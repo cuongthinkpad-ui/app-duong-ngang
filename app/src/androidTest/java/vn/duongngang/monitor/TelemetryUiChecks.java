@@ -311,7 +311,7 @@ final class TelemetryUiChecks {
             String shown = labels((View) get("screen"));
             check(shown.contains("Designed by Cao Xuân Cường"), "signature in settings only");
             check(
-                shown.contains("Thử chuông báo lỗi") && shown.contains("Cài đặt chạy nền"),
+                !shown.contains("Thử chuông báo lỗi") && shown.contains("Cài đặt chạy nền"),
                 "operational controls retained");
             check(
                 shown.contains("30 giây") && shown.contains("2 phút") && shown.contains("5 phút"),

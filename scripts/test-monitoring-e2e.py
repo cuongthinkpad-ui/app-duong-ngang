@@ -208,6 +208,14 @@ def main():
             assert int(empty.get('lastAlarm', '0')) == 0, 'Empty snapshot must not sound'
             assert not faults(empty), 'Exempt axle reports must not create faults'
             print('PASS: six qualifying errors and one large deviation at all six exempt points remain silent', flush=True)
+            if '--retention-only' in sys.argv:
+                local_day = (datetime.now(timezone.utc) + timedelta(hours=7)).date()
+                retention_start = datetime.combine(local_day - timedelta(days=14), datetime.min.time(),
+                                                   timezone(timedelta(hours=7)))
+                assert int(empty.get('retentionCutoff', '0')) == int(retention_start.timestamp()*1000), 'Expected 15-day Vietnamese retention floor'
+                assert int(empty.get('retentionPreparedAt', '0')) == int(empty['retentionCutoff']), 'Expected persisted checkpoint barrier before pruning'
+                print('PASS: foreground poll prepares durable 15-date retention while accepting current reports silently', flush=True)
+                return
             if '--diagram-only' in sys.argv:
                 run_diagram_checks()
                 print('4 diagram monitoring checks passed', flush=True)

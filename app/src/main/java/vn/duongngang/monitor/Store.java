@@ -84,6 +84,54 @@ public final class Store {
     }
   }
 
+  public boolean historyCleanupDue(long now) {
+    return prefs.getLong("retentionCutoff", 0) < Rules.historyCutoff(now);
+  }
+
+  /** Checkpoint first, delete second: long-running trains survive removal of old raw rows. */
+  public int maintainHistory(String expected, long now) {
+    synchronized (Store.class) {
+      if (!account().equals(expected)) throw new IllegalStateException("Tài khoản đã thay đổi");
+      long cutoff = Rules.historyCutoff(now);
+      if (!historyCleanupDue(now)) return 0;
+      prepareSelfEvidence(expected, now);
+      updateTravelState(now);
+      if (!prefs.contains("occupiedPoints")) {
+        JSONArray occupied = new JSONArray();
+        for (var point : Rules.occupancies(route(), events(0, now + 1)))
+          occupied.put(new JSONArray().put(point.crossing()).put(point.direction()).put(point.at()));
+        prefs.edit().putString("occupiedPoints", occupied.toString()).apply();
+      }
+      // Flush the checkpoint synchronously before the destructive database commit. If the
+      // process dies during cleanup, a restart must still know about trains older than cutoff.
+      if (!prefs.edit().putLong("retentionPreparedAt", cutoff).commit())
+        throw new IllegalStateException("Chưa lưu được trạng thái trước khi dọn lịch sử");
+      int removed;
+      try (var database = db()) {
+        removed = database.delete("events", "at<?", new String[] {"" + cutoff});
+        // Persist the import floor as well: old pages must not grow the archive again.
+        prefs.edit().putLong("retentionCutoff", cutoff).apply();
+        if (removed > 0) database.execSQL("VACUUM");
+      }
+      Map<String, Long> pending = pendingSelf();
+      pending.values().removeIf(at -> at < cutoff);
+      prefs.edit().putString("pendingSelf", new JSONObject(pending).toString()).apply();
+      return removed;
+    }
+  }
+
+  public synchronized List<Rules.Event> crossingEvents(String crossing, long from, long to) {
+    List<Rules.Event> out = new ArrayList<>();
+    try (var database = db(); var cursor = database.rawQuery(
+        "SELECT * FROM events WHERE replace(lower(km),' ','') IN (?,?) AND at>=? AND at<? ORDER BY at DESC",
+        new String[] {Rules.km(crossing).toLowerCase(Locale.ROOT), "km" + Rules.km(crossing).toLowerCase(Locale.ROOT), "" + from, "" + to})) {
+      appendRows(cursor, out);
+    }
+    out.removeIf(Rules::isExcludedAxleFault);
+    out.sort(Comparator.comparingLong(Rules.Event::at).reversed().thenComparing(Rules.Event::id));
+    return out;
+  }
+
   public List<Rules.Event> activeFaults() {
     List<Rules.Event> result = new ArrayList<>();
     try {
@@ -463,6 +511,8 @@ public final class Store {
           if (n.getId() != 1) notifications.cancel(n.getId());
         prefs
             .edit()
+            .remove("retentionPreparedAt")
+            .remove("retentionCutoff")
             .remove("lastSuccess")
             .remove("coverage")
             .remove("baselineFrom")
@@ -522,7 +572,9 @@ public final class Store {
     try (var db = db()) {
       db.beginTransaction();
       try {
+        long cutoff = prefs.getLong("retentionCutoff", 0);
         for (var e : events) {
+          if (e.at() < cutoff) continue;
           ContentValues v = new ContentValues();
           v.put("id", e.id());
           v.put("at", e.at());

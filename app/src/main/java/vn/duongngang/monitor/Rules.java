@@ -39,6 +39,65 @@ public final class Rules {
               "332+350",
               "334+830"));
 
+  /** Fifteen Vietnamese calendar dates, including today. */
+  public static long historyCutoff(long now) {
+    return java.time.Instant.ofEpochMilli(now).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+        .toLocalDate().minusDays(14).atStartOfDay(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+        .toInstant().toEpochMilli();
+  }
+
+  /** Display grouping only; never changes equipment faults or the train diagram. */
+  public record EventGroup(String crossing, int direction, boolean completed, List<Event> events) {}
+
+  public static List<EventGroup> crossingHistory(List<Event> input, String crossing) {
+    List<Event> ordered = new ArrayList<>();
+    Set<String> seen = new HashSet<>();
+    for (Event event : input)
+      if (km(event.crossing()).equals(km(crossing)) && seen.add(event.id())) ordered.add(event);
+    ordered.sort(Comparator.comparingLong(Event::at).thenComparingInt(Rules::reportPhase)
+        .thenComparing(Event::id));
+    List<EventGroup> groups = new ArrayList<>();
+    List<Event> current = new ArrayList<>();
+    int currentDirection = 0;
+    boolean completed = false, passedOnly = false;
+    for (Event event : ordered) {
+      int arrival = event.red() ? 0 : direction(event.text());
+      int passage = event.red() ? 0 : passedDirection(event.text());
+      boolean reset = !event.red() && evidenceReset(event);
+      // Explicit arrivals always begin a fresh train, even if the last one never restored.
+      // A passage without an arrival can start an incomplete visit, but never absorb a
+      // previous completed train or a visit travelling in the opposite direction.
+      boolean starts = arrival != 0
+          || passage != 0 && (currentDirection == 0 || completed || passedOnly
+              || currentDirection != passage);
+      boolean separateLooseCluster = currentDirection == 0 && !current.isEmpty()
+          && (event.at() - current.get(current.size() - 1).at() > 5 * 60000L
+              || event.at() - current.get(0).at() > 15 * 60000L);
+      if ((starts || separateLooseCluster) && !current.isEmpty()) {
+        groups.add(new EventGroup(km(crossing), currentDirection, completed, List.copyOf(current)));
+        current.clear();
+        completed = false;
+      }
+      if (starts) {
+        currentDirection = arrival != 0 ? arrival : passage;
+        passedOnly = arrival == 0;
+      } else if (completed && (!reset
+          || event.at() - current.get(current.size() - 1).at() > 5 * 60000L)) {
+        groups.add(new EventGroup(km(crossing), currentDirection, true, List.copyOf(current)));
+        current.clear();
+        currentDirection = 0;
+        completed = false;
+        passedOnly = false;
+      }
+      current.add(event);
+      if (reset && currentDirection != 0) completed = true;
+    }
+    if (!current.isEmpty())
+      groups.add(new EventGroup(km(crossing), currentDirection, completed, List.copyOf(current)));
+    Collections.reverse(groups);
+    return groups;
+  }
+
   public static boolean isPoint(String raw) {
     return raw != null && POINT.matcher(raw.trim()).matches();
   }
