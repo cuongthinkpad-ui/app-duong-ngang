@@ -217,3 +217,11 @@ Chủ dự án gửi ảnh báo nhầm. Môi trường đọc Visitec bị chặ
 Bản 0.22 giữ mốc lượt có hướng riêng khỏi hoạt động thiết bị, giữ nguồn tàu rõ hướng chưa sử dụng dù đã khôi phục; đúng hướng và một nguồn chỉ dùng một lần. Không thay xử lý mất kết nối hay tự sinh tàu từ thao tác. Nâng cache suy luận lên 4, giữ lỗi gốc và checkpoint của lượt có raw đã quá 15 ngày khi phát lại suy luận. Công cụ phát lại thật ngoài Git, các test công khai dùng số liệu tổng hợp. Xem docs/UI_REVIEW_0.22.md.
 
 Kiểm tra 0.22: 611 quy tắc, 171 lưu trữ, 69 UI cập nhật đạt; 2 ca dịch vụ mới trên chu kỳ 30 giây xác nhận không báo/chuông giả khi chuỗi thử xen giữa, nguồn chỉ dùng một lần và cảnh báo mới vẫn phát âm. Đợi lastSuccess trước kiểm tra lastAlarm để tránh đọc giữa lượt cập nhật; giữ cùng APK. Build/Lint 0 lỗi, 15 cảnh báo; cùng chữ ký, chưa có kiểm chứng Xiaomi mới. Chủ dự án yêu cầu giữ nguyên phần mất kết nối, ca canary vẫn cho kết quả cũ.
+
+## 31/10 — sửa tàu treo trên sơ đồ sau 0.22
+
+Chủ dự án phản ánh một tàu lẻ thành hai đoạn trong khoảng 16:40–16:44, yêu cầu đọc web thật, sửa và thử lại. Sau giải thích, chủ dự án xác nhận quy tắc chung cho cả chẵn/lẻ: khi tàu thực tế mới vào đoạn có dấu vết cũ treo thì bỏ dấu vết cũ và nhận lượt mới ngay; không chờ đã qua/khôi phục. Nút bấm và thao tác cần/khôi phục không được tự tạo lượt. Đã cho phép sửa và kiểm thử tiếp. Kết quả, thay đổi cache và giới hạn phát hành được ghi ở `FIX_DIAGRAM_AFTER_0.22.md`; dữ liệu báo cáo xác thực giữ ngoài Git.
+
+Chủ dự án gửi lại hai tệp sao lưu khóa và cho phép tiếp tục sửa app. Đã lưu ngoài Git, khôi phục/xác minh khóa gốc và build APK 0.23.0/versionCode 23 ký cùng chứng chỉ. Chưa đăng GitHub, chưa chạy Android instrumentation/điện thoại tại môi trường mới; không gán các kết quả runtime cũ cho bản mới.
+
+Chủ dự án không tải được liên kết tệp workspace; tiếp tục bàn giao mã và APK 0.23 qua GitHub theo cách Download raw file đã dùng ở các bản trước.

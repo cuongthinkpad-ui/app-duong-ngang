@@ -2,6 +2,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/env.sh
+rail_signing_info=/workspace/private-backups/duong-ngang-signing/restored/signing-info.json
+if [[ -z "${DUONG_NGANG_SIGNING_INFO:-}" && -f "$rail_signing_info" ]]; then
+  export DUONG_NGANG_SIGNING_INFO="$rail_signing_info"
+fi
 proxy_options=()
 if [[ -n "${HTTPS_PROXY:-}" ]]; then
   read -r rail_proxy_host rail_proxy_port < <(node -e 'const u=new URL(process.env.HTTPS_PROXY); console.log(u.hostname,u.port || 80)')

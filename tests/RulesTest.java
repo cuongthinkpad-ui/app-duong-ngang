@@ -542,8 +542,8 @@ public class RulesTest {
     var once =
         Rules.travelState(line, followingState, List.of(event(7000, "101+000", "Tàu lẻ", false)));
     check(
-        Rules.betweenCrossings(once).size() == 1,
-        "one downstream arrival consumes only one of two pending trains");
+        Rules.betweenCrossings(once).isEmpty(),
+        "new downstream arrival replaces older unmatched trails on the same interval");
     check(
         Rules.betweenCrossings(
                 Rules.travelState(line, once, List.of(event(8000, "101+000", "Tàu lẻ", false))))
@@ -1631,9 +1631,59 @@ public class RulesTest {
           "station exit appears at adjacent crossing report: " + direction);
     }
     missingDiagramVisits();
+    missingMiddleVisit();
     historyGrouping();
     nonTrainActions();
     System.out.println(scenarios + " domain scenarios passed");
+  }
+
+  static void missingMiddleVisit() {
+    for (int d : List.of(1, -1)) {
+      var route = new Rules.Route(List.of("99+000 (S)", "100+000", "101+000", "102+000", "103+000 (T)"));
+      String a = d == 1 ? "100+000" : "102+000", b = "101+000";
+      String c = d == 1 ? "102+000" : "100+000";
+      String text = d == 1 ? "Tàu lẻ" : "Tàu chẵn";
+      var history = List.of(event(1000, a, text, false),
+          event(2000, a, text + " đã qua đường ngang", false),
+          event(3000, a, "Khôi phục hệ thống", false),
+          event(4000, b, "Ấn nút Duy tu", false),
+          event(5000, b, "Khôi phục hệ thống", false),
+          event(100000, a, text, false), event(101000, b, text, false));
+      var state = Rules.travelState(route, Rules.TravelState.empty(), history);
+      oneSegment(route, state, a, b, d,
+          "new real arrival replaces the old unmatched trail without waiting for passage/reset: " + d);
+      check(state.journeys().stream().anyMatch(j -> j.id().equals(history.get(5).id()) && j.reached()),
+          "new destination arrival belongs to the newest real source, not the old ghost: " + d);
+      var next = new ArrayList<>(history); next.add(event(102000, c, text, false));
+      oneSegment(route, Rules.travelState(route, Rules.TravelState.empty(), next), b, c, d,
+          "overlapping next crossing does not leave a second train behind: " + d);
+      var following = new ArrayList<>(next); following.add(event(103000, a, text, false));
+      check(Rules.trackSegments(route, Rules.travelState(route, Rules.TravelState.empty(), following)).size() == 2,
+          "a following source newer than the matched arrival stays independent: " + d);
+      var incremental = Rules.TravelState.empty();
+      for (var e : next) incremental = Rules.travelState(route, incremental, List.of(e));
+      check(incremental.equals(Rules.travelState(route, Rules.TravelState.empty(), next)),
+          "replacement is stable across individual polls/checkpoint seeds: " + d);
+      var reversed = new ArrayList<>(next); Collections.reverse(reversed);
+      check(incremental.equals(Rules.travelState(route, Rules.TravelState.empty(), reversed)),
+          "backfilled page ordering cannot restore the ghost: " + d);
+      var activity = new ArrayList<>(history.subList(0, 6));
+      activity.add(event(101000, b, "Cần chắn 1 đã hạ", false));
+      check(Rules.travelState(route, Rules.TravelState.empty(), activity).journeys().stream()
+          .anyMatch(j -> j.id().equals(history.get(5).id()) && !j.reached()),
+          "barrier action cannot consume the newest train as an independent real arrival: " + d);
+      activity.add(event(102000, b, text, false));
+      oneSegment(route, Rules.travelState(route, Rules.TravelState.empty(), activity), a, b, d,
+          "real approach corrects an earlier activity match to a stale source: " + d);
+      var tested = List.of(event(1000, a, text, false),
+          event(2000, a, text + " đã qua đường ngang", false),
+          event(3000, a, "Khôi phục hệ thống", false),
+          event(4000, b, "Cần chắn 1 đã hạ", false),
+          event(5000, b, "Cần chắn 1 đã nâng", false),
+          event(6000, b, "Khôi phục hệ thống", false), event(7000, b, text, false));
+      oneSegment(route, Rules.travelState(route, Rules.TravelState.empty(), tested), a, b, d,
+          "activity/reset followed by a real approach still represents one train: " + d);
+    }
   }
 
   static void missingDiagramVisits() {

@@ -1,6 +1,10 @@
-# Đường Ngang — bản thử 0.22
+# Đường Ngang — bản thử 0.23
 
-**[Tải APK 0.22](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.22.apk)** — chọn **Download raw file** nếu GitHub mở trang xem tệp.
+**[Tải APK 0.23](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.23.apk)** — versionCode 23, ký bằng khóa cũ để cập nhật cài đè. Chọn **Download raw file** nếu GitHub mở trang xem tệp.
+
+Sửa tàu treo trên sơ đồ: tàu thật mới thay dấu vết cũ trên đúng đoạn/hướng ngay khi nhận lượt, cho cả chẵn/lẻ. Thao tác cần và khôi phục không tự tạo tàu. Giữ lỗi thiết bị gốc và checkpoint có nguồn quá hạn. Chưa thử trên Xiaomi; xem [kiểm chứng](../docs/FIX_DIAGRAM_AFTER_0.22.md).
+
+Nội dung bản 0.22 trước đó:
 
 - Sửa đối chiếu nghi tự kích khi thao tác thử tại điểm hiện tại làm mất bằng chứng tàu phía trước đã khôi phục. Một thao tác hay cả loạt không tự là lượt tàu/mốc chia lượt thực; giữ nguồn tàu rõ hướng chưa dùng, vẫn chỉ dùng một lần.
 - Cài đè đánh giá lại cảnh báo suy luận theo dữ liệu còn lưu, giữ lỗi thiết bị thật và checkpoint tàu có nguồn quá 15 ngày. Không thay quy tắc mất kết nối theo yêu cầu riêng, không đổi giao diện/chuông/trục.

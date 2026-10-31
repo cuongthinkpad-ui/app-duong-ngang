@@ -11,7 +11,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import org.json.*;
 
 public final class Store {
-  private static final int TRAVEL_VERSION = 4;
+  private static final int TRAVEL_VERSION = 5;
   private static final int AXLE_VERSION = 3;
   private static final int SELF_EVIDENCE_VERSION = 4;
   private final Context context;
@@ -446,8 +446,16 @@ public final class Store {
     if (prefs.getInt("travelVersion", 0) != TRAVEL_VERSION
         || !topology.equals(prefs.getString("travelRoute", ""))
         || checkpointAt > boundary) {
+      long floor = prefs.getLong("retentionCutoff", 0);
+      List<Rules.Journey> expired = new ArrayList<>();
+      if (floor > 0 && floor <= boundary
+          && topology.equals(prefs.getString("travelRoute", "")))
+        for (var journey : checkpoint.journeys())
+          if (journey.at() < floor) expired.add(journey);
+      // Migrations can replay only retained raw reports. Never discard pending trains
+      // whose source reports were already pruned by the fifteen-date policy.
       checkpointAt = boundary;
-      checkpoint = Rules.travelState(route(), Rules.TravelState.empty(), events(0, boundary));
+      checkpoint = Rules.travelState(route(), new Rules.TravelState(expired), events(0, boundary));
     }
     if (checkpointAt < boundary)
       checkpoint = Rules.travelState(route(), checkpoint, events(checkpointAt, boundary));

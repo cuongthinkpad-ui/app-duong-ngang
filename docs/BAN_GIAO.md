@@ -211,3 +211,11 @@ Chủ dự án đã xác nhận sửa: các thao tác nút Duy tu/Cảnh báo/Ph
 `selfEvidenceVersion=4` đánh giá lại suy luận cũ, giữ raw/lỗi thật, không phát lại chuông lịch sử. Khi phát lại phần trước checkpoint, giữ những lượt có raw đã quá retention rồi phát lại phần còn lưu, tránh xóa tàu đang chờ vì kho raw không còn đầy đủ. Giữ `travelVersion=4`, `axleVersion=3`, 15 ngày và UI/chuông/khóa ký. Xem docs/UI_REVIEW_0.22.md.
 
 Kiểm tra 0.22: **611 quy tắc, 171 lưu trữ và 69 UI cập nhật** đạt trên APK cuối; **2 ca dịch vụ mới** qua chu kỳ 30 giây đạt cùng APK: không báo/chuông giả sau chuỗi thử, và lượt sau thiếu nguồn mới vẫn báo có âm, không dùng lại bằng chứng. Test dịch vụ chờ lastSuccess hoàn tất để không đọc trạng thái giữa chừng. Không chạy lại toàn bộ service suite; build/Lint 0 lỗi, 15 cảnh báo. Phát lại riêng mốc trong ảnh tái hiện/gỡ trường hợp thao tác, canary mất kết nối không đổi. Không kiểm chứng Xiaomi mới, chữ ký cũ. Xem docs/UI_REVIEW_0.22.md.
+
+## Sửa tiếp sau 0.22 — chưa phát hành
+
+Chủ dự án chốt thay dấu vết tàu treo ngay khi tàu thực tế mới vào đúng đoạn, cả hai hướng; không chờ đã qua/khôi phục và không coi thao tác là tàu. Mã đang sửa dùng nguồn mới nhất cho bản tin tàu thật, giữ lượt theo sau mới hơn thời điểm nhận và các đoạn độc lập. `travelVersion=5` dựng lại retained raw, giữ checkpoint có raw hết hạn. Chi tiết và giới hạn kiểm thử tại [bản kiểm tra sau 0.22](FIX_DIAGRAM_AFTER_0.22.md). Chưa thay APK phát hành vì môi trường mới chưa có khóa ký cũ.
+
+Cập nhật khóa ký sau đó: đã nhận, lưu riêng và khôi phục khóa cũ; chứng chỉ trực tiếp từ keystore khớp fingerprint gốc. Xem `docs/SAO_LUU_KHOA_KY.md`. Chưa chuyển build sang khóa cũ hoặc phát hành bản mới.
+
+Bản cập nhật đã chuẩn bị tiếp theo: **0.23.0/versionCode 23**, `downloads/DuongNgang-0.23.apk`, ký khóa cũ và xác minh bằng apksigner. Mã/APK đi kèm commit bàn giao 0.23; tải qua GitHub Download raw file. Các ghi chú chưa có khóa/chưa ký ở trên là trạng thái trước bước này. Build, lint (0 lỗi/15 cảnh báo), 629 quy tắc, 12 parser, 15 fixture đọc xác thực và 602 kiểm tra phát lại báo cáo thật đạt; instrumentation mới/điện thoại chưa chạy.

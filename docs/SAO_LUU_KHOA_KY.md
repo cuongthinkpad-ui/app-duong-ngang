@@ -47,3 +47,7 @@ b5a46a086a71f161a554daa47acadd8741018a3648d0506cbe156b06f4768108
 ```
 
 Các kiểm tra đã đạt: giải mã qua CLI, khớp bytes khóa gốc, khớp chứng chỉ, từ chối mật khẩu sai, từ chối ciphertext bị sửa. Không thay đổi mã app hoặc APK hiện tại.
+
+## Khôi phục tại môi trường mới — 31/10/2026
+
+Chủ dự án đã gửi lại đủ hai tệp và yêu cầu lưu. Đã lưu ngoài Git tại `/workspace/private-backups/duong-ngang-signing/`, quyền thư mục 700/tệp 600; giải mã bằng công cụ của repo vào thư mục riêng `restored/`. Đã xuất chứng chỉ trực tiếp từ keystore bằng keytool và đối chiếu đúng fingerprint khóa cũ nêu trên. Không ghi đè khóa debug hiện có của toolchain. Chưa đổi cấu hình ký build, chưa phát hành APK mới. Các ghi chú thiếu khóa trước thời điểm này là tình trạng lịch sử. Việc lưu ở workspace hiện tại không xác nhận đã xuất bản snapshot hoặc khôi phục ở một tác vụ mới.

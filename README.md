@@ -1,10 +1,17 @@
-# Đường Ngang — Android 0.22
+# Đường Ngang — Android 0.23
 
 **Đổi phiên/tài khoản ChatGPT:** đọc [Bản bàn giao và cách tiếp tục](docs/BAN_GIAO.md) và [Nhật ký trao đổi, yêu cầu đã chốt](docs/LICH_SU_TRAO_DOI.md). [Sao lưu khóa ký APK](docs/SAO_LUU_KHOA_KY.md).
 
 **[Tải gói sao lưu phiên làm việc 23/10/2026](backups/README.md)** — mã nguồn, APK, ngữ cảnh và lịch sử Git; khóa ký cần giữ riêng.
 
 Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt navy, xanh cyan và xanh lá. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
+
+## Thay đổi 0.23
+
+- Tàu thực tế mới nhận đúng đoạn/hướng sẽ thay dấu vết cũ bị treo ngay, cho cả chẵn và lẻ; không chờ đã qua/khôi phục. Giữ lượt theo sau mới hơn thời điểm nhận và các đoạn độc lập.
+- Thao tác nút/cần/khôi phục không tự thành tàu mới. Sửa cả trường hợp thao tác tạm ghép nhầm nguồn cũ trước bản tin tàu thật.
+- Nâng cache sơ đồ lên 5, phát lại lịch sử còn lưu và giữ checkpoint có nguồn quá 15 ngày. Giữ lỗi gốc, tài khoản, giao diện và quy tắc nghi tự kích.
+- APK 0.23.0/versionCode 23 ký đúng khóa các bản trước. Build, 629 quy tắc, parser và phát lại dữ liệu thật đạt; chưa chạy instrumentation/điện thoại trong môi trường mới. Xem [kiểm chứng và giới hạn](docs/FIX_DIAGRAM_AFTER_0.22.md).
 
 ## Thay đổi 0.22
 

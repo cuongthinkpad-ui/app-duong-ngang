@@ -402,21 +402,27 @@ public final class Rules {
     return false;
   }
 
-  /** A passage is also evidence of arrival; do not require its separate approach message. */
+  /** An explicit arrival takes the newest source on its directed interval and retires older
+   * unmatched trails there immediately. Sources after this arrival remain following trains.
+   * Activity-only evidence retains single-source matching and cannot perform this cleanup.
+   */
   private static void linkPredecessor(Map<String, Journey> journeys, Journey current) {
-    if (claimed(journeys, current.id())) return;
+    boolean actualTrain = !current.id().startsWith(MOTION_JOURNEY);
+    if (!actualTrain && claimed(journeys, current.id())) return;
     Journey previous = null;
     for (Journey j : journeys.values())
       if (current.from().equals(j.to())
           && current.direction() == j.direction()
           && !j.reached()
           && j.at() <= current.at()
-          && (previous == null || j.at() < previous.at())) previous = j;
-    if (previous != null)
-      journeys.put(
-          previous.id(),
-          progress(
-              previous, previous.passed(), previous.released(), true, current.id(), current.at()));
+          && (previous == null || (actualTrain ? j.at() > previous.at() : j.at() < previous.at())))
+        previous = j;
+    if (previous == null) return;
+    for (Journey j : new ArrayList<>(journeys.values()))
+      if (current.from().equals(j.to()) && current.direction() == j.direction()
+          && !j.reached() && (j.id().equals(previous.id()) || actualTrain && j.at() <= previous.at()))
+        journeys.put(j.id(),
+            progress(j, j.passed(), j.released(), true, current.id(), current.at()));
   }
 
   /** Barrier activity may locate an existing incoming train; it cannot create one on its own. */
@@ -449,16 +455,18 @@ public final class Rules {
             false);
   }
 
-  /** A later explicit approach in the same unfinished motion visit keeps its existing owner. */
+  /** Activity-only ownership must yield to the real approach, even after an activity reset. */
   private static boolean promoteMovement(
       Map<String, Journey> journeys, Event event, int direction) {
     String point = km(event.crossing());
-    Journey motion = latestJourney(journeys, point, direction, true);
+    Journey motion = latestJourney(journeys, point, direction, false);
     if (motion == null
         || !motion.id().startsWith(MOTION_JOURNEY)
         || motion.at() > event.at()
-        || (motion.passed() || motion.reached()) && event.at() > motion.lastAt()
+        || (motion.reached() || motion.passed() && !motion.released())
+            && event.at() > motion.lastAt()
         || freshUpstream(journeys, point, direction, motion.at(), event.at())) return false;
+    boolean afterActivityReset = motion.released() && event.at() > motion.lastAt();
     journeys.remove(motion.id());
     Journey current =
         new Journey(
@@ -467,8 +475,8 @@ public final class Rules {
             motion.to(),
             direction,
             event.at(),
-            motion.passed(),
-            motion.released(),
+            motion.passed() && !afterActivityReset,
+            motion.released() && !afterActivityReset,
             motion.reached(),
             motion.successorId(),
             Math.max(event.at(), motion.lastAt()),
@@ -478,12 +486,16 @@ public final class Rules {
       if (motion.id().equals(j.successorId()))
         journeys.put(
             j.id(), progress(j, j.passed(), j.released(), j.reached(), current.id(), event.at()));
+    // A tentative activity match may have selected the old trail. The explicit report
+    // must still take ownership of the newest eligible real source.
+    linkPredecessor(journeys, current);
+    linkEarlierDownstream(journeys, current);
     return true;
   }
 
   /**
-   * Confirmed traversal supersedes older missing visits on this same directed interval. Approach
-   * alone retains one-to-one matching; later following trains remain pending.
+   * Confirmed traversal also reconciles delayed reports after a downstream crossing has
+   * taken ownership. Sources newer than the current arrival remain following trains.
    */
   private static void reconcileTraversal(Map<String, Journey> journeys, Journey current, long at) {
     if (current.selfTriggered()) return;
@@ -652,10 +664,14 @@ public final class Rules {
           journeys.put(current.id(), current);
         }
         if (current == null) continue;
-        if (!current.released() && !current.reached()) {
-          if (passed != 0) retireContradictions(route, journeys, point, passed, e.at());
-          linkPredecessor(journeys, current);
-          linkEarlierDownstream(journeys, current);
+        if (!current.released()) {
+          if (!current.reached()) {
+            if (passed != 0) retireContradictions(route, journeys, point, passed, e.at());
+            linkPredecessor(journeys, current);
+            linkEarlierDownstream(journeys, current);
+          }
+          // The next crossing may already own the visible interval before this passage.
+          // That must not suppress reconciliation of the older incoming trail.
           reconcileTraversal(journeys, current, e.at());
           current = journeys.get(current.id());
         }

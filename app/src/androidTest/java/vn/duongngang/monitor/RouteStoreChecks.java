@@ -1068,7 +1068,7 @@ public final class RouteStoreChecks extends Instrumentation {
       store.prepareTravelState(store.account(), replayNow);
       check(
           store.travelReady()
-              && store.prefs.getInt("travelVersion", 0) == 4
+              && store.prefs.getInt("travelVersion", 0) == 5
               && Rules.trackSegments(store.route(), store.travelState()).isEmpty(),
           "upgrade replays source and motion before checkpoint and restoration after checkpoint");
       check(
@@ -1239,6 +1239,17 @@ public final class RouteStoreChecks extends Instrumentation {
       check(Rules.trackSegments(migrateRoute, new Store(context).travelState())
               .contains(new Rules.TrackSegment("100+000", "101+000", 1)),
           "retained-history inference migration preserves expired pending train checkpoint");
+      var beforeDiagramUpgrade = Rules.trackSegments(migrateRoute, store.travelState());
+      int beforeDiagramRaw = store.events(0, migrateNow + 1).size();
+      store.prefs.edit().putInt("travelVersion", 4).commit();
+      check(!store.travelReady(), "version-four diagram is withheld until retained raw replay");
+      store.prepareTravelState(store.account(), migrateNow);
+      check(store.travelReady() && store.prefs.getInt("travelVersion", 0) == 5
+              && beforeDiagramUpgrade.equals(Rules.trackSegments(migrateRoute, store.travelState()))
+              && store.events(0, migrateNow + 1).size() == beforeDiagramRaw,
+          "diagram upgrade keeps expired-source journeys and every retained raw report");
+      check(beforeDiagramUpgrade.equals(Rules.trackSegments(migrateRoute, new Store(context).travelState())),
+          "diagram migration persists pending expired-source state across reopen");
       store.credentials("https://rail.example.test/", "retention-new-account", "test-only");
       check(!store.prefs.contains("retentionCutoff"), "new account has no previous import floor");
       result.putString("stream", checks + " account storage checks passed\n");
