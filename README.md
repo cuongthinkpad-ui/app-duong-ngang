@@ -1,5 +1,7 @@
 # Đường Ngang — Android 0.23
 
+**[Bàn giao phiên mới nhất — tiếp tục ở tài khoản khác](docs/TIEP_TUC_SAU_0.23.md)**.
+
 **Đổi phiên/tài khoản ChatGPT:** đọc [Bản bàn giao và cách tiếp tục](docs/BAN_GIAO.md) và [Nhật ký trao đổi, yêu cầu đã chốt](docs/LICH_SU_TRAO_DOI.md). [Sao lưu khóa ký APK](docs/SAO_LUU_KHOA_KY.md).
 
 **[Tải gói sao lưu phiên làm việc 23/10/2026](backups/README.md)** — mã nguồn, APK, ngữ cảnh và lịch sử Git; khóa ký cần giữ riêng.
