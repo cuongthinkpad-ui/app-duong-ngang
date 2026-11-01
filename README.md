@@ -1,4 +1,4 @@
-# Đường Ngang — Android 0.23
+# Đường Ngang — Android 0.24
 
 **[Bàn giao phiên mới nhất — tiếp tục ở tài khoản khác](docs/TIEP_TUC_SAU_0.23.md)**.
 
@@ -7,6 +7,13 @@
 **[Tải gói sao lưu phiên làm việc 23/10/2026](backups/README.md)** — mã nguồn, APK, ngữ cảnh và lịch sử Git; khóa ký cần giữ riêng.
 
 Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt navy, xanh cyan và xanh lá. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
+
+## Thay đổi 0.24
+
+- Sửa đọc ngày đầu tháng: nhận cả 1/6 và 01/06, cùng dạng trộn có/không có số 0 ở ô ngày và bảng sự kiện.
+- Thêm **Ngày theo dõi** trên **Phạm vi theo dõi** trong Cài đặt. Hôm nay tự động theo ngày Việt Nam; chọn ngày trước để xem lịch sử có nhãn rõ, không phát chuông lịch sử, có nút về hôm nay.
+- Tất cả bộ chọn ngày và lưu trữ chuyển thành **30 ngày tính cả hôm nay**; mở sàn nhập cũ để tải lại ngày website còn dữ liệu. Giữ checkpoint tàu trước khi dọn.
+- Đã đọc thành công báo cáo thật ngày 01/11 và 31/10; 644 quy tắc, 12 parser và 39 fixture đọc xác thực đạt. Xem [kiểm chứng 0.24](docs/UI_REVIEW_0.24.md) về các ca Android/điện thoại chưa chạy.
 
 ## Thay đổi 0.23
 

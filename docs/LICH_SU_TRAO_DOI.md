@@ -225,3 +225,7 @@ Chủ dự án phản ánh một tàu lẻ thành hai đoạn trong khoảng 16:
 Chủ dự án gửi lại hai tệp sao lưu khóa và cho phép tiếp tục sửa app. Đã lưu ngoài Git, khôi phục/xác minh khóa gốc và build APK 0.23.0/versionCode 23 ký cùng chứng chỉ. Chưa đăng GitHub, chưa chạy Android instrumentation/điện thoại tại môi trường mới; không gán các kết quả runtime cũ cho bản mới.
 
 Chủ dự án không tải được liên kết tệp workspace; tiếp tục bàn giao mã và APK 0.23 qua GitHub theo cách Download raw file đã dùng ở các bản trước.
+
+## 01/11 — ngày đầu tháng và lịch sử 30 ngày
+
+Chủ dự án báo không tải được dữ liệu đầu tháng, yêu cầu thêm mục ngày/tháng trong Cài đặt ngay trên phạm vi theo dõi, mặc định hôm nay tự đổi và chọn được ngày trước. Sau đó chốt giới hạn chọn/lưu 30 ngày tính cả hôm nay và yêu cầu nhận cả dạng 01/06, 1/6, 01/6, 1/06. Đã xác nhận website thật trả 1/11/2026, sửa ngày input và bảng theo LocalDate, kiểm thử/report thật như UI_REVIEW_0.24.md. Ngày lịch sử không tạo chuông/notification từ bản tin cũ; giữ các quy tắc tàu/lỗi khác.

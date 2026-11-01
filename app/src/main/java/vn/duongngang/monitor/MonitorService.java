@@ -138,6 +138,30 @@ public class MonitorService extends Service {
           sourceAccount = account;
         }
       }
+      if (store.historicalMonitoring()) {
+        LocalDate selected = store.monitoringDay();
+        alarm.stop();
+        ringingFaults.clear();
+        // A completed past day needs no full two-day download on every 30-second tick.
+        if (selected.toString().equals(store.prefs.getString("historyReadDay", ""))
+            && System.currentTimeMillis() - store.prefs.getLong("historyReadAt", 0) < 15 * 60000L)
+          return;
+        var data = source.readDay(selected);
+        List<Rules.Event> historical = new ArrayList<>(data.events());
+        if (!selected.minusDays(1).isBefore(LocalDate.now(WebSource.ZONE).minusDays(29)))
+          historical.addAll(source.readDay(selected.minusDays(1)).events());
+        synchronized (Store.class) {
+          if (!store.account().equals(account) || Thread.currentThread().isInterrupted()
+              || !store.monitoringDay().equals(selected)) return;
+          store.saveForAccount(account, new WebSource.DayData(historical, data.route()));
+          store.prefs.edit().putString("historyReadDay", selected.toString())
+              .putLong("historyReadAt", System.currentTimeMillis())
+              .putString("status", "Đã tải lịch sử · " + selected.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")))
+              .apply();
+        }
+        sendBroadcast(new Intent(UPDATE).setPackage(getPackageName()));
+        return;
+      }
       LocalDate today = LocalDate.now(WebSource.ZONE);
       long dayStart = today.atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
       long previousStart =
@@ -171,6 +195,7 @@ public class MonitorService extends Service {
       incoming.sort(Comparator.comparingLong(Rules.Event::at));
       synchronized (Store.class) {
         if (!store.account().equals(account) || Thread.currentThread().isInterrupted()) return;
+        if (store.historicalMonitoring()) return;
         List<Rules.Event> added =
             new ArrayList<>(
                 store.saveForAccount(account, new WebSource.DayData(incoming, data.route())));

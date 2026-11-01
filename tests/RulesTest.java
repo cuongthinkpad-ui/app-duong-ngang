@@ -1632,6 +1632,15 @@ public class RulesTest {
     }
     missingDiagramVisits();
     missingMiddleVisit();
+    for (String dayText : List.of("2026-11-01", "2027-01-01", "2028-03-01")) {
+      var date = java.time.LocalDate.parse(dayText);
+      long now = date.atTime(0, 1).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant().toEpochMilli();
+      check(Rules.monitoringDay("", now).equals(date), "automatic date follows month/year/leap rollover");
+      check(Rules.monitoringDay(date.minusDays(29).toString(), now).equals(date.minusDays(29)), "oldest retained date selectable");
+      check(Rules.monitoringDay(date.minusDays(30).toString(), now).equals(date), "expired selected date falls back to today");
+      check(Rules.monitoringDay(date.plusDays(1).toString(), now).equals(date), "future date is rejected");
+      check(Rules.historyCutoff(now) == date.minusDays(29).atStartOfDay(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant().toEpochMilli(), "thirty-date retention across calendar boundaries");
+    }
     historyGrouping();
     nonTrainActions();
     System.out.println(scenarios + " domain scenarios passed");
@@ -2004,9 +2013,9 @@ public class RulesTest {
   static void historyGrouping() {
     var day = java.time.LocalDate.of(2026, 10, 31).atStartOfDay(
         java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant().toEpochMilli();
-    check(Rules.historyCutoff(day + 12 * 3600000L) == day - 14 * 86400000L,
-        "retention includes today and fourteen preceding Vietnamese dates");
-    check(Rules.historyCutoff(day - 1) == day - 15 * 86400000L,
+    check(Rules.historyCutoff(day + 12 * 3600000L) == day - 29 * 86400000L,
+        "retention includes today and twenty-nine preceding Vietnamese dates");
+    check(Rules.historyCutoff(day - 1) == day - 30 * 86400000L,
         "retention cutoff changes at Vietnamese midnight");
     var a = event(day + 1000, "100+000", "Tàu lẻ", false);
     var b = event(day + 10000, "100+000", "Tàu chẵn", false);

@@ -249,7 +249,7 @@ def main():
                                                    timezone(timedelta(hours=7)))
                 assert int(empty.get('retentionCutoff', '0')) == int(retention_start.timestamp()*1000), 'Expected 15-day Vietnamese retention floor'
                 assert int(empty.get('retentionPreparedAt', '0')) == int(empty['retentionCutoff']), 'Expected persisted checkpoint barrier before pruning'
-                print('PASS: foreground poll prepares durable 15-date retention while accepting current reports silently', flush=True)
+                print('PASS: foreground poll prepares durable 30-date retention while accepting current reports silently', flush=True)
                 return
             if '--diagram-only' in sys.argv:
                 run_diagram_checks()

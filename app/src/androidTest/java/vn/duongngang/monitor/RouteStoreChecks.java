@@ -1168,7 +1168,7 @@ public final class RouteStoreChecks extends Instrumentation {
       long beforeBytes = context.getDatabasePath("events.db").length();
       check(store.historyCleanupDue(retentionNow), "old install needs history retention cleanup");
       check(store.maintainHistory(store.account(), retentionNow) == 3,
-          "retention deletes only rows before the inclusive 15-date boundary");
+          "retention deletes only rows before the inclusive 30-date boundary");
       check(store.events(0, retentionNow + 1).size() == 2
               && store.events(cutoff, cutoff + 1).get(0).id().equals(exactBoundary.id()),
           "retention keeps boundary and current rows");
@@ -1205,7 +1205,7 @@ public final class RouteStoreChecks extends Instrumentation {
               List.of(new Rules.TrackSegment("101+000", "102+000", 1))),
           "train can progress after its original reports have been pruned");
       // An obsolete inference inside retained history must not wipe a pending train
-      // whose original records have already been deleted by the 15-date policy.
+      // whose original records have already been deleted by the 30-date policy.
       store.credentials("https://rail.example.test/", "retained-self-upgrade", "test-only");
       long migrateNow = System.currentTimeMillis();
       long migrateFloor = Rules.historyCutoff(migrateNow);
@@ -1252,6 +1252,24 @@ public final class RouteStoreChecks extends Instrumentation {
           "diagram migration persists pending expired-source state across reopen");
       store.credentials("https://rail.example.test/", "retention-new-account", "test-only");
       check(!store.prefs.contains("retentionCutoff"), "new account has no previous import floor");
+      long extendNow = System.currentTimeMillis();
+      long oldFloor = java.time.LocalDate.now(WebSource.ZONE).minusDays(14)
+          .atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
+      store.prefs.edit().putLong("retentionCutoff", oldFloor).remove("retentionDays").commit();
+      check(store.historyCleanupDue(extendNow), "legacy 15-date floor requires thirty-date migration");
+      store.maintainHistory(store.account(), extendNow);
+      check(store.prefs.getLong("retentionCutoff", 0) == Rules.historyCutoff(extendNow)
+              && store.prefs.getInt("retentionDays", 0) == 30,
+          "upgrade lowers old import floor so older retained dates can be fetched again");
+      var recovered = new Rules.Event("recovered-day-20", oldFloor - 5 * 86400000L,
+          "100+000", "Tàu lẻ", false, List.of());
+      check(store.saveForAccount(store.account(), new WebSource.DayData(List.of(recovered),
+          new Rules.Route(List.of("100+000", "101+000")))).size() == 1,
+          "a report older than fifteen days but inside thirty dates can be imported after upgrade");
+      store.prefs.edit().putString("monitorDate", java.time.LocalDate.now(WebSource.ZONE).minusDays(20).toString()).commit();
+      check(store.historicalMonitoring(), "fixed retained day opens historical mode");
+      store.prefs.edit().putString("monitorDate", "").commit();
+      check(!store.historicalMonitoring(), "empty date restores automatic today");
       result.putString("stream", checks + " account storage checks passed\n");
 
     } catch (Throwable failure) {

@@ -155,9 +155,23 @@ public final class WebSource {
     return d;
   }
 
+  private static LocalDate calendarDate(String value) {
+    try {
+      return LocalDate.parse(value.trim(), value.trim().matches("\\d{4}-\\d{2}-\\d{2}")
+          ? DateTimeFormatter.ISO_LOCAL_DATE
+          : DateTimeFormatter.ofPattern("d/M/uuuu").withResolverStyle(ResolverStyle.STRICT));
+    } catch (java.time.DateTimeException invalid) { return null; }
+  }
+
+  private static LocalDate reportDate(Element input) {
+    return input == null ? null : calendarDate(input.val());
+  }
+
   private static Element dateInput(Document d) {
     for (Element e : d.select("input[name]"))
-      if (e.val().matches("\\d{2}/\\d{2}/\\d{4}") || e.attr("type").equals("date")) return e;
+      if (e.attr("name").toLowerCase(Locale.ROOT).endsWith("txtngay")) return e;
+    for (Element e : d.select("input[name]"))
+      if (reportDate(e) != null || e.attr("type").equals("date")) return e;
     return null;
   }
 
@@ -192,7 +206,7 @@ public final class WebSource {
     Element date = dateInput(d);
     if (date == null) throw new Exception("Chưa nhận diện bộ chọn ngày");
     var data = fields(date.closest("form"));
-    if (date.val().equals(dayValue(date, day)) && allFiltersSelected(d)) return d;
+    if (day.equals(reportDate(date)) && allFiltersSelected(d)) return d;
     data.put(date.attr("name"), dayValue(date, day));
     data.put("__EVENTTARGET", date.attr("name"));
     data.put("__EVENTARGUMENT", "");
@@ -224,7 +238,7 @@ public final class WebSource {
   private static void validateReport(Document d, LocalDate day, Rules.Route expected)
       throws Exception {
     Element date = dateInput(d);
-    if (date == null || !date.val().equals(dayValue(date, day)))
+    if (date == null || !day.equals(reportDate(date)))
       throw new Exception("Ngày trên web không khớp ngày yêu cầu; bỏ lượt đọc");
     if (!allFiltersSelected(d))
       throw new Exception("Web chưa trả về toàn bộ tuyến và bản tin; bỏ lượt đọc");
@@ -351,8 +365,8 @@ public final class WebSource {
         }
       if (timeIndex < 0) continue;
       String date = cells.get(timeIndex - 1).text();
-      if (!date.equals(day.format(DateTimeFormatter.ofPattern("dd/MM")))
-          && !date.equals(day.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))))
+      if (!day.equals(calendarDate(date.trim().matches("\\d{1,2}/\\d{1,2}")
+          ? date.trim() + "/" + day.getYear() : date)))
         throw new Exception("Ngày trả về không khớp ngày yêu cầu");
       long at =
           LocalDateTime.of(day, LocalTime.parse(cells.get(timeIndex).text()))

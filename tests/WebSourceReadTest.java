@@ -9,7 +9,7 @@ import vn.duongngang.monitor.*;
 
 /** Local ASP.NET fixture includes the master-page logout button and both report filters. */
 public final class WebSourceReadTest {
-  static final LocalDate DAY = LocalDate.now(WebSource.ZONE);
+  static LocalDate DAY = LocalDate.now(WebSource.ZONE);
   static int checks;
 
   static void check(boolean ok, String message) {
@@ -37,6 +37,11 @@ public final class WebSourceReadTest {
         + "</td></tr>";
   }
 
+  static String datePattern(String mode) {
+    return mode.equals("unpadded") ? "d/M" : mode.equals("daypad") ? "dd/M"
+        : mode.equals("monthpad") ? "d/MM" : "dd/MM";
+  }
+
   static String report(int page, String mode, boolean head) {
     String code = mode.equals("changed") && page == 2 ? "DIFFERENT" : "CS";
     String point = page == 1 ? "275+290" : mode.equals("outside") ? "500+100" : "276+351";
@@ -45,6 +50,7 @@ public final class WebSourceReadTest {
     if (mode.equals("repeat")) rows = row("275+290", "Tàu lẻ", "10:20:01");
     if (head && mode.equals("moving")) rows = row("280+500", "Tàu chẵn", "11:00:00");
     if (head && mode.equals("newhead")) rows = row("280+500", "Tàu chẵn", "10:20:03") + rows;
+    rows = rows.replace(DAY.format(DateTimeFormatter.ofPattern("dd/MM")), DAY.format(DateTimeFormatter.ofPattern(datePattern(mode))));
     String table =
         mode.equals("empty") ? "<h1>BÁO CÁO ĐƯỜNG NGANG CBTĐ</h1>" : "<table>" + rows + "</table>";
     String pager =
@@ -54,7 +60,7 @@ public final class WebSourceReadTest {
                 ? "<a href=\"javascript:__doPostBack('grid','Page$2')\">...</a>"
                 : "<a href=\"javascript:__doPostBack('grid','Page$1')\">1</a>";
     return "<form action='/report'><input name='date' value='"
-        + selected.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+        + selected.format(DateTimeFormatter.ofPattern(datePattern(mode) + "/yyyy"))
         + "'>"
         + "<input name='__VIEWSTATE' value='test'>"
         + inventory(code)
@@ -192,6 +198,16 @@ public final class WebSourceReadTest {
               && supplementedDelta.route().points().equals(supplemented.route().points())
               && supplementedDelta.events().size() == 1,
           "delta read retains account station without inventing events or breaking anchors");
+      for (LocalDate target : List.of(LocalDate.of(2026, 11, 1), LocalDate.of(2026, 6, 1), LocalDate.of(2027, 1, 1),
+          LocalDate.of(2028, 2, 29), LocalDate.of(2028, 3, 1), LocalDate.of(2026, 12, 31))) {
+        DAY = target;
+        for (String format : List.of("normal", "unpadded", "daypad", "monthpad")) {
+          var read = new WebSource(base + format, "fixture-user", "fixture-only").readDay(target);
+          check(read.events().size() == 2 && read.events().stream()
+              .allMatch(e -> Instant.ofEpochMilli(e.at()).atZone(WebSource.ZONE).toLocalDate().equals(target)),
+              "authenticated date selection/rows across month/year/leap boundaries: " + target + " " + format);
+        }
+      }
       System.out.println(checks + " authenticated read scenarios passed (local web fixture)");
     } finally {
       server.stop(0);

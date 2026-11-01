@@ -42,6 +42,14 @@ public final class Store {
     return prefs.getString("url", "") + "\n" + prefs.getString("user", "");
   }
 
+  public java.time.LocalDate monitoringDay() {
+    return Rules.monitoringDay(prefs.getString("monitorDate", ""), System.currentTimeMillis());
+  }
+
+  public boolean historicalMonitoring() {
+    return !monitoringDay().equals(java.time.LocalDate.now(WebSource.ZONE));
+  }
+
   public Rules.Route route() {
     try {
       var array = new JSONArray(prefs.getString("route", "[]"));
@@ -85,7 +93,8 @@ public final class Store {
   }
 
   public boolean historyCleanupDue(long now) {
-    return prefs.getLong("retentionCutoff", 0) < Rules.historyCutoff(now);
+    return prefs.getInt("retentionDays", 0) != 30
+        || prefs.getLong("retentionCutoff", 0) < Rules.historyCutoff(now);
   }
 
   /** Checkpoint first, delete second: long-running trains survive removal of old raw rows. */
@@ -110,7 +119,7 @@ public final class Store {
       try (var database = db()) {
         removed = database.delete("events", "at<?", new String[] {"" + cutoff});
         // Persist the import floor as well: old pages must not grow the archive again.
-        prefs.edit().putLong("retentionCutoff", cutoff).apply();
+        prefs.edit().putLong("retentionCutoff", cutoff).putInt("retentionDays", 30).apply();
         if (removed > 0) database.execSQL("VACUUM");
       }
       Map<String, Long> pending = pendingSelf();
@@ -453,7 +462,7 @@ public final class Store {
         for (var journey : checkpoint.journeys())
           if (journey.at() < floor) expired.add(journey);
       // Migrations can replay only retained raw reports. Never discard pending trains
-      // whose source reports were already pruned by the fifteen-date policy.
+      // whose source reports were already pruned by the retention policy.
       checkpointAt = boundary;
       checkpoint = Rules.travelState(route(), new Rules.TravelState(expired), events(0, boundary));
     }
@@ -532,6 +541,7 @@ public final class Store {
             .edit()
             .remove("retentionPreparedAt")
             .remove("retentionCutoff")
+            .remove("retentionDays")
             .remove("lastSuccess")
             .remove("coverage")
             .remove("baselineFrom")
@@ -549,6 +559,9 @@ public final class Store {
             .remove("axleVersion")
             .remove("axleNotices")
             .remove("lastFull")
+            .remove("monitorDate")
+            .remove("historyReadDay")
+            .remove("historyReadAt")
             .remove("route")
             .remove("rangeFrom")
             .remove("rangeTo")

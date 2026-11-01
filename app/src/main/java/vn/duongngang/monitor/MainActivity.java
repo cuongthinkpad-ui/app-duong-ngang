@@ -73,6 +73,8 @@ public class MainActivity extends Activity {
           String state =
               store.prefs.getString("status", "")
                   + store.prefs.getLong("lastSuccess", 0)
+                  + store.prefs.getLong("historyReadAt", 0)
+                  + store.monitoringDay()
                   + staleData()
                   + LocalDate.now(WebSource.ZONE);
           if (!state.equals(lastUiState)) {
@@ -87,6 +89,8 @@ public class MainActivity extends Activity {
   public void onCreate(Bundle state) {
     super.onCreate(state);
     store = new Store(this);
+    selected = historyDay = store.monitoringDay();
+    followToday = historyFollowToday = !store.historicalMonitoring();
     // Older builds could reopen in preview mode. The app now always opens live monitoring.
     store.prefs.edit().remove("demoUi").apply();
     demo = false;
@@ -408,17 +412,28 @@ public class MainActivity extends Activity {
     return route().inRange(crossing, rangeFrom(), rangeTo());
   }
 
+  private long monitoringStart() {
+    return store.monitoringDay().atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
+  }
+
+  private long monitoringEnd() {
+    return store.historicalMonitoring()
+        ? store.monitoringDay().plusDays(1).atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli()
+        : System.currentTimeMillis() + 1;
+  }
+
+  private long displayedLastSuccess() {
+    if (!store.historicalMonitoring()) return store.prefs.getLong("lastSuccess", 0);
+    return store.monitoringDay().toString().equals(store.prefs.getString("historyReadDay", ""))
+        ? store.prefs.getLong("historyReadAt", 0) : 0;
+  }
+
   private List<Rules.Event> allToday() {
     if (viewDayEvents == null)
       viewDayEvents =
           demo
               ? samples()
-              : store.events(
-                  LocalDate.now(WebSource.ZONE)
-                      .atStartOfDay(WebSource.ZONE)
-                      .toInstant()
-                      .toEpochMilli(),
-                  System.currentTimeMillis() + 1);
+              : store.events(monitoringStart(), monitoringEnd());
     return viewDayEvents;
   }
 
@@ -431,6 +446,8 @@ public class MainActivity extends Activity {
   }
 
   private List<Rules.Event> occupancyEvents() {
+    if (!demo && store.historicalMonitoring())
+      return store.events(Rules.historyCutoff(System.currentTimeMillis()), monitoringEnd());
     if (!demo && store.prefs.contains("occupiedPoints")) return store.occupationEvents();
     return demo
         ? samples()
@@ -445,7 +462,8 @@ public class MainActivity extends Activity {
 
   private boolean staleData() {
     if (demo) return false;
-    long last = store.prefs.getLong("lastSuccess", 0);
+    if (store.historicalMonitoring()) return true;
+    long last = displayedLastSuccess();
     String message = store.prefs.getString("status", "");
     return last == 0
         || System.currentTimeMillis() - last
@@ -486,6 +504,7 @@ public class MainActivity extends Activity {
   private List<Rules.Event> activeFaults() {
     if (viewFaults != null) return viewFaults;
     if (demo) return viewFaults = Rules.activeFaults(samples());
+    if (store.historicalMonitoring()) return viewFaults = Rules.activeFaults(allToday());
     long baseline =
         Rules.faultBaseline(store.prefs.getLong("baselineFrom", 0), System.currentTimeMillis());
     List<Rules.Event> current = new ArrayList<>();
@@ -642,10 +661,10 @@ public class MainActivity extends Activity {
   }
 
   private void updateLiveBadge() {
-    boolean known = store.prefs.getLong("lastSuccess", 0) > 0;
+    boolean known = displayedLastSuccess() > 0;
     boolean running = store.prefs.getBoolean("running", false);
     boolean live = known && running && !staleData();
-    liveBadge.setText(!known ? "CHỜ" : !running ? "DỪNG" : live ? "LIVE" : "CŨ");
+    liveBadge.setText(store.historicalMonitoring() ? "LỊCH SỬ" : !known ? "CHỜ" : !running ? "DỪNG" : live ? "LIVE" : "CŨ");
     liveBadge.setTextColor(live ? BLUE : WARNING);
     liveBadge.setContentDescription(live ? "Dữ liệu web đang cập nhật" : "Dữ liệu chưa trực tuyến");
     navHasFault = !scopedFaults().isEmpty();
@@ -726,7 +745,7 @@ public class MainActivity extends Activity {
     int total = 0;
     for (String point : route().crossings()) if (inScope(point)) total++;
     int faults = scopedFaults().size();
-    boolean known = store.prefs.getLong("lastSuccess", 0) > 0;
+    boolean known = displayedLastSuccess() > 0;
     boolean running = store.prefs.getBoolean("running", false);
     int color = !known || staleData() ? WARNING : faults > 0 ? RED : running ? GREEN : WARNING;
     summaryCard.setBackground(
@@ -737,6 +756,7 @@ public class MainActivity extends Activity {
             ? "CHỜ KẾT NỐI"
             : !running
                 ? "ĐÃ DỪNG THEO DÕI"
+                : store.historicalMonitoring() ? "ĐANG XEM LỊCH SỬ"
                 : staleData()
                     ? "CẦN KIỂM TRA CẬP NHẬT"
                     : faults > 0 ? "CÓ SỰ CỐ" : "ĐANG THEO DÕI");
@@ -747,10 +767,11 @@ public class MainActivity extends Activity {
             : faults > 0
                 ? faults + " sự cố chưa khôi phục"
                 : total + " đường ngang · Chưa ghi nhận lỗi mới");
-    long last = store.prefs.getLong("lastSuccess", 0);
+    long last = displayedLastSuccess();
     int interval = store.prefs.getInt("interval", 30);
     summaryTime.setText(
-        (last == 0 ? "Chưa có dữ liệu từ website" : "Cập nhật " + time(last))
+        (store.historicalMonitoring() ? "Lịch sử " + store.monitoringDay().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " · " : "")
+            + (last == 0 ? "Chưa có dữ liệu từ website" : "Cập nhật " + time(last))
             + " · "
             + (interval < 60 ? interval + " giây" : interval / 60 + " phút"));
     summaryRing.number = faults > 0 ? faults : total;
@@ -794,6 +815,9 @@ public class MainActivity extends Activity {
   }
 
   private Rules.TravelState diagramState() {
+    if (!demo && store.historicalMonitoring())
+      return Rules.travelState(route(), Rules.TravelState.empty(),
+          store.events(Rules.historyCutoff(System.currentTimeMillis()), monitoringEnd()));
     if (!demo) return store.travelState();
     return Rules.travelState(route(), Rules.TravelState.empty(), samples());
   }
@@ -814,10 +838,12 @@ public class MainActivity extends Activity {
                 ? " · Dữ liệu minh họa"
                 : staleData() ? " · Dữ liệu cũ hoặc chưa cập nhật" : " · Theo bản tin web"));
     routeView.updateOccupancy();
-    long last = store.prefs.getLong("lastSuccess", 0);
+    long last = displayedLastSuccess();
     routeNote.setText(
         demo
             ? "Minh họa"
+            : store.historicalMonitoring()
+                ? "Lịch sử " + store.monitoringDay().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + (last == 0 ? " · Chưa tải" : " · Đã tải " + time(last))
             : !store.travelReady()
                 ? "Đang cập nhật sơ đồ"
                 : last == 0
@@ -994,7 +1020,7 @@ public class MainActivity extends Activity {
     if (fn == 0) {
       TextView empty =
           text(
-              store.prefs.getLong("lastSuccess", 0) > 0 ? "Không có sự cố" : "Đang chờ dữ liệu",
+              displayedLastSuccess() > 0 ? "Không có sự cố" : "Đang chờ dữ liệu",
               11,
               MUTED,
               false);
@@ -1123,7 +1149,7 @@ public class MainActivity extends Activity {
     disc.addView(
         icon(
             kind,
-            kind.equals("shield") && (demo || store.prefs.getLong("lastSuccess", 0) > 0)
+            kind.equals("shield") && (demo || displayedLastSuccess() > 0)
                 ? GREEN
                 : MUTED,
             22));
@@ -1141,7 +1167,7 @@ public class MainActivity extends Activity {
     LinearLayout controls = card(SURFACE);
     LinearLayout date = row();
     date.addView(icon("calendar", BLUE, 17));
-    TextView day = text(selected.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), 13, INK, true);
+    TextView day = text(selected.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")), 13, INK, true);
     day.setPadding(dp(8), 0, 0, 0);
     date.addView(day, new LinearLayout.LayoutParams(0, -2, 1));
     TextView fetch = pill("Tải dữ liệu", BLUE, TINT);
@@ -1247,9 +1273,9 @@ public class MainActivity extends Activity {
 
   private void loadHistory() {
     LocalDate day = page.equals("crossingHistory") ? historyDay : selected;
-    if (day.isBefore(LocalDate.now(WebSource.ZONE).minusDays(14))
+    if (day.isBefore(LocalDate.now(WebSource.ZONE).minusDays(29))
         || day.isAfter(LocalDate.now(WebSource.ZONE))) {
-      Toast.makeText(this, "Chọn ngày trong 15 ngày gần nhất", Toast.LENGTH_SHORT).show();
+      Toast.makeText(this, "Chọn ngày trong 30 ngày gần nhất", Toast.LENGTH_SHORT).show();
       return;
     }
     if (demo) {
@@ -1347,8 +1373,54 @@ public class MainActivity extends Activity {
     return sw;
   }
 
+  private void applyMonitoringDate(LocalDate day) {
+    stopService(new Intent(this, MonitorService.class));
+    boolean automatic = day.equals(LocalDate.now(WebSource.ZONE));
+    store.prefs.edit().putString("monitorDate", automatic ? "" : day.toString())
+        .remove("historyReadDay").remove("historyReadAt")
+        .putString("status", automatic ? "Đang đọc ngày hiện tại…" : "Đang tải ngày đã chọn…").apply();
+    selected = historyDay = day;
+    followToday = historyFollowToday = automatic;
+    invalidateViewData();
+    if (!store.prefs.getString("url", "").isEmpty() && !store.prefs.getString("user", "").isEmpty())
+      startForegroundService(new Intent(this, MonitorService.class).setAction("RESTART"));
+    render();
+  }
+
+  private void limitHistoryDates(DatePickerDialog picker) {
+    LocalDate today = LocalDate.now(WebSource.ZONE);
+    // DatePicker interprets epoch limits in the device zone; keep its calendar labels
+    // aligned with Vietnamese dates even when the device uses another time zone.
+    java.time.ZoneId deviceZone = java.time.ZoneId.systemDefault();
+    picker.getDatePicker().setMinDate(today.minusDays(29).atStartOfDay(deviceZone).toInstant().toEpochMilli());
+    picker.getDatePicker().setMaxDate(today.atTime(23, 59, 59).atZone(deviceZone).toInstant().toEpochMilli());
+  }
+
+  private void chooseMonitoringDate() {
+    LocalDate initial = store.monitoringDay();
+    DatePickerDialog picker = new DatePickerDialog(this,
+        (v, year, month, day) -> applyMonitoringDate(LocalDate.of(year, month + 1, day)),
+        initial.getYear(), initial.getMonthValue() - 1, initial.getDayOfMonth());
+    limitHistoryDates(picker);
+    picker.show();
+  }
+
   private void settings() {
     String[] range = {rangeFrom(), rangeTo()};
+    LinearLayout dates = card(SURFACE);
+    sectionHeading(dates, "Ngày theo dõi", "calendar");
+    TextView dateChoice = pill(store.monitoringDay().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+        + (store.historicalMonitoring() ? " · Lịch sử  ▾" : " · Hôm nay (tự động)  ▾"), BLUE, TINT);
+    dateChoice.setContentDescription("Chọn ngày tháng theo dõi");
+    touch(dateChoice, this::chooseMonitoringDate);
+    dates.addView(dateChoice);
+    if (store.historicalMonitoring()) {
+      gap(dates, 6);
+      dates.addView(text("Đang xem ngày cũ · Không phát chuông lịch sử", 10, MUTED, false));
+      dates.addView(action("Về hôm nay · Tự đổi ngày", null, false,
+          () -> applyMonitoringDate(LocalDate.now(WebSource.ZONE))));
+    }
+    content.addView(dates);
     LinearLayout scope = card(SURFACE);
     sectionHeading(scope, "Phạm vi theo dõi", "direction");
     String[] rangeLabels = {"Từ đường ngang", "Đến đường ngang"};
@@ -1537,6 +1609,8 @@ public class MainActivity extends Activity {
                     .putBoolean("demoUi", false)
                     .apply();
                 demo = false;
+                selected = historyDay = store.monitoringDay();
+                followToday = historyFollowToday = !store.historicalMonitoring();
                 startForegroundService(new Intent(this, MonitorService.class).setAction("RESTART"));
                 navigate("overview");
               } catch (Exception e) {
@@ -1785,7 +1859,7 @@ public class MainActivity extends Activity {
 
   private void chooseHistoryDate(boolean crossing) {
     LocalDate initial = crossing ? historyDay : selected;
-    LocalDate first = LocalDate.now(WebSource.ZONE).minusDays(14);
+    LocalDate first = LocalDate.now(WebSource.ZONE).minusDays(29);
     if (initial.isBefore(first)) initial = first;
     DatePickerDialog picker = new DatePickerDialog(this, (v, year, month, day) -> {
       LocalDate chosen = LocalDate.of(year, month + 1, day);
@@ -1798,8 +1872,7 @@ public class MainActivity extends Activity {
       }
       render();
     }, initial.getYear(), initial.getMonthValue() - 1, initial.getDayOfMonth());
-    picker.getDatePicker().setMinDate(Rules.historyCutoff(System.currentTimeMillis()));
-    picker.getDatePicker().setMaxDate(System.currentTimeMillis());
+    limitHistoryDates(picker);
     picker.show();
   }
 
@@ -1808,7 +1881,7 @@ public class MainActivity extends Activity {
     controls.addView(text("Km " + selectedCrossing, 18, INK, true));
     gap(controls, 10);
     LinearLayout date = row();
-    TextView day = text(historyDay.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), 13, BLUE, true);
+    TextView day = text(historyDay.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")), 13, BLUE, true);
     date.addView(day, new LinearLayout.LayoutParams(0, -2, 1));
     touch(day, () -> chooseHistoryDate(true));
     TextView load = pill("Tải dữ liệu", BLUE, TINT);
@@ -1816,7 +1889,7 @@ public class MainActivity extends Activity {
     date.addView(load);
     controls.addView(date);
     gap(controls, 7);
-    controls.addView(text("Lưu lịch sử 15 ngày, tính cả hôm nay", 10, MUTED, false));
+    controls.addView(text("Lưu lịch sử 30 ngày, tính cả hôm nay", 10, MUTED, false));
     content.addView(controls);
     long from = historyDay.atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
     long to = historyDay.plusDays(1).atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();

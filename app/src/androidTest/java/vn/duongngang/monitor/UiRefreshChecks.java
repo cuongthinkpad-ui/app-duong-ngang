@@ -969,7 +969,7 @@ final class UiRefreshChecks {
         check(detailsAction != null && ((View) detailsAction.getParent()).performClick(), "history details action is usable");
         check(field(activity, "page").equals("crossingHistory"), "history details opens a dedicated page");
         String historyVisible = labels((View) field(activity, "content"));
-        check(historyVisible.contains("15 ngày") && historyVisible.contains("Tàu lẻ")
+        check(historyVisible.contains("30 ngày") && historyVisible.contains("Tàu lẻ")
                 && historyVisible.contains("Tàu chẵn") && !historyVisible.contains("Đèn 2 hỏng"),
             "day history shows selected crossing only and retention period");
         LinearLayout groups = (LinearLayout) field(activity, "content");

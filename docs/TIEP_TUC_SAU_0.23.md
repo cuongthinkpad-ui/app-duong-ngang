@@ -1,4 +1,6 @@
-# Bàn giao phiên làm việc — Đường Ngang 0.23
+# Bàn giao phiên làm việc — Đường Ngang 0.23 (lịch sử)
+
+**Cập nhật mới hơn: bản 0.24 ngày 01/11/2026. Đọc [UI_REVIEW_0.24.md](UI_REVIEW_0.24.md) và [BAN_GIAO.md](BAN_GIAO.md) trước. Cửa sổ lưu/chọn ngày hiện là 30 ngày tính cả hôm nay; các số 15 ngày bên dưới mô tả phiên 0.23 cũ.**
 
 Ngày 31/10/2026. Đây là bản bàn giao kỹ thuật để tiếp tục ở tài khoản Codex/ChatGPT khác, không phải bản xuất nguyên văn cuộc trò chuyện hoặc bản sao môi trường cloud. Tài khoản mới không tự nhận lịch sử chat, bộ nhớ, tiến trình hay quyền GitHub của tài khoản cũ.
 

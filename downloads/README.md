@@ -1,4 +1,10 @@
-# Đường Ngang — bản thử 0.23
+# Đường Ngang — bản thử 0.24
+
+**[Tải APK 0.24](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.24.apk)** — chọn **Download raw file**. Cài đè bản cũ, cùng khóa ký, versionCode 24.
+
+Sửa lỗi đọc báo cáo đầu tháng: hỗ trợ ngày/tháng có hoặc không có số 0, kể cả dạng trộn. Cài đặt có **Ngày theo dõi** trên phạm vi: mặc định hôm nay tự đổi, chọn ngày cũ có nhãn lịch sử và không chuông lịch sử. Chọn ngày/lưu dữ liệu **30 ngày tính cả hôm nay**; dữ liệu từng bị xóa cần tải lại nếu website còn. Xem [kiểm chứng 0.24](../docs/UI_REVIEW_0.24.md); chưa thử trên điện thoại.
+
+## Bản 0.23 trước đó
 
 **[Tải APK 0.23](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.23.apk)** — versionCode 23, ký bằng khóa cũ để cập nhật cài đè. Chọn **Download raw file** nếu GitHub mở trang xem tệp.
 

@@ -42,11 +42,20 @@ public final class Rules {
   /** Fifteen Vietnamese calendar dates, including today. */
   public static long historyCutoff(long now) {
     return java.time.Instant.ofEpochMilli(now).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
-        .toLocalDate().minusDays(14).atStartOfDay(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+        .toLocalDate().minusDays(29).atStartOfDay(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
         .toInstant().toEpochMilli();
   }
 
   /** Display grouping only; never changes equipment faults or the train diagram. */
+  /** Empty selection follows the Vietnamese calendar, including month/year transitions. */
+  public static java.time.LocalDate monitoringDay(String selection, long now) {
+    var today = java.time.Instant.ofEpochMilli(now).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toLocalDate();
+    try {
+      var chosen = java.time.LocalDate.parse(selection);
+      return chosen.isAfter(today) || chosen.isBefore(today.minusDays(29)) ? today : chosen;
+    } catch (java.time.DateTimeException invalid) { return today; }
+  }
+
   public record EventGroup(String crossing, int direction, boolean completed, List<Event> events) {}
 
   public static List<EventGroup> crossingHistory(List<Event> input, String crossing) {

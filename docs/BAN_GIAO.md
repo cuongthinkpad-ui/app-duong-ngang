@@ -8,13 +8,13 @@ Bản tóm tắt phiên đầy đủ nhất: [Tiếp tục sau 0.23](TIEP_TUC_SA
 
 1. Kết nối cùng repository GitHub `cuongthinkpad-ui/app-duong-ngang`, lấy nhánh `main`; nếu không có công cụ GitHub, tải mã nguồn ZIP từ GitHub và cung cấp cho phiên mới.
 2. Đọc tài liệu này, `README.md`, `docs/LICH_SU_TRAO_DOI.md` và `docs/TIEP_TUC_SAU_0.23.md` và `docs/FIX_DIAGRAM_AFTER_0.22.md` trước khi thay đổi. Tài liệu 0.1–0.21 là lịch sử; yêu cầu mới nhất của chủ dự án được ưu tiên, các quy tắc không được sửa vẫn giữ.
-3. Kiểm tra mã nguồn/commit thực tế. Bản ứng dụng hiện tại là **0.23.0**, versionCode **23**, commit mã/APK `7b2439e`. Chủ dự án đã xác nhận thao tác thử không tự tạo mốc lượt tàu thật, giữ bằng chứng nguồn chưa dùng kể cả đã khôi phục; tiếp tục phát hành thông thường trên cùng kho GitHub. Khi tiếp tục, kiểm tra commit/APK thực tế trên main; không nhầm commit chỉ sửa tài liệu với bản APK mới.
+3. Kiểm tra mã nguồn/commit thực tế. Bản ứng dụng hiện tại là **0.24.0**, versionCode **24**. Chủ dự án đã xác nhận thao tác thử không tự tạo mốc lượt tàu thật, giữ bằng chứng nguồn chưa dùng kể cả đã khôi phục; tiếp tục phát hành thông thường trên cùng kho GitHub. Khi tiếp tục, kiểm tra commit/APK thực tế trên main; không nhầm commit chỉ sửa tài liệu với bản APK mới.
 4. Tài khoản ChatGPT mới cần được cấp quyền truy cập GitHub riêng. Lịch sử chat, bộ nhớ ChatGPT, cache build và cấu hình cloud không tự chuyển theo repository.
 5. Tài khoản/mật khẩu website được chủ dự án nhập trực tiếp trong app hoặc cung cấp riêng khi cần kiểm thử. Không yêu cầu gửi lại toàn bộ cuộc trò chuyện và không chép mật khẩu vào mã nguồn.
 
 Tin nhắn chủ dự án có thể sao chép vào cuộc trò chuyện mới:
 
-> Tiếp tục app Android Đường Ngang tại https://github.com/cuongthinkpad-ui/app-duong-ngang, nhánh main. Hãy đọc AGENTS.md, docs/BAN_GIAO.md, docs/LICH_SU_TRAO_DOI.md, README.md và biên bản kiểm tra mới nhất trước. Điểm bàn giao hiện tại là bản 0.23; đọc thêm docs/TIEP_TUC_SAU_0.23.md. Giữ các yêu cầu đã chốt, kiểm tra mã nguồn hiện có và tiếp tục từ đó. Phân biệt rõ phần đã thử trên giả lập và phần chưa được xác minh trên Xiaomi thật. Yêu cầu tiếp theo của tôi là: [ghi việc muốn làm].
+> Tiếp tục app Android Đường Ngang tại https://github.com/cuongthinkpad-ui/app-duong-ngang, nhánh main. Hãy đọc AGENTS.md, docs/BAN_GIAO.md, docs/LICH_SU_TRAO_DOI.md, README.md và biên bản kiểm tra mới nhất trước. Điểm bàn giao hiện tại là bản 0.24; đọc thêm docs/UI_REVIEW_0.24.md và docs/TIEP_TUC_SAU_0.23.md. Giữ các yêu cầu đã chốt, kiểm tra mã nguồn hiện có và tiếp tục từ đó. Phân biệt rõ phần đã thử trên giả lập và phần chưa được xác minh trên Xiaomi thật. Yêu cầu tiếp theo của tôi là: [ghi việc muốn làm].
 
 ## Mục tiêu và trạng thái
 
@@ -221,3 +221,7 @@ Chủ dự án chốt thay dấu vết tàu treo ngay khi tàu thực tế mới
 Cập nhật khóa ký sau đó: đã nhận, lưu riêng và khôi phục khóa cũ; chứng chỉ trực tiếp từ keystore khớp fingerprint gốc. Xem `docs/SAO_LUU_KHOA_KY.md`. Chưa chuyển build sang khóa cũ hoặc phát hành bản mới.
 
 Bản cập nhật đã chuẩn bị tiếp theo: **0.23.0/versionCode 23**, `downloads/DuongNgang-0.23.apk`, ký khóa cũ và xác minh bằng apksigner. Mã/APK đi kèm commit bàn giao 0.23; tải qua GitHub Download raw file. Các ghi chú chưa có khóa/chưa ký ở trên là trạng thái trước bước này. Build, lint (0 lỗi/15 cảnh báo), 629 quy tắc, 12 parser, 15 fixture đọc xác thực và 602 kiểm tra phát lại báo cáo thật đạt; instrumentation mới/điện thoại chưa chạy.
+
+## 01/11 — bản 0.24
+
+Ngày website có thể là 1/11 thay vì 01/11; đã sửa nhận và so sánh LocalDate cho cả input/rows. Thêm ngày theo dõi trong Cài đặt, hôm nay tự động hoặc ngày lịch sử, không chuông lịch sử. Chủ dự án chốt lưu/chọn **30 ngày tính cả hôm nay**, thay quy tắc 15 ngày. Giữ checkpoint và nâng sàn nhập cũ để tải lại dữ liệu ngày 16–30 khi còn trên web. Kiểm chứng/giới hạn: `docs/UI_REVIEW_0.24.md`.
