@@ -54,12 +54,74 @@ public class MainActivity extends Activity {
       incidentFilter = "Tất cả";
   private boolean demo = false, expanded = false, followToday = true;
   private LocalDate selected = LocalDate.now(WebSource.ZONE);
+  private LocalDate detailDay;
+  private boolean detailFollowToday;
   private LocalDate historyDay = LocalDate.now(WebSource.ZONE);
   private boolean historyFollowToday = true, preparingLocalData;
   private final long demoClock = System.currentTimeMillis();
   private final ExecutorService io = Executors.newSingleThreadExecutor();
+  private final ExecutorService dataIo = Executors.newSingleThreadExecutor();
+  private record DayView(String revision, List<Rules.Event> events,
+      List<Rules.Event> incidents, List<Rules.Event> travelEvents, Rules.TravelState travel) {}
+  private final Map<String, DayView> dayViews = new HashMap<>();
+  private final Set<String> pendingDays = new HashSet<>();
+  private final Set<String> loadingDays = new HashSet<>();
+
+  private String dayKey(LocalDate day) { return store.account() + "\n" + day; }
+  private String dataRevision() {
+    return store.prefs.getLong("dataRevision", 0) + ":" + store.prefs.getLong("lastSuccess", 0)
+        + ":" + store.prefs.getLong("historyReadAt", 0) + ":" + store.monitoringDay()
+        + ":" + store.prefs.getInt("interval", 30);
+  }
+  private boolean dayLoaded(LocalDate day) { return dayViews.containsKey(dayKey(day)); }
+
+  /** Read SQLite, rebuild daily alerts and assemble history away from the UI thread. */
+  private DayView dayData(LocalDate day) {
+    String key = dayKey(day), revision = dataRevision(), account = store.account();
+    DayView cached = dayViews.get(key);
+    if ((cached == null || !cached.revision().equals(revision))
+        && !dataIo.isShutdown() && pendingDays.add(key)) {
+      dataIo.execute(() -> {
+        DayView loaded = null;
+        try {
+          synchronized (Store.class) {
+            if (!store.account().equals(account)) return;
+            long from = day.atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
+            long to = day.plusDays(1).atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
+            if (day.equals(LocalDate.now(WebSource.ZONE))) to = System.currentTimeMillis() + 1;
+            var events = Rules.dailyRecords(store.route(), store.events(from, to));
+            var incidents = day.equals(LocalDate.now(WebSource.ZONE))
+                ? store.incidentEvents(from, to) : events;
+            var travel = day.equals(store.monitoringDay()) && store.historicalMonitoring()
+                ? store.events(Rules.historyCutoff(System.currentTimeMillis()), to) : List.<Rules.Event>of();
+            var state = Rules.diagramEnabled(store.prefs.getInt("interval", 30))
+                ? Rules.travelState(store.route(), Rules.TravelState.empty(), travel) : Rules.TravelState.empty();
+            loaded = new DayView(revision, events, incidents, travel, state);
+          }
+        } catch (RuntimeException failure) {
+          android.util.Log.w("RailHistory", "Chưa đọc được dữ liệu ngày", failure);
+        } finally {
+          DayView result = loaded;
+          runOnUiThread(() -> {
+            pendingDays.remove(key);
+            if (isFinishing() || !store.account().equals(account)) return;
+            if (result != null) {
+              // Keep only a small number of days; never mix another day's cached rows.
+              if (dayViews.size() >= 4 && !dayViews.containsKey(key)) dayViews.clear();
+              dayViews.put(key, result);
+              if (day.equals(viewDay()) || day.equals(selected) || day.equals(historyDay))
+                refreshContent();
+            }
+          });
+        }
+      });
+    }
+    return cached == null ? new DayView("", List.of(), List.of(), List.of(), Rules.TravelState.empty()) : cached;
+  }
+
   private final Handler handler = new Handler(Looper.getMainLooper());
   private String lastUiState = "";
+  private final Map<String, Integer> rowLimits = new HashMap<>();
   private Rules.Route viewRoute;
   private String viewRangeFrom, viewRangeTo;
   private List<Rules.Event> viewDayEvents, viewFaults;
@@ -74,6 +136,7 @@ public class MainActivity extends Activity {
               store.prefs.getString("status", "")
                   + store.prefs.getLong("lastSuccess", 0)
                   + store.prefs.getLong("historyReadAt", 0)
+                  + store.prefs.getLong("dataRevision", 0)
                   + store.monitoringDay()
                   + staleData()
                   + LocalDate.now(WebSource.ZONE);
@@ -161,6 +224,7 @@ public class MainActivity extends Activity {
   protected void onDestroy() {
     stopEffects();
     io.shutdownNow();
+    dataIo.shutdownNow();
     super.onDestroy();
   }
 
@@ -412,20 +476,29 @@ public class MainActivity extends Activity {
     return route().inRange(crossing, rangeFrom(), rangeTo());
   }
 
+  private LocalDate viewDay() {
+    if (page.equals("detail") && detailDay != null)
+      return detailFollowToday ? LocalDate.now(WebSource.ZONE) : detailDay;
+    if (page.equals("crossingHistory")) return historyDay;
+    if (page.equals("incidents")) return selected;
+    return store.monitoringDay();
+  }
+
+  private boolean historicalView() { return !viewDay().equals(LocalDate.now(WebSource.ZONE)); }
+
   private long monitoringStart() {
-    return store.monitoringDay().atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
+    return viewDay().atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
   }
 
   private long monitoringEnd() {
-    return store.historicalMonitoring()
-        ? store.monitoringDay().plusDays(1).atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli()
+    return historicalView()
+        ? viewDay().plusDays(1).atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli()
         : System.currentTimeMillis() + 1;
   }
 
   private long displayedLastSuccess() {
-    if (!store.historicalMonitoring()) return store.prefs.getLong("lastSuccess", 0);
-    return store.monitoringDay().toString().equals(store.prefs.getString("historyReadDay", ""))
-        ? store.prefs.getLong("historyReadAt", 0) : 0;
+    if (!historicalView()) return store.prefs.getLong("lastSuccess", 0);
+    return store.prefs.getLong("completeDay:" + viewDay(), 0);
   }
 
   private List<Rules.Event> allToday() {
@@ -433,7 +506,7 @@ public class MainActivity extends Activity {
       viewDayEvents =
           demo
               ? samples()
-              : store.events(monitoringStart(), monitoringEnd());
+              : dayData(viewDay()).events();
     return viewDayEvents;
   }
 
@@ -446,18 +519,10 @@ public class MainActivity extends Activity {
   }
 
   private List<Rules.Event> occupancyEvents() {
-    if (!demo && store.historicalMonitoring())
-      return store.events(Rules.historyCutoff(System.currentTimeMillis()), monitoringEnd());
+    if (!demo && historicalView())
+      return dayData(viewDay()).travelEvents();
     if (!demo && store.prefs.contains("occupiedPoints")) return store.occupationEvents();
-    return demo
-        ? samples()
-        : store.events(
-            LocalDate.now(WebSource.ZONE)
-                .minusDays(1)
-                .atStartOfDay(WebSource.ZONE)
-                .toInstant()
-                .toEpochMilli(),
-            System.currentTimeMillis() + 1);
+    return demo ? samples() : dayData(viewDay()).events();
   }
 
   private boolean staleData() {
@@ -504,14 +569,18 @@ public class MainActivity extends Activity {
   private List<Rules.Event> activeFaults() {
     if (viewFaults != null) return viewFaults;
     if (demo) return viewFaults = Rules.activeFaults(samples());
-    if (store.historicalMonitoring()) return viewFaults = Rules.activeFaults(allToday());
+    if (historicalView()) {
+      var records = new ArrayList<>(allToday());
+      if (!Rules.selfTriggerEnabled(store.prefs.getInt("interval", 30))) records.removeIf(Rules::isSelfTrigger);
+      return viewFaults = Rules.activeFaults(records);
+    }
     long baseline =
         Rules.faultBaseline(store.prefs.getLong("baselineFrom", 0), System.currentTimeMillis());
     List<Rules.Event> current = new ArrayList<>();
     List<Rules.Event> records =
         store.prefs.contains("activeFaults")
             ? store.activeFaults()
-            : store.events(baseline, System.currentTimeMillis() + 1);
+            : dayData(viewDay()).events();
     boolean selfEnabled = Rules.selfTriggerEnabled(store.prefs.getInt("interval", 30));
     for (var event : records)
       if ((event.at() >= baseline
@@ -664,7 +733,7 @@ public class MainActivity extends Activity {
     boolean known = displayedLastSuccess() > 0;
     boolean running = store.prefs.getBoolean("running", false);
     boolean live = known && running && !staleData();
-    liveBadge.setText(store.historicalMonitoring() ? "LỊCH SỬ" : !known ? "CHỜ" : !running ? "DỪNG" : live ? "LIVE" : "CŨ");
+    liveBadge.setText(historicalView() ? "LỊCH SỬ" : !known ? "CHỜ" : !running ? "DỪNG" : live ? "LIVE" : "CŨ");
     liveBadge.setTextColor(live ? BLUE : WARNING);
     liveBadge.setContentDescription(live ? "Dữ liệu web đang cập nhật" : "Dữ liệu chưa trực tuyến");
     navHasFault = !scopedFaults().isEmpty();
@@ -673,6 +742,12 @@ public class MainActivity extends Activity {
 
   private void updateStatusLine() {
     String message = store.prefs.getString("status", "");
+    if (page.equals("crossingHistory") || page.equals("incidents")) {
+      LocalDate shown = page.equals("crossingHistory") ? historyDay : selected;
+      if (!shown.equals(store.monitoringDay()))
+        message = (store.dayComplete(shown) ? "Đã tải ngày " : "Chưa tải đủ ngày ")
+            + shown.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+    }
     status.setText(message);
     status.setVisibility(message.isEmpty() ? View.GONE : View.VISIBLE);
     // Overview already shows freshness in its summary and diagram. Keep only actionable messages.
@@ -815,9 +890,9 @@ public class MainActivity extends Activity {
   }
 
   private Rules.TravelState diagramState() {
+    if (!demo && !Rules.diagramEnabled(store.prefs.getInt("interval", 30))) return Rules.TravelState.empty();
     if (!demo && store.historicalMonitoring())
-      return Rules.travelState(route(), Rules.TravelState.empty(),
-          store.events(Rules.historyCutoff(System.currentTimeMillis()), monitoringEnd()));
+      return dayData(store.monitoringDay()).travel();
     if (!demo) return store.travelState();
     return Rules.travelState(route(), Rules.TravelState.empty(), samples());
   }
@@ -849,6 +924,8 @@ public class MainActivity extends Activity {
                 : last == 0
                     ? "Chưa cập nhật từ web"
                     : (staleData() ? "Dữ liệu cũ · " : "Theo bản tin web · ") + time(last));
+    if (!demo && !Rules.diagramEnabled(store.prefs.getInt("interval", 30)))
+      routeNote.setText("Sơ đồ chạy tàu chỉ hoạt động ở chu kỳ 30 giây");
     routeNote.setTextColor(!demo && staleData() ? WARNING : MUTED);
   }
 
@@ -1199,7 +1276,7 @@ public class MainActivity extends Activity {
     List<Rules.Event> records =
         demo && selected.equals(LocalDate.now(WebSource.ZONE))
             ? samples()
-            : demo ? List.of() : store.incidentEvents(from, to);
+            : demo ? List.of() : dayData(selected).incidents();
     Set<String> openIds = new HashSet<>();
     if (selected.equals(LocalDate.now(WebSource.ZONE))) {
       records = new ArrayList<>(records);
@@ -1210,13 +1287,14 @@ public class MainActivity extends Activity {
         if (!present.contains(event.id())) records.add(event);
       }
     }
-    if (selected.equals(LocalDate.now(WebSource.ZONE))
-        && !Rules.selfTriggerEnabled(store.prefs.getInt("interval", 30))) {
+    if (!Rules.selfTriggerEnabled(store.prefs.getInt("interval", 30))) {
       records = new ArrayList<>(records);
       records.removeIf(Rules::isSelfTrigger);
     }
     int shown = 0;
-    long baseline = demo ? 0 : store.prefs.getLong("baselineFrom", 0);
+    long baseline = demo || !selected.equals(LocalDate.now(WebSource.ZONE)) ? 0 : store.prefs.getLong("baselineFrom", 0);
+    String incidentLimitKey = dayKey(selected) + "|incidents|" + incidentFilter;
+    int incidentLimit = rowLimits.getOrDefault(incidentLimitKey, 40), matchedIncidents = 0;
     for (Rules.Incident incident : Rules.incidentHistory(records)) {
       if ((!openIds.contains(incident.fault().id())
               && (incident.fault().at() < from || incident.fault().at() >= to))
@@ -1228,6 +1306,7 @@ public class MainActivity extends Activity {
                   && incident.fault().at() < baseline;
       if (incidentFilter.equals("Đã khôi phục") && !recovered) continue;
       if (incidentFilter.equals("Chưa khôi phục") && (recovered || reset)) continue;
+      if (++matchedIncidents > incidentLimit) continue;
       LinearLayout item = card(recovered ? GOOD : reset ? SURFACE : FAULT);
       LinearLayout identity = row();
       TextView clock = text(time(incident.fault().at()), 10, MUTED, true);
@@ -1264,15 +1343,25 @@ public class MainActivity extends Activity {
       content.addView(item);
       shown++;
     }
+    if (matchedIncidents > incidentLimit)
+      content.addView(action("Hiển thị thêm · " + shown + "/" + matchedIncidents + " sự cố", "history", true,
+          () -> { rowLimits.put(incidentLimitKey, incidentLimit + 40); refreshContent(); }));
     if (shown == 0) {
       LinearLayout emptyCard = card(SURFACE);
-      empty(emptyCard, "Không có sự cố", "", "shield");
+      boolean complete = demo || dayLoaded(selected) && (selected.equals(LocalDate.now(WebSource.ZONE))
+          ? displayedLastSuccess() > 0 : store.dayComplete(selected));
+      empty(emptyCard, complete ? "Không có sự cố" : "Chưa tải đủ dữ liệu",
+          complete ? "" : "Đợi tải xong hoặc chọn Tải dữ liệu để đọc đủ báo cáo ngày này.", "shield");
       content.addView(emptyCard);
     }
   }
 
   private void loadHistory() {
     LocalDate day = page.equals("crossingHistory") ? historyDay : selected;
+    loadHistory(day);
+  }
+
+  private void loadHistory(LocalDate day) {
     if (day.isBefore(LocalDate.now(WebSource.ZONE).minusDays(29))
         || day.isAfter(LocalDate.now(WebSource.ZONE))) {
       Toast.makeText(this, "Chọn ngày trong 30 ngày gần nhất", Toast.LENGTH_SHORT).show();
@@ -1287,11 +1376,15 @@ public class MainActivity extends Activity {
       return;
     }
     String account = store.account();
+    String request = account + "\n" + day;
+    if (!loadingDays.add(request)) return;
     status.setText("Đang tải dữ liệu…");
     status.setVisibility(View.VISIBLE);
     io.execute(
         () -> {
           try {
+            if (!store.account().equals(account)
+                || !(page.equals("crossingHistory") ? historyDay : selected).equals(day)) return;
             WebSource source =
                 new WebSource(
                     store.prefs.getString("url", ""),
@@ -1299,7 +1392,11 @@ public class MainActivity extends Activity {
                     store.password());
             store.maintainHistory(account, System.currentTimeMillis());
             var data = source.readDay(day);
-            store.saveForAccount(account, data);
+            var records = new ArrayList<>(data.events());
+            if (day.isBefore(LocalDate.now(WebSource.ZONE))
+                && !day.minusDays(1).isBefore(LocalDate.now(WebSource.ZONE).minusDays(29)))
+              records.addAll(source.readDay(day.minusDays(1)).events());
+            store.saveHistoricalDay(account, day, new WebSource.DayData(records, data.route()));
             long now = System.currentTimeMillis();
             if (day.equals(LocalDate.now(WebSource.ZONE)))
               store.updateActiveFaults(
@@ -1311,7 +1408,8 @@ public class MainActivity extends Activity {
             List<Rules.Event> events = data.events();
             runOnUiThread(
                 () -> {
-                  if (isFinishing()) return;
+                  if (isFinishing() || !store.account().equals(account)
+                      || !(page.equals("crossingHistory") ? historyDay : selected).equals(day)) return;
                   refreshContent();
                   Toast.makeText(this, "Đã tải " + events.size() + " bản ghi", Toast.LENGTH_SHORT)
                       .show();
@@ -1319,13 +1417,16 @@ public class MainActivity extends Activity {
           } catch (Exception e) {
             runOnUiThread(
                 () -> {
-                  if (!isFinishing())
+                  if (!isFinishing() && store.account().equals(account)
+                      && (page.equals("crossingHistory") ? historyDay : selected).equals(day))
                     new AlertDialog.Builder(this)
                         .setTitle("Chưa tải được dữ liệu")
                         .setMessage(e.getMessage())
                         .setPositiveButton("Đóng", null)
                         .show();
                 });
+          } finally {
+            runOnUiThread(() -> loadingDays.remove(request));
           }
         });
   }
@@ -1374,7 +1475,6 @@ public class MainActivity extends Activity {
   }
 
   private void applyMonitoringDate(LocalDate day) {
-    stopService(new Intent(this, MonitorService.class));
     boolean automatic = day.equals(LocalDate.now(WebSource.ZONE));
     store.prefs.edit().putString("monitorDate", automatic ? "" : day.toString())
         .remove("historyReadDay").remove("historyReadAt")
@@ -1631,6 +1731,8 @@ public class MainActivity extends Activity {
   }
 
   private void openCrossing(String km) {
+    detailDay = viewDay();
+    detailFollowToday = !historicalView();
     selectedCrossing = Rules.km(km);
     navigate("detail");
   }
@@ -1742,34 +1844,22 @@ public class MainActivity extends Activity {
     }
   }
 
-  private String latestDevice(List<Rules.Event> events, String... keywords) {
-    for (Rules.Event e : events) {
-      String t = e.text().toLowerCase(Locale.ROOT);
-      for (String keyword : keywords)
-        if (t.contains(keyword)) return e.text() + " · " + time(e.at());
-    }
-    return "Chưa có dữ liệu";
-  }
-
-  private String deviceReading(
-      List<Rules.Event> events, List<Rules.Event> faults, String... keywords) {
+  private String deviceReading(List<Rules.Event> faults, String group) {
     List<String> active = new ArrayList<>();
-    for (Rules.Event fault : faults) {
-      String lower = fault.text().toLowerCase(Locale.ROOT);
-      for (String keyword : keywords)
-        if (lower.contains(keyword)) {
-          active.add(fault.text() + " · " + time(fault.at()));
-          break;
-        }
-    }
-    return active.isEmpty() ? latestDevice(events, keywords) : String.join("\n", active);
+    for (Rules.Event fault : faults)
+      if (Rules.deviceGroup(fault).equals(group))
+        active.add(fault.text() + " · " + time(fault.at()));
+    if (!active.isEmpty()) return String.join("\n", active);
+    return demo || dayLoaded(viewDay()) && (historicalView()
+        ? store.dayComplete(viewDay()) : displayedLastSuccess() > 0)
+        ? "Tốt" : "Chưa tải đủ dữ liệu";
   }
 
   private void deviceRow(
       LinearLayout parent, String title, String value, String kind, boolean error) {
     LinearLayout r = new LinearLayout(this);
     r.setGravity(Gravity.TOP);
-    boolean recovered = value.toLowerCase(Locale.ROOT).contains("khôi phục tốt");
+    boolean recovered = value.equals("Tốt") || value.toLowerCase(Locale.ROOT).contains("khôi phục tốt");
     r.addView(icon(kind, error ? RED : recovered ? GREEN : BLUE, 17));
     TextView name = text(title, 11, MUTED, false);
     name.setPadding(dp(9), 0, dp(8), 0);
@@ -1791,11 +1881,13 @@ public class MainActivity extends Activity {
     LinearLayout top = row();
     top.addView(
         text("Km " + selectedCrossing, 22, INK, true), new LinearLayout.LayoutParams(0, -2, 1));
-    boolean resetBaseline = !demo && store.prefs.getLong("baselineFrom", 0) > 0;
+    boolean resetBaseline = !demo && !historicalView() && store.prefs.getLong("baselineFrom", 0) > 0;
     String badge =
         !faults.isEmpty()
             ? "Đang có sự cố"
-            : resetBaseline
+            : !demo && (!dayLoaded(viewDay()) || historicalView() && !store.dayComplete(viewDay()))
+                ? "Chưa tải đủ dữ liệu"
+                : resetBaseline
                 ? "✓ Đã đặt lại"
                 : events.isEmpty() ? "Chờ dữ liệu" : "✓ Chưa ghi nhận lỗi";
     int badgeColor = !faults.isEmpty() ? RED : events.isEmpty() && !resetBaseline ? MUTED : GREEN;
@@ -1811,19 +1903,9 @@ public class MainActivity extends Activity {
     gap(summary, 7);
     summary.addView(text("Thông tin ghi nhận gần nhất", 10, MUTED, false));
     divider(summary);
-    String bell = deviceReading(events, faults, "chuông"),
-        light = deviceReading(events, faults, "đèn");
-    String barriers = deviceReading(events, faults, "cần chắn");
-    List<Rules.Event> sensorEvents = new ArrayList<>(), sensorFaults = new ArrayList<>();
-    for (var event : events)
-      if (!event.text().toLowerCase(Locale.ROOT).contains("điện áp")) sensorEvents.add(event);
-    for (var event : faults)
-      if (!event.text().toLowerCase(Locale.ROOT).contains("điện áp")) sensorFaults.add(event);
-    String sensors = deviceReading(sensorEvents, sensorFaults, "cảm biến", "cb");
-    String connection = deviceReading(events, faults, "kết nối giám sát"),
-        voltage = deviceReading(events, faults, "điện áp", "220vac");
     String[] labels = {"Chuông", "Đèn", "Cần chắn", "Cảm biến", "Kết nối", "Điện áp"};
-    String[] values = {bell, light, barriers, sensors, connection, voltage};
+    String[] values = new String[labels.length];
+    for (int i = 0; i < labels.length; i++) values[i] = deviceReading(faults, labels[i]);
     String[] icons = {"bell", "alert", "rail", "overview", "link", "voltage"};
     for (int i = 0; i < labels.length; i++) {
       final String value = values[i];
@@ -1850,8 +1932,8 @@ public class MainActivity extends Activity {
     }
     content.addView(history);
     history.addView(action("Chi tiết", "history", true, () -> {
-      historyDay = LocalDate.now(WebSource.ZONE);
-      historyFollowToday = true;
+      historyDay = viewDay();
+      historyFollowToday = !historicalView();
       navigate("crossingHistory");
     }));
     gap(content, 17);
@@ -1871,6 +1953,7 @@ public class MainActivity extends Activity {
         followToday = chosen.equals(LocalDate.now(WebSource.ZONE));
       }
       render();
+      if (!demo && !store.dayComplete(chosen)) loadHistory(chosen);
     }, initial.getYear(), initial.getMonthValue() - 1, initial.getDayOfMonth());
     limitHistoryDates(picker);
     picker.show();
@@ -1893,9 +1976,14 @@ public class MainActivity extends Activity {
     content.addView(controls);
     long from = historyDay.atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
     long to = historyDay.plusDays(1).atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
-    List<Rules.Event> records = demo ? samples() : store.crossingEvents(selectedCrossing, from, to);
+    List<Rules.Event> records = new ArrayList<>();
+    for (var event : demo ? samples() : dayData(historyDay).events())
+      if (Rules.km(event.crossing()).equals(Rules.km(selectedCrossing))) records.add(event);
     List<Rules.EventGroup> groups = Rules.crossingHistory(records, selectedCrossing);
+    String limitKey = dayKey(historyDay) + "|" + selectedCrossing;
+    int limit = rowLimits.getOrDefault(limitKey, 20), rendered = 0;
     for (var group : groups) {
+      if (rendered++ >= limit) break;
       LinearLayout frame = card(SURFACE);
       frame.setBackground(panel(SURFACE, LINE));
       String title = group.direction() > 0 ? "Tàu lẻ →"
@@ -1928,6 +2016,9 @@ public class MainActivity extends Activity {
       }
       content.addView(frame);
     }
+    if (groups.size() > limit)
+      content.addView(action("Hiển thị thêm · " + Math.min(limit, groups.size()) + "/" + groups.size() + " nhóm sự kiện",
+          "history", true, () -> { rowLimits.put(limitKey, limit + 20); refreshContent(); }));
     if (groups.isEmpty()) {
       LinearLayout none = card(SURFACE);
       empty(none, "Chưa có sự kiện trong ngày", "Chọn Tải dữ liệu để đọc từ website.", "history");

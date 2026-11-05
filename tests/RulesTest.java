@@ -34,6 +34,49 @@ public class RulesTest {
   }
 
   public static void main(String[] args) {
+    var historyRoute = new Rules.Route(List.of("312+111", "313+800", "314+550"));
+    List<Rules.Event> historyRaw = new ArrayList<>();
+    for (int i = 0; i < 6; i++) historyRaw.add(axle(100000L + i * 60000L, "313+800", 3, 3));
+    historyRaw.add(axle(900000L, "313+800", 3, 20));
+    var coldHistory = Rules.dailyRecords(historyRoute, historyRaw);
+    var replayRoute = new Rules.Route(List.of("100+000", "101+000", "102+000"));
+    var replayArrival = event(60000, "101+000", "Tàu lẻ", false);
+    check(Rules.historicalSelfTriggers(replayRoute, List.of(replayArrival), 0, 0, 100000, 30).size() == 1,
+        "complete historical day reconstructs eligible self inference");
+    check(Rules.historicalSelfTriggers(replayRoute, List.of(replayArrival,
+        event(30000, "100+000", "Tàu lẻ", false)), 0, 0, 100000, 30).isEmpty(),
+        "historical upstream evidence prevents false inference");
+    check(Rules.historicalSelfTriggers(replayRoute, List.of(replayArrival), 0, 0, 80000, 30).isEmpty(),
+        "day end does not prematurely confirm a final pending arrival");
+    check(Rules.historicalSelfTriggers(replayRoute, List.of(replayArrival), 0, 0, 100000, 120).isEmpty()
+        && Rules.historicalSelfTriggers(replayRoute, List.of(replayArrival), 0, 0, 100000, 300).isEmpty(),
+        "historical inference also respects thirty-second-only setting");
+    check(coldHistory.stream().filter(Rules::isAxleFault).count() == 2,
+        "fresh historical data derives both sixth deviation and large single deviation");
+    check(Rules.activeFaults(coldHistory).stream().filter(Rules::isAxleFault).count() == 2,
+        "historical detail retains the same axle faults as incidents");
+    check(coldHistory.equals(Rules.dailyRecords(historyRoute, coldHistory)),
+        "warm and cold history derive identical alerts without duplication");
+    check(coldHistory.stream().filter(e -> !Rules.isGenerated(e)).count() == historyRaw.size(),
+        "history preserves every original measurement");
+    for (var e : coldHistory) if (Rules.isAxleFault(e))
+      check(Rules.deviceGroup(e).equals("Cảm biến"), "derived axle warning belongs to sensor row");
+    check(Rules.deviceGroup(event(1, "313+800", "Điện áp cảm biến 6 < 5V", true)).equals("Cảm biến"),
+        "sensor voltage is a sensor fault, not common power");
+    check(Rules.deviceGroup(event(1, "313+800", "Điện áp cảm biến 6 khôi phục tốt", false)).equals("Cảm biến"),
+        "sensor voltage recovery stays with sensors");
+    check(Rules.deviceGroup(event(1, "313+800", "Mất nguồn xoay chiều 220VAC", true)).equals("Điện áp"),
+        "common power stays in voltage group");
+    for (String label : List.of("Chuông", "Đèn", "Cần chắn", "Kết nối"))
+      check(Rules.deviceGroup(event(1, "313+800", label + " 1 hỏng", true)).equals(label),
+          "hardware group " + label);
+    var normalBarrier = event(1, "313+800", "Cần chắn 2 đã nâng", false);
+    check(Rules.activeFaults(List.of(normalBarrier)).isEmpty(), "normal barrier action is not a fault");
+    check(Rules.diagramEnabled(30) && !Rules.diagramEnabled(120) && !Rules.diagramEnabled(300),
+        "diagram operates only at thirty seconds");
+    for (String point : List.of("280+500", "307+507", "309+056", "320+445", "338+900", "343+350"))
+      check(Rules.dailyRecords(new Rules.Route(List.of(point)), List.of(axle(1, point, 3, 20)))
+          .stream().noneMatch(Rules::isAxleFault), "history respects axle exclusion " + point);
     check(
         Rules.axleNote(List.of("46", "46", "48", "44", "46", "46"))
             .equals("CB3 thừa 2 trục · CB4 thiếu 2 trục"),

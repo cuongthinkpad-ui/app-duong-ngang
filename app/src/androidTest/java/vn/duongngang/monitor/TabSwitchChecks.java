@@ -45,6 +45,25 @@ final class TabSwitchChecks {
       data.setAccessible(true);
       page.setAccessible(true);
       render.setAccessible(true);
+      // Compare populated pages, not a new build's initial asynchronous loading placeholders.
+      Method invalidate = MainActivity.class.getDeclaredMethod("invalidateViewData");
+      Method records = MainActivity.class.getDeclaredMethod("allToday");
+      invalidate.setAccessible(true); records.setAccessible(true);
+      long readyDeadline = SystemClock.elapsedRealtime() + 90000;
+      boolean[] populated = {false};
+      while (!populated[0] && SystemClock.elapsedRealtime() < readyDeadline) {
+        Throwable[] preparationError = {null};
+        runner.runOnMainSync(() -> {
+          try {
+            data.set(activity, store);
+            invalidate.invoke(activity);
+            populated[0] = ((List<?>) records.invoke(activity)).size() == events.size();
+          } catch (Throwable error) { preparationError[0] = error; }
+        });
+        if (preparationError[0] != null) throw new AssertionError(preparationError[0]);
+        if (!populated[0]) Thread.sleep(100);
+      }
+      if (!populated[0]) throw new AssertionError("Timing fixture did not finish loading all 1000 events");
       StringBuilder timings = new StringBuilder();
       for (String target : List.of("crossings", "incidents", "settings", "overview")) {
         Throwable[] failure = {null};

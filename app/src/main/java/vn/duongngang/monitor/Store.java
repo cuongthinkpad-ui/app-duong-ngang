@@ -92,6 +92,37 @@ public final class Store {
     }
   }
 
+  /** Mark a day complete only after a full, validated read and derived-alert rebuild. */
+  public void saveHistoricalDay(String expected, java.time.LocalDate day, WebSource.DayData data) {
+    synchronized (Store.class) {
+      saveForAccount(expected, data);
+      long from = day.atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
+      long to = day.plusDays(1).atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
+      syncAxleAlerts(expected, from, to);
+      if (day.isBefore(java.time.LocalDate.now(WebSource.ZONE))) {
+        long coverage = Math.max(Rules.historyCutoff(System.currentTimeMillis()), from - 86400000L);
+        List<Rules.Event> records = events(coverage, to);
+        List<Rules.Event> inferred = Rules.historicalSelfTriggers(route(), records,
+            coverage, from, to, prefs.getInt("interval", 30));
+        try (var database = db()) {
+          database.delete("events", "at>=? AND at<? AND id LIKE 'self:%'",
+              new String[] {"" + from, "" + to});
+        }
+        save(inferred);
+        // A backfill can change retained evidence before the rolling checkpoint.
+        // The existing migration path preserves journeys whose raw source already expired.
+        prefs.edit().putLong("dataRevision", prefs.getLong("dataRevision", 0) + 1)
+            .putInt("travelVersion", 0).apply();
+      }
+      if (day.isBefore(java.time.LocalDate.now(WebSource.ZONE)))
+        prefs.edit().putLong("completeDay:" + day, System.currentTimeMillis()).apply();
+    }
+  }
+
+  public boolean dayComplete(java.time.LocalDate day) {
+    return prefs.getLong("completeDay:" + day, 0) > 0;
+  }
+
   public boolean historyCleanupDue(long now) {
     return prefs.getInt("retentionDays", 0) != 30
         || prefs.getLong("retentionCutoff", 0) < Rules.historyCutoff(now);
@@ -517,6 +548,8 @@ public final class Store {
       try (var db = db()) {
         for (String id : ids) db.delete("events", "id=?", new String[] {id});
       }
+      if (!ids.isEmpty())
+        prefs.edit().putLong("dataRevision", prefs.getLong("dataRevision", 0) + 1).apply();
     }
   }
 
@@ -533,6 +566,10 @@ public final class Store {
       boolean changed =
           !url.equals(prefs.getString("url", "")) || !user.equals(prefs.getString("user", ""));
       if (changed) {
+        var completion = prefs.edit();
+        for (String name : prefs.getAll().keySet())
+          if (name.startsWith("completeDay:")) completion.remove(name);
+        completion.remove("dataRevision").apply();
         context.deleteDatabase("events.db");
         var notifications = context.getSystemService(android.app.NotificationManager.class);
         for (var n : notifications.getActiveNotifications())
@@ -623,6 +660,8 @@ public final class Store {
         db.endTransaction();
       }
     }
+    if (!added.isEmpty())
+      prefs.edit().putLong("dataRevision", prefs.getLong("dataRevision", 0) + 1).apply();
     return added;
   }
 

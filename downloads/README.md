@@ -1,4 +1,15 @@
-# Đường Ngang — bản thử 0.24
+# Đường Ngang — bản 0.25
+
+**[Tải APK 0.25](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.25.apk)** — chọn **Download raw file**. Cài đè bản cũ, **không gỡ ứng dụng**; cùng khóa ký, versionCode 25.
+
+- Ngày cũ được tải và xử lý lại đầy đủ; cảnh báo sai trục hiện cả ở Sự cố và **Chi tiết đường ngang → Cảm biến**, kể cả máy mới.
+- Ô thiết bị chỉ hiện lỗi đang mở, không lỗi sau khi tải đủ thì **Tốt**. Nâng/hạ cần bình thường vẫn giữ trong lịch sử. Điện áp cảm biến thuộc Cảm biến, nguồn chung thuộc Điện áp.
+- Mở Chi tiết giữ đúng ngày đã chọn. Sơ đồ tàu chỉ hoạt động ở chu kỳ **30 giây**; 2/5 phút vẫn đọc báo cáo và giám sát lỗi.
+- Đọc và tổng hợp dữ liệu ngày ở nền; danh sách dài có **Hiển thị thêm** với số lượng rõ ràng, không bỏ bớt bản tin.
+
+Đạt 669 ca quy tắc, 12 parser, 39 HTTP fixture, 189 lưu trữ và 18 giao diện lịch sử; build/lint đạt và đã thử nâng cấp từ 0.24 giữ tệp/cài đặt trên giả lập. Chưa thử trên Xiaomi thật hoặc đối chiếu website bằng tài khoản thực trong phiên này. Xem [biên bản 0.25](../docs/UI_REVIEW_0.25.md).
+
+## Bản 0.24 trước đó
 
 **[Tải APK 0.24](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.24.apk)** — chọn **Download raw file**. Cài đè bản cũ, cùng khóa ký, versionCode 24.
 

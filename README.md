@@ -1,4 +1,4 @@
-# Đường Ngang — Android 0.24
+# Đường Ngang — Android 0.25
 
 **[Bàn giao phiên mới nhất — tiếp tục ở tài khoản khác](docs/TIEP_TUC_SAU_0.23.md)**.
 
@@ -7,6 +7,15 @@
 **[Tải gói sao lưu phiên làm việc 23/10/2026](backups/README.md)** — mã nguồn, APK, ngữ cảnh và lịch sử Git; khóa ký cần giữ riêng.
 
 Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt navy, xanh cyan và xanh lá. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
+
+## Thay đổi 0.25
+
+- Tải và xử lý lại đầy đủ ngày cũ; cảnh báo đếm trục xuất hiện cả ở Sự cố và Chi tiết đường ngang → Cảm biến trên máy mới hoặc có cache.
+- Ô thiết bị chỉ hiện lỗi đang mở; không có lỗi sau khi tải đủ thì ghi Tốt. Hoạt động nâng/hạ cần bình thường vẫn nằm trong lịch sử.
+- Điện áp cảm biến thuộc Cảm biến; giữ nguồn chung ở Điện áp. Mở Chi tiết giữ đúng ngày đang xem.
+- Sơ đồ tàu chỉ hoạt động khi chọn 30 giây; 2/5 phút vẫn đọc báo cáo và theo dõi lỗi thiết bị.
+- Đọc/tổng hợp dữ liệu ngày ở nền, cache theo tài khoản/ngày; danh sách dài dựng theo đợt có nút Hiển thị thêm.
+- Xem [kiểm chứng và tình trạng phát hành 0.25](docs/UI_REVIEW_0.25.md). APK 0.25 đã ký/xác minh bằng khóa gốc, đã thử cài đè giữ dữ liệu trên giả lập.
 
 ## Thay đổi 0.24
 

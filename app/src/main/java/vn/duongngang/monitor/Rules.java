@@ -1062,6 +1062,41 @@ public final class Rules {
     return confirmed;
   }
 
+  /** Device identity takes precedence over measurement words such as voltage. */
+  public static String deviceGroup(Event event) {
+    String t = event.text().toLowerCase(Locale.ROOT);
+    if (isAxleFault(event) || t.contains("cảm biến") || t.matches(".*\\bcb[1-6]\\b.*")) return "Cảm biến";
+    if (t.contains("chuông")) return "Chuông";
+    if (t.contains("đèn")) return "Đèn";
+    if (t.contains("cần chắn")) return "Cần chắn";
+    if (t.contains("kết nối")) return "Kết nối";
+    if (t.contains("điện áp") || t.contains("220vac") || t.contains("nguồn")) return "Điện áp";
+    return "";
+  }
+
+  public static boolean diagramEnabled(int seconds) { return seconds == 30; }
+
+  /** Derive the same daily axle alerts on a fresh install and on a warm cache. */
+  public static List<Event> dailyRecords(Route route, List<Event> raw) {
+    List<Event> records = new ArrayList<>();
+    for (Event e : raw) if (!isAxleFault(e)) records.add(e);
+    records.addAll(axleAlerts(route, records));
+    records.sort(Comparator.comparingLong(Event::at).reversed().thenComparing(Event::id));
+    return records;
+  }
+
+  /** Full historical evidence can be replayed without creating live notifications. */
+  public static List<Event> historicalSelfTriggers(Route route, List<Event> records,
+      long coverage, long from, long to, int interval) {
+    if (!selfTriggerEnabled(interval)) return List.of();
+    List<Event> original = new ArrayList<>(), inferred = new ArrayList<>();
+    for (Event e : records) if (!isGenerated(e)) original.add(e);
+    for (Event e : suspectedSelfTriggers(route, original, coverage))
+      if (e.at() >= from && e.at() + 30000L < to)
+        inferred.add(new Event("self:" + e.id(), e.at(), e.crossing(), "Nghi tự kích", true, List.of()));
+    return inferred;
+  }
+
   /** Generic system restoration must never clear unrelated device faults. */
   public static String faultKey(String text) {
     String t = text.toLowerCase(Locale.ROOT);

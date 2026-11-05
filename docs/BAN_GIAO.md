@@ -1,3 +1,5 @@
+> Phiên 05/11/2026: bản 0.25.0/versionCode 25 sửa sáu yêu cầu lịch sử/thiết bị/sơ đồ và tối ưu độ mượt. Đọc `UI_REVIEW_0.25.md` trước khi tiếp tục. APK `downloads/DuongNgang-0.25.apk` đã ký đúng khóa gốc; 189 ca lưu trữ, 18 ca giao diện lịch sử và thử cài đè từ 0.24 giữ dữ liệu đạt trên giả lập API 29. Chưa xác minh Xiaomi/website thật trong phiên này.
+
 # Bàn giao để tiếp tục ở tài khoản ChatGPT khác
 
 Cập nhật: 31/10/2026, giờ Việt Nam. Tài liệu này ghi yêu cầu đã chốt và tình trạng thực tế, giúp tiếp tục dự án khi đổi phiên/tài khoản. Không chứa mật khẩu website hoặc khóa ký riêng.
@@ -8,13 +10,13 @@ Bản tóm tắt phiên đầy đủ nhất: [Tiếp tục sau 0.23](TIEP_TUC_SA
 
 1. Kết nối cùng repository GitHub `cuongthinkpad-ui/app-duong-ngang`, lấy nhánh `main`; nếu không có công cụ GitHub, tải mã nguồn ZIP từ GitHub và cung cấp cho phiên mới.
 2. Đọc tài liệu này, `README.md`, `docs/LICH_SU_TRAO_DOI.md` và `docs/TIEP_TUC_SAU_0.23.md` và `docs/FIX_DIAGRAM_AFTER_0.22.md` trước khi thay đổi. Tài liệu 0.1–0.21 là lịch sử; yêu cầu mới nhất của chủ dự án được ưu tiên, các quy tắc không được sửa vẫn giữ.
-3. Kiểm tra mã nguồn/commit thực tế. Bản ứng dụng hiện tại là **0.24.0**, versionCode **24**. Chủ dự án đã xác nhận thao tác thử không tự tạo mốc lượt tàu thật, giữ bằng chứng nguồn chưa dùng kể cả đã khôi phục; tiếp tục phát hành thông thường trên cùng kho GitHub. Khi tiếp tục, kiểm tra commit/APK thực tế trên main; không nhầm commit chỉ sửa tài liệu với bản APK mới.
+3. Kiểm tra mã nguồn/commit thực tế. Bản ứng dụng hiện tại là **0.25.0**, versionCode **25**. Chủ dự án đã xác nhận thao tác thử không tự tạo mốc lượt tàu thật, giữ bằng chứng nguồn chưa dùng kể cả đã khôi phục; tiếp tục phát hành thông thường trên cùng kho GitHub. Khi tiếp tục, kiểm tra commit/APK thực tế trên main; không nhầm commit chỉ sửa tài liệu với bản APK mới.
 4. Tài khoản ChatGPT mới cần được cấp quyền truy cập GitHub riêng. Lịch sử chat, bộ nhớ ChatGPT, cache build và cấu hình cloud không tự chuyển theo repository.
 5. Tài khoản/mật khẩu website được chủ dự án nhập trực tiếp trong app hoặc cung cấp riêng khi cần kiểm thử. Không yêu cầu gửi lại toàn bộ cuộc trò chuyện và không chép mật khẩu vào mã nguồn.
 
 Tin nhắn chủ dự án có thể sao chép vào cuộc trò chuyện mới:
 
-> Tiếp tục app Android Đường Ngang tại https://github.com/cuongthinkpad-ui/app-duong-ngang, nhánh main. Hãy đọc AGENTS.md, docs/BAN_GIAO.md, docs/LICH_SU_TRAO_DOI.md, README.md và biên bản kiểm tra mới nhất trước. Điểm bàn giao hiện tại là bản 0.24; đọc thêm docs/UI_REVIEW_0.24.md và docs/TIEP_TUC_SAU_0.23.md. Giữ các yêu cầu đã chốt, kiểm tra mã nguồn hiện có và tiếp tục từ đó. Phân biệt rõ phần đã thử trên giả lập và phần chưa được xác minh trên Xiaomi thật. Yêu cầu tiếp theo của tôi là: [ghi việc muốn làm].
+> Tiếp tục app Android Đường Ngang tại https://github.com/cuongthinkpad-ui/app-duong-ngang, nhánh main. Hãy đọc AGENTS.md, docs/BAN_GIAO.md, docs/LICH_SU_TRAO_DOI.md, README.md và biên bản kiểm tra mới nhất trước. Điểm bàn giao hiện tại là bản 0.25; đọc thêm docs/UI_REVIEW_0.25.md và docs/TIEP_TUC_SAU_0.23.md. Giữ các yêu cầu đã chốt, kiểm tra mã nguồn hiện có và tiếp tục từ đó. Phân biệt rõ phần đã thử trên giả lập và phần chưa được xác minh trên Xiaomi thật. Yêu cầu tiếp theo của tôi là: [ghi việc muốn làm].
 
 ## Mục tiêu và trạng thái
 

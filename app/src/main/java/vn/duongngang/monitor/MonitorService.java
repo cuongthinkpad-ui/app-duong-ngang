@@ -126,6 +126,7 @@ public class MonitorService extends Service {
     String account = store.account();
     if (wake != null) wake.acquire(600000L);
     try {
+      WebSource pollSource;
       synchronized (Store.class) {
         if (!store.account().equals(account) || Thread.currentThread().isInterrupted()) return;
         store.maintainHistory(account, System.currentTimeMillis());
@@ -137,23 +138,24 @@ public class MonitorService extends Service {
                   store.password());
           sourceAccount = account;
         }
+        pollSource = source;
       }
       if (store.historicalMonitoring()) {
         LocalDate selected = store.monitoringDay();
         alarm.stop();
         ringingFaults.clear();
         // A completed past day needs no full two-day download on every 30-second tick.
-        if (selected.toString().equals(store.prefs.getString("historyReadDay", ""))
+        if (store.dayComplete(selected) && selected.toString().equals(store.prefs.getString("historyReadDay", ""))
             && System.currentTimeMillis() - store.prefs.getLong("historyReadAt", 0) < 15 * 60000L)
           return;
-        var data = source.readDay(selected);
+        var data = pollSource.readDay(selected);
         List<Rules.Event> historical = new ArrayList<>(data.events());
         if (!selected.minusDays(1).isBefore(LocalDate.now(WebSource.ZONE).minusDays(29)))
-          historical.addAll(source.readDay(selected.minusDays(1)).events());
+          historical.addAll(pollSource.readDay(selected.minusDays(1)).events());
         synchronized (Store.class) {
           if (!store.account().equals(account) || Thread.currentThread().isInterrupted()
               || !store.monitoringDay().equals(selected)) return;
-          store.saveForAccount(account, new WebSource.DayData(historical, data.route()));
+          store.saveHistoricalDay(account, selected, new WebSource.DayData(historical, data.route()));
           store.prefs.edit().putString("historyReadDay", selected.toString())
               .putLong("historyReadAt", System.currentTimeMillis())
               .putString("status", "Đã tải lịch sử · " + selected.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")))
@@ -183,13 +185,13 @@ public class MonitorService extends Service {
               .apply();
           sendBroadcast(new Intent(UPDATE).setPackage(getPackageName()));
         }
-        incoming.addAll(source.readDay(today.minusDays(1)).events());
+        incoming.addAll(pollSource.readDay(today.minusDays(1)).events());
       }
       Set<String> known = new HashSet<>();
       if (!full)
         for (var e : store.events(dayStart, started + 1))
           if (!Rules.isGenerated(e)) known.add(e.id());
-      var data = full ? source.readDay(today) : source.readDelta(today, known);
+      var data = full ? pollSource.readDay(today) : pollSource.readDelta(today, known);
       incoming.addAll(data.events());
       if (!data.connected()) reset = true;
       incoming.sort(Comparator.comparingLong(Rules.Event::at));

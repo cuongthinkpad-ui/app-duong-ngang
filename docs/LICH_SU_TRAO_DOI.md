@@ -229,3 +229,14 @@ Chủ dự án không tải được liên kết tệp workspace; tiếp tục b
 ## 01/11 — ngày đầu tháng và lịch sử 30 ngày
 
 Chủ dự án báo không tải được dữ liệu đầu tháng, yêu cầu thêm mục ngày/tháng trong Cài đặt ngay trên phạm vi theo dõi, mặc định hôm nay tự đổi và chọn được ngày trước. Sau đó chốt giới hạn chọn/lưu 30 ngày tính cả hôm nay và yêu cầu nhận cả dạng 01/06, 1/6, 01/6, 1/06. Đã xác nhận website thật trả 1/11/2026, sửa ngày input và bảng theo LocalDate, kiểm thử/report thật như UI_REVIEW_0.24.md. Ngày lịch sử không tạo chuông/notification từ bản tin cũ; giữ các quy tắc tàu/lỗi khác.
+
+
+## 05/11 — lịch sử thiếu lỗi, nhóm thiết bị và tối ưu
+
+Chủ dự án gửi ảnh Km 313+800: Sự cố có cảnh báo CB3 nhưng chi tiết cảm biến thiếu trên máy mới; Chi tiết lượt tàu nhảy về hôm nay. Xác nhận sáu mục: tải đầy đủ ngày cũ và tính lại mọi trở ngại như cùng ngày trực tiếp; cần chắn chỉ hiển thị lỗi ở ô tình trạng; điện áp cảm biến thuộc Cảm biến; không lỗi thì Tốt sau khi tải đủ; giữ ngày xuyên suốt chi tiết; sơ đồ tàu chỉ ở chu kỳ 30 giây. Bổ sung làm tải/thao tác mượt hơn, chốt “ok,làm đi”, nhắc riêng phải thấy sai trục tại chi tiết Cảm biến và yêu cầu bản dùng luôn, cài đè bằng khóa gốc. Không thay sáu điểm miễn đối chiếu trục, lỗi website hay phát chuông lịch sử. Tình trạng mã, kiểm thử và khóa ký được ghi trong UI_REVIEW_0.25.md.
+
+
+Hoàn thiện 0.25: chủ dự án gửi lại hai tệp sao lưu khóa riêng; khôi phục ngoài Git và ký/xác minh đúng chứng chỉ gốc. 669 quy tắc, 12 parser, 39 fixture đọc, 189 lưu trữ và 18 giao diện lịch sử đạt. Thử nâng cấp APK 0.24 → 0.25 giữ tệp private và cài đặt đạt trên giả lập Android 10/API 29. Không gán kết quả giả lập cho Xiaomi hoặc đọc website thật. Android 15 phần mềm không boot ổn định khi thiếu KVM, đã chuyển image nhẹ hơn để hoàn tất kiểm chứng.
+
+
+Mẫu đo callback dựng trang cùng 1.000 sự kiện trên giả lập phần mềm: danh sách đường ngang 8.331 → 3.729 ms, Sự cố 10.627 → 3.487 ms. Tổng quan 1.596 → 1.994 ms ở mẫu đơn; không khẳng định cải thiện mọi màn hình hoặc tốc độ trên điện thoại. Toàn bộ bảng và giới hạn phép đo trong UI_REVIEW_0.25.md.

@@ -8,7 +8,7 @@ import java.util.List;
 /** No test dependencies. Uses a separate device-protected sandbox, never the app's normal data. */
 public final class RouteStoreChecks extends Instrumentation {
   private int checks;
-  private boolean uiMode, previewMode, timingMode, telemetryMode;
+  private boolean uiMode, previewMode, timingMode, telemetryMode, historyMode;
 
   private void check(boolean result, String message) {
     checks++;
@@ -18,6 +18,7 @@ public final class RouteStoreChecks extends Instrumentation {
   @Override
   public void onCreate(Bundle arguments) {
     super.onCreate(arguments);
+    historyMode = arguments != null && "history".equals(arguments.getString("mode"));
     previewMode = arguments != null && "preview".equals(arguments.getString("mode"));
     uiMode = arguments != null && "ui".equals(arguments.getString("mode"));
     timingMode = arguments != null && "timing".equals(arguments.getString("mode"));
@@ -27,6 +28,17 @@ public final class RouteStoreChecks extends Instrumentation {
 
   @Override
   public void onStart() {
+    if (historyMode) {
+      Bundle result = new Bundle();
+      try {
+        result.putString("stream", new HistoryUiChecks(this).run() + " historical UI checks passed\n");
+        finish(-1, result);
+      } catch (Throwable failure) {
+        result.putString("stream", "FAILED: " + failure + "\n");
+        finish(0, result);
+      }
+      return;
+    }
     if (telemetryMode) {
       Bundle result = new Bundle();
       try {
@@ -1270,6 +1282,32 @@ public final class RouteStoreChecks extends Instrumentation {
       check(store.historicalMonitoring(), "fixed retained day opens historical mode");
       store.prefs.edit().putString("monitorDate", "").commit();
       check(!store.historicalMonitoring(), "empty date restores automatic today");
+      var pastDay = java.time.LocalDate.now(WebSource.ZONE).minusDays(2);
+      long pastStart = pastDay.atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
+      var pastRoute = new Rules.Route(List.of("312+111", "313+800", "314+550"));
+      var pastMeasurement = new Rules.Event("history-count", pastStart + 3600000L,
+          "313+800", "Khôi phục hệ thống", false, List.of("98", "98", "118", "98", "98", "98"));
+      var currentDay = java.time.LocalDate.now(WebSource.ZONE);
+      store.saveHistoricalDay(store.account(), currentDay, new WebSource.DayData(List.of(), pastRoute));
+      check(!store.dayComplete(currentDay), "midday snapshot cannot mark a future historical day complete");
+      long revisionBefore = store.prefs.getLong("dataRevision", 0);
+      check(!store.dayComplete(pastDay), "unread historical day is not complete");
+      store.saveHistoricalDay(store.account(), pastDay, new WebSource.DayData(List.of(pastMeasurement), pastRoute));
+      var pastEvents = store.events(pastStart, pastStart + 86400000L);
+      check(store.dayComplete(pastDay), "full historical read persists completion");
+      check(store.prefs.getLong("dataRevision", 0) > revisionBefore, "historical import invalidates day snapshot cache");
+      check(pastEvents.stream().anyMatch(Rules::isAxleFault), "historical read persists derived axle warning");
+      check(Rules.activeFaults(pastEvents).stream().anyMatch(Rules::isAxleFault),
+          "historical crossing detail sees derived sensor fault");
+      int historicalSize = pastEvents.size();
+      store.saveHistoricalDay(store.account(), pastDay, new WebSource.DayData(List.of(pastMeasurement), pastRoute));
+      check(store.events(pastStart, pastStart + 86400000L).size() == historicalSize,
+          "repeat historical download does not duplicate raw or derived rows");
+      check(store.incidentEvents(pastStart, pastStart + 86400000L).stream().filter(Rules::isAxleFault).count()
+          == pastEvents.stream().filter(Rules::isAxleFault).count(), "detail and incidents agree on historical axle alerts");
+      check(new Store(context).dayComplete(pastDay), "historical completion survives reopen");
+      store.credentials("https://rail.example.test/", "history-new-account", "test-only");
+      check(!store.dayComplete(pastDay), "account change clears historical completion");
       result.putString("stream", checks + " account storage checks passed\n");
 
     } catch (Throwable failure) {
