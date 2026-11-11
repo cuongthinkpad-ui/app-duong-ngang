@@ -1,4 +1,4 @@
-# Đường Ngang — Android 0.26
+# Đường Ngang — Android 0.27 (bản kiểm thử)
 
 **[Bàn giao phiên mới nhất — tiếp tục ở tài khoản khác](docs/TIEP_TUC_SAU_0.23.md)**.
 
@@ -7,6 +7,12 @@
 **[Tải gói sao lưu phiên làm việc 23/10/2026](backups/README.md)** — mã nguồn, APK, ngữ cảnh và lịch sử Git; khóa ký cần giữ riêng.
 
 Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt navy, xanh cyan và xanh lá. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
+
+## Bản kiểm thử 0.27
+
+Thêm ba chế độ: **Giọng nói** (2 hồi chuông, đọc cảnh báo 6 lượt, rung), **Chỉ chuông** (6 hồi và rung), **Im lặng** (chỉ thông báo). Giữ cài đặt tắt âm cũ, dữ liệu lịch sử im lặng và không ép âm lượng hệ thống.
+
+Bổ sung nhận lỗi cầu chì 50A không tô đỏ và ghép khôi phục nguồn DC/24V theo tên chủ dự án cung cấp. Đã kiểm thử local và ký gốc; **chưa đối chiếu được website thật do môi trường chặn miền**, nên bản chính thức trên main vẫn là 0.26. Xem [kiểm chứng và phần còn chờ](docs/UI_REVIEW_0.27.md), [APK kiểm thử](downloads/DuongNgang-0.27.apk).
 
 ## Thay đổi 0.26
 

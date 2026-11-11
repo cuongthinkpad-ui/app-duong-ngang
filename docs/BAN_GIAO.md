@@ -1,3 +1,5 @@
+> Bản kiểm thử 0.27 từ `48bdc1d`: ba chế độ giọng nói/chỉ chuông/im lặng và hai cặp lỗi nguồn theo yêu cầu. Đã ký gốc/kiểm thử/cài đè; chờ đối chiếu web thật vì môi trường còn chặn miền. Nhánh `codex/0.27-voice-alerts`, main vẫn 0.26. Đọc [UI_REVIEW_0.27.md](UI_REVIEW_0.27.md) trước khi tiếp tục; thông tin truy cập đã lưu riêng, không cần xin lại.
+
 > Phiên 11/11/2026: bản 0.26.0/versionCode 26 từ `111f8db` đã ký gốc, thử cài đè và hoàn tất kiểm thử; yêu cầu và kiểm chứng mới nhất ở [UI_REVIEW_0.26.md](UI_REVIEW_0.26.md). Các mô tả chu kỳ 2/5 phút và khôi phục lượt treo trong tài liệu cũ đã được yêu cầu mới thay thế.
 
 > Phiên 05/11/2026: bản 0.25.0/versionCode 25 sửa sáu yêu cầu lịch sử/thiết bị/sơ đồ và tối ưu độ mượt. Đọc `UI_REVIEW_0.25.md` trước khi tiếp tục. APK `downloads/DuongNgang-0.25.apk` đã ký đúng khóa gốc; 189 ca lưu trữ, 18 ca giao diện lịch sử và thử cài đè từ 0.24 giữ dữ liệu đạt trên giả lập API 29. Chưa xác minh Xiaomi/website thật trong phiên này.
