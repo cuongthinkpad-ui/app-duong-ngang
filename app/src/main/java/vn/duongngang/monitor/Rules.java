@@ -11,6 +11,10 @@ public final class Rules {
       java.util.regex.Pattern.compile(
           "(?iu)^(?:km\\s*)?(\\d+)\\s*\\+\\s*(\\d{1,3})(?:\\s*\\(\\s*([^()]+?)\\s*\\))?$");
   private static final java.util.regex.Pattern WHITESPACE = java.util.regex.Pattern.compile("\\s+");
+  private static final java.util.regex.Pattern FUSE_BLOWN = java.util.regex.Pattern.compile("cầu chì 50\\s*a bị đứt");
+  private static final java.util.regex.Pattern FUSE_RECOVERED = java.util.regex.Pattern.compile("cầu chì 50\\s*a khôi phục tốt");
+  private static final java.util.regex.Pattern DC_OVER = java.util.regex.Pattern.compile("nguồn dc\\s*>\\s*29\\s*v");
+  private static final java.util.regex.Pattern DC_RECOVERED = java.util.regex.Pattern.compile("nguồn 24\\s*v khôi phục tốt");
   private static final java.util.regex.Pattern VOLTAGE_DEVICE =
       java.util.regex.Pattern.compile("điện áp\\s+cảm biến\\s*(\\d+)");
   private static final java.util.regex.Pattern NUMBERED_DEVICE =
@@ -216,7 +220,28 @@ public final class Rules {
   }
 
   public record Event(
-      String id, long at, String crossing, String text, boolean red, List<String> counts) {}
+      String id, long at, String crossing, String text, boolean red, List<String> counts) {
+    public Event {
+      red = knownFault(text) || red && !knownRecovery(text);
+    }
+  }
+
+  private static String normalizedReport(String text) {
+    String t = WHITESPACE.matcher(text.trim()).replaceAll(" ").toLowerCase(Locale.ROOT);
+    return t.endsWith(".") || t.endsWith("!") ? t.substring(0, t.length() - 1).trim() : t;
+  }
+
+  public static boolean knownFault(String text) {
+    String t = normalizedReport(text);
+    return t.startsWith("cầu chì") && FUSE_BLOWN.matcher(t).matches()
+        || t.startsWith("nguồn") && DC_OVER.matcher(t).matches();
+  }
+
+  private static boolean knownRecovery(String text) {
+    String t = normalizedReport(text);
+    return t.startsWith("cầu chì") && FUSE_RECOVERED.matcher(t).matches()
+        || t.startsWith("nguồn") && DC_RECOVERED.matcher(t).matches();
+  }
 
   public static String km(String raw) {
     if (raw == null) return "";
@@ -1139,7 +1164,7 @@ public final class Rules {
     if (t.contains("đèn")) return "Đèn";
     if (t.contains("cần chắn")) return "Cần chắn";
     if (t.contains("kết nối")) return "Kết nối";
-    if (t.contains("điện áp") || t.contains("220vac") || t.contains("nguồn")) return "Điện áp";
+    if (t.contains("điện áp") || t.contains("220vac") || t.contains("nguồn") || t.contains("cầu chì")) return "Điện áp";
     return "";
   }
 
@@ -1168,7 +1193,10 @@ public final class Rules {
 
   /** Generic system restoration must never clear unrelated device faults. */
   public static String faultKey(String text) {
-    String t = text.toLowerCase(Locale.ROOT);
+    String t = normalizedReport(text);
+    if (FUSE_BLOWN.matcher(t).matches() || FUSE_RECOVERED.matcher(t).matches()) return "cầu chì 50a";
+    if (DC_OVER.matcher(t).matches() || DC_RECOVERED.matcher(t).matches())
+      return "nguồn dc > 29v";
     if (t.contains("220vac")) return "nguồn 220VAC";
     if (t.contains("kết nối giám sát")) return "kết nối giám sát";
     var voltage = VOLTAGE_DEVICE.matcher(t);

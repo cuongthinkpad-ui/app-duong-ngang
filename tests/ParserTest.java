@@ -83,6 +83,16 @@ public class ParserTest {
             LocalDate.of(2026, 10, 22));
     if (!bell.get(0).text().equals(original) || !bell.get(0).red())
       throw new AssertionError("preserve exact numbered device fault message");
-    System.out.println("12 parser scenarios passed");
+    for (String fault : List.of("Cầu chì 50A bị đứt", "nguồn DC > 29v")) {
+      String black = html.replace("<font color='red'>", "<font>")
+          .replace("Điện áp cảm biến 6 &lt; 5V", fault.replace(">", "&gt;"));
+      var e = WebSource.parse(Jsoup.parse(black), LocalDate.of(2026,10,22)).get(0);
+      if (!e.red() || !e.text().equals(fault)) throw new AssertionError("preserve and classify uncolored power fault");
+    }
+    for (String restore : List.of("Cầu chì 50A khôi phục tốt", "Nguồn 24V khôi phục tốt")) {
+      var e = WebSource.parse(Jsoup.parse(html.replace("Điện áp cảm biến 6 &lt; 5V", restore)), LocalDate.of(2026,10,22)).get(0);
+      if (e.red() || !e.text().equals(restore)) throw new AssertionError("exact power recovery survives styling");
+    }
+    System.out.println("16 parser scenarios passed");
   }
 }

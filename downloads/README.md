@@ -1,4 +1,16 @@
-# Đường Ngang — bản 0.26
+# Đường Ngang — bản kiểm thử 0.27
+
+**[APK kiểm thử 0.27](DuongNgang-0.27.apk)** — chọn **Download raw file**; ký khóa gốc, versionCode 27, cài đè 0.26 không gỡ app. Bản này trên nhánh `codex/0.27-voice-alerts`, chưa thay bản 0.26 chính thức vì đối chiếu web thật còn bị chặn.
+
+Trong Cài đặt chọn:
+
+- **Giọng nói:** 2 hồi chuông → đọc mỗi cảnh báo mới 6 lượt, có rung.
+- **Chỉ chuông:** 6 hồi chuông và rung.
+- **Im lặng:** chỉ hiện lỗi/thông báo.
+
+Máy cần có bộ giọng tiếng Việt trong cài đặt giọng đọc Android. Nút tắt âm thanh chung dừng chuông, giọng đọc và rung; lịch sử không báo âm. Nhận cầu chì 50A không đỏ và khôi phục DC/24V theo chuỗi chủ dự án cung cấp. [Kiểm chứng, checksum và giới hạn](../docs/UI_REVIEW_0.27.md).
+
+## Bản chính thức 0.26
 
 **[Tải APK 0.26](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.26.apk)** — chọn **Download raw file**. Giữ nguyên ứng dụng hiện tại và cài đè; applicationId/chữ ký gốc không đổi, versionCode 26.
 

@@ -14,6 +14,7 @@ public class MonitorService extends Service {
   private PowerManager.WakeLock wake;
   private Store store;
   private final AlarmSound alarm = new AlarmSound();
+  private VoiceAlarm voice;
   private final Set<String> ringingFaults = ConcurrentHashMap.newKeySet();
   private final Handler dailyHandler = new Handler(Looper.getMainLooper());
   private final Runnable dailyReset =
@@ -33,7 +34,8 @@ public class MonitorService extends Service {
     Set<String> current = new HashSet<>();
     for (var fault : store.activeFaults()) current.add(fault.id());
     ringingFaults.retainAll(current);
-    if (ringingFaults.isEmpty()) alarm.stop();
+    if (voice != null) voice.retain(current);
+    if (ringingFaults.isEmpty()) stopAlerts();
     sendBroadcast(new Intent(UPDATE).setPackage(getPackageName()));
   }
 
@@ -52,18 +54,45 @@ public class MonitorService extends Service {
   public void onCreate() {
     super.onCreate();
     store = new Store(this);
+    voice = new VoiceAlarm(this, message -> store.prefs.edit().putString("voiceStatus", message).apply());
+    store.prefs.edit().putString("voiceStatus", AlertOptions.SILENT.equals(store.alertMode())
+        ? "Đã tắt âm thanh cảnh báo" : AlertOptions.BELL.equals(store.alertMode())
+            ? "Chế độ chỉ chuông" : "Giọng đọc sử dụng tiếng Việt của điện thoại").apply();
     var manager = getSystemService(NotificationManager.class);
     manager.createNotificationChannel(
         new NotificationChannel("monitor", "Theo dõi nền", NotificationManager.IMPORTANCE_LOW));
-    manager.createNotificationChannel(
-        new NotificationChannel(
-            "faults_sound", "Sự cố có chuông", NotificationManager.IMPORTANCE_HIGH));
+    var alerts = new NotificationChannel("faults_alerts_027", "Thông báo sự cố", NotificationManager.IMPORTANCE_HIGH);
+    alerts.setSound(null, null);
+    alerts.enableVibration(false);
+    manager.createNotificationChannel(alerts);
     var silent =
         new NotificationChannel(
             "faults_silent", "Sự cố im lặng", NotificationManager.IMPORTANCE_HIGH);
     silent.setSound(null, null);
     silent.enableVibration(false);
     manager.createNotificationChannel(silent);
+  }
+
+  private void stopAlerts() {
+    alarm.stop();
+    if (voice != null) voice.stop();
+  }
+
+  private void playAlerts(String account, List<Rules.Event> events, long now) {
+    String mode = store.alertMode();
+    if (AlertOptions.SILENT.equals(mode)) { stopAlerts(); return; }
+    if (AlertOptions.BELL.equals(mode)) {
+      voice.stop();
+      if (alarm.play(this)) store.prefs.edit().putLong("lastAlarm", now).apply();
+    } else {
+      alarm.stop();
+      voice.enqueue(events,
+          () -> store.account().equals(account) && AlertOptions.VOICE.equals(store.alertMode())
+              && !store.historicalMonitoring() && store.prefs.getBoolean("running", false)
+              && events.stream().anyMatch(e -> ringingFaults.contains(e.id())
+                  && e.at() >= Rules.faultBaseline(store.prefs.getLong("baselineFrom", 0), System.currentTimeMillis())),
+          () -> store.prefs.edit().putLong("lastAlarm", System.currentTimeMillis()).apply());
+    }
   }
 
   private PendingIntent open() {
@@ -77,7 +106,7 @@ public class MonitorService extends Service {
   @Override
   public int onStartCommand(Intent intent, int flags, int id) {
     if (intent != null && "MUTE_ALARM".equals(intent.getAction())) {
-      alarm.stop();
+      stopAlerts();
       ringingFaults.clear();
       if (worker == null) stopSelf();
       return worker == null ? START_NOT_STICKY : START_STICKY;
@@ -87,6 +116,7 @@ public class MonitorService extends Service {
       stopSelf();
       return START_NOT_STICKY;
     }
+    if (intent != null && "RESTART".equals(intent.getAction())) stopAlerts();
     if (intent != null && "RESTART".equals(intent.getAction()) && worker != null) {
       worker.shutdownNow();
       worker = null;
@@ -142,7 +172,7 @@ public class MonitorService extends Service {
       }
       if (store.historicalMonitoring()) {
         LocalDate selected = store.monitoringDay();
-        alarm.stop();
+        stopAlerts();
         ringingFaults.clear();
         // A completed past day needs no full two-day download on every 30-second tick.
         if (store.dayComplete(selected) && selected.toString().equals(store.prefs.getString("historyReadDay", ""))
@@ -278,8 +308,9 @@ public class MonitorService extends Service {
           if (notification.getId() != 1 && !notificationIds.contains(notification.getId()))
             manager.cancel(notification.getId());
         ringingFaults.retainAll(open);
-        if (ringingFaults.isEmpty() || !store.prefs.getBoolean("sound", true)) alarm.stop();
-        boolean audibleNew = false;
+        voice.retain(open);
+        if (ringingFaults.isEmpty() || !store.prefs.getBoolean("sound", true)) stopAlerts();
+        Map<String, Rules.Event> audibleNew = new LinkedHashMap<>();
         if (last > 0 && !reset)
           for (var event : added)
             if (event.red()
@@ -289,7 +320,7 @@ public class MonitorService extends Service {
                 && store.claimAxleNotice(event, now)) {
               notifyFault(event);
               ringingFaults.add(event.id());
-              audibleNew = true;
+              audibleNew.put(event.id(), event);
             }
         // A newly started monitoring session must also sound for current, unresolved faults.
         // Merely returning to an already-running Activity does not replay old alerts.
@@ -300,10 +331,10 @@ public class MonitorService extends Service {
                 && store.claimAxleNotice(event, now)) {
               if (Rules.isAxleFault(event)) notifyFault(event);
               ringingFaults.add(event.id());
-              audibleNew = true;
+              audibleNew.put(event.id(), event);
             }
-        if (audibleNew && store.prefs.getBoolean("sound", true) && alarm.play(this))
-          store.prefs.edit().putLong("lastAlarm", now).apply();
+        if (!audibleNew.isEmpty() && store.prefs.getBoolean("sound", true))
+          playAlerts(account, new ArrayList<>(audibleNew.values()), now);
         firstPoll = false;
         var preferences =
             store
@@ -339,7 +370,7 @@ public class MonitorService extends Service {
   private void notifyFault(Rules.Event e) {
     boolean sound = store.prefs.getBoolean("sound", true);
     var n =
-        new Notification.Builder(this, sound ? "faults_sound" : "faults_silent")
+        new Notification.Builder(this, sound ? "faults_alerts_027" : "faults_silent")
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle(
                 java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")
@@ -358,7 +389,8 @@ public class MonitorService extends Service {
   @Override
   public void onDestroy() {
     dailyHandler.removeCallbacks(dailyReset);
-    alarm.stop();
+    stopAlerts();
+    if (voice != null) voice.close();
     ringingFaults.clear();
     if (worker != null) worker.shutdownNow();
     if (wake != null && wake.isHeld()) wake.release();
