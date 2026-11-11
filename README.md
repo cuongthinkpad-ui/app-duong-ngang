@@ -1,6 +1,6 @@
 # Đường Ngang — Android 0.27 (bản kiểm thử)
 
-**[Bàn giao phiên mới nhất — tiếp tục ở tài khoản khác](docs/TIEP_TUC_SAU_0.23.md)**.
+**[Bàn giao phiên mới nhất — tiếp tục với Google AI Studio hoặc công cụ khác](docs/TIEP_TUC_0.27_AI_STUDIO.md)**. Dùng nhánh `codex/0.27-voice-alerts` để lấy mã 0.27; main hiện giữ bản 0.26.
 
 **Đổi phiên/tài khoản ChatGPT:** đọc [Bản bàn giao và cách tiếp tục](docs/BAN_GIAO.md) và [Nhật ký trao đổi, yêu cầu đã chốt](docs/LICH_SU_TRAO_DOI.md). [Sao lưu khóa ký APK](docs/SAO_LUU_KHOA_KY.md).
 

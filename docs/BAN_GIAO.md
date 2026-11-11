@@ -1,3 +1,5 @@
+> Bàn giao mới nhất của phiên 11/11/2026 cho Google AI Studio: [TIEP_TUC_0.27_AI_STUDIO.md](TIEP_TUC_0.27_AI_STUDIO.md). Lấy nhánh `codex/0.27-voice-alerts`; mã ứng dụng đã kiểm thử tại `bb17427`.
+
 > Bản kiểm thử 0.27 từ `48bdc1d`: ba chế độ giọng nói/chỉ chuông/im lặng và hai cặp lỗi nguồn theo yêu cầu. Đã ký gốc/kiểm thử/cài đè; chờ đối chiếu web thật vì môi trường còn chặn miền. Nhánh `codex/0.27-voice-alerts`, main vẫn 0.26. Đọc [UI_REVIEW_0.27.md](UI_REVIEW_0.27.md) trước khi tiếp tục; thông tin truy cập đã lưu riêng, không cần xin lại.
 
 > Phiên 11/11/2026: bản 0.26.0/versionCode 26 từ `111f8db` đã ký gốc, thử cài đè và hoàn tất kiểm thử; yêu cầu và kiểm chứng mới nhất ở [UI_REVIEW_0.26.md](UI_REVIEW_0.26.md). Các mô tả chu kỳ 2/5 phút và khôi phục lượt treo trong tài liệu cũ đã được yêu cầu mới thay thế.
