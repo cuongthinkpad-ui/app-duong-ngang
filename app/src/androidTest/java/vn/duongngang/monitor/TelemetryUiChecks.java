@@ -314,8 +314,8 @@ final class TelemetryUiChecks {
                 !shown.contains("Thử chuông báo lỗi") && shown.contains("Cài đặt chạy nền"),
                 "operational controls retained");
             check(
-                shown.contains("30 giây") && shown.contains("2 phút") && shown.contains("5 phút"),
-                "all polling intervals retained");
+                shown.contains("30 giây") && !shown.contains("2 phút") && !shown.contains("5 phút"),
+                "fixed polling interval has no old choices");
           });
       UiPreview.shot(runner, activity, "telemetry-settings-0.14.png");
       ui(() -> ((ScrollView) get("pageScroll")).fullScroll(View.FOCUS_DOWN));

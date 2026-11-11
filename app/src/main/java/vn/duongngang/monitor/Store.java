@@ -11,15 +11,17 @@ import javax.crypto.spec.GCMParameterSpec;
 import org.json.*;
 
 public final class Store {
-  private static final int TRAVEL_VERSION = 5;
+  private static final int TRAVEL_VERSION = 6;
   private static final int AXLE_VERSION = 3;
-  private static final int SELF_EVIDENCE_VERSION = 4;
+  private static final int SELF_EVIDENCE_VERSION = 5;
   private final Context context;
   public final android.content.SharedPreferences prefs;
 
   public Store(Context c) {
     context = c;
     prefs = c.getSharedPreferences("monitor", 0);
+    if (prefs.getInt("interval", 0) != Rules.POLL_SECONDS)
+      prefs.edit().putInt("interval", Rules.POLL_SECONDS).apply();
   }
 
   private javax.crypto.SecretKey key() throws Exception {
@@ -103,7 +105,7 @@ public final class Store {
         long coverage = Math.max(Rules.historyCutoff(System.currentTimeMillis()), from - 86400000L);
         List<Rules.Event> records = events(coverage, to);
         List<Rules.Event> inferred = Rules.historicalSelfTriggers(route(), records,
-            coverage, from, to, prefs.getInt("interval", 30));
+            coverage, from, to, Rules.POLL_SECONDS);
         try (var database = db()) {
           database.delete("events", "at>=? AND at<? AND id LIKE 'self:%'",
               new String[] {"" + from, "" + to});
@@ -425,7 +427,7 @@ public final class Store {
                 j.getBoolean(7),
                 j.isNull(8) ? null : j.getString(8),
                 j.optLong(9, j.getLong(4)),
-                j.optBoolean(10, false)));
+                j.optBoolean(10, false), j.optBoolean(11, false)));
       }
     } catch (JSONException ignored) {
     }
@@ -447,7 +449,7 @@ public final class Store {
               .put(j.reached())
               .put(j.successorId() == null ? JSONObject.NULL : j.successorId())
               .put(j.lastAt())
-              .put(j.selfTriggered()));
+              .put(j.selfTriggered()).put(j.stalled()));
     return list.toString();
   }
 

@@ -2,10 +2,13 @@ package vn.duongngang.monitor;
 
 import android.content.Context;
 import android.media.*;
+import android.os.Vibrator;
+import android.os.VibrationEffect;
 
 /** Six chimes per alert; no periodic replay of old faults and no forced volume. */
 final class AlarmSound {
   private MediaPlayer player;
+  private Vibrator vibrator;
   private AudioManager manager;
   private AudioFocusRequest focus;
 
@@ -38,7 +41,7 @@ final class AlarmSound {
             descriptor.getFileDescriptor(), descriptor.getStartOffset(), descriptor.getLength());
       }
       player.setLooping(false);
-      player.setVolume(0.85f, 0.85f);
+      player.setVolume(1f, 1f);
       player.setOnCompletionListener(p -> stop());
       player.setOnErrorListener(
           (p, what, extra) -> {
@@ -47,6 +50,10 @@ final class AlarmSound {
           });
       player.prepare();
       player.start();
+      vibrator = context.getSystemService(Vibrator.class);
+      if (vibrator != null && vibrator.hasVibrator())
+        vibrator.vibrate(VibrationEffect.createWaveform(
+            new long[] {0, 650, 1350, 650, 1350, 650, 1350, 650, 1350, 650, 1350, 650}, -1), attributes);
       return true;
     } catch (Exception failure) {
       stop();
@@ -63,6 +70,7 @@ final class AlarmSound {
   }
 
   synchronized void stop() {
+    if (vibrator != null) { vibrator.cancel(); vibrator = null; }
     if (player != null) {
       player.release();
       player = null;

@@ -720,7 +720,7 @@ public final class RouteStoreChecks extends Instrumentation {
               "real-bell", axleDay + 111000, "101+000", "Chuông 2 hỏng", true, List.of());
       var isolated =
           new Rules.Event(
-              "isolated-arrival", axleDay + 120000, "103+000", "Tàu lẻ", false, List.of());
+              "isolated-arrival", axleDay + 120000, "103+000", "Tàu chẵn", false, List.of());
       var genuineSelf =
           new Rules.Event(
               "self:" + isolated.id(),
@@ -1080,7 +1080,7 @@ public final class RouteStoreChecks extends Instrumentation {
       store.prepareTravelState(store.account(), replayNow);
       check(
           store.travelReady()
-              && store.prefs.getInt("travelVersion", 0) == 5
+              && store.prefs.getInt("travelVersion", 0) == 6
               && Rules.trackSegments(store.route(), store.travelState()).isEmpty(),
           "upgrade replays source and motion before checkpoint and restoration after checkpoint");
       check(
@@ -1238,7 +1238,7 @@ public final class RouteStoreChecks extends Instrumentation {
           new Rules.Event("retained-operation-reset", migrateFloor + 3000, "201+000", "Khôi phục hệ thống", false, List.of()),
           migrationArrival, migrationSelf), migrateRoute));
       // Seed the legacy state without running the new inference reassessment yet.
-      store.prefs.edit().putInt("selfEvidenceVersion", 4).commit();
+      store.prefs.edit().putInt("selfEvidenceVersion", 5).commit();
       store.updateActiveFaults(store.account(), migrateFloor, migrateNow, 0, List.of());
       store.maintainHistory(store.account(), migrateNow);
       store.prefs.edit().putInt("selfEvidenceVersion", 3).commit();
@@ -1256,7 +1256,7 @@ public final class RouteStoreChecks extends Instrumentation {
       store.prefs.edit().putInt("travelVersion", 4).commit();
       check(!store.travelReady(), "version-four diagram is withheld until retained raw replay");
       store.prepareTravelState(store.account(), migrateNow);
-      check(store.travelReady() && store.prefs.getInt("travelVersion", 0) == 5
+      check(store.travelReady() && store.prefs.getInt("travelVersion", 0) == 6
               && beforeDiagramUpgrade.equals(Rules.trackSegments(migrateRoute, store.travelState()))
               && store.events(0, migrateNow + 1).size() == beforeDiagramRaw,
           "diagram upgrade keeps expired-source journeys and every retained raw report");
@@ -1308,6 +1308,33 @@ public final class RouteStoreChecks extends Instrumentation {
       check(new Store(context).dayComplete(pastDay), "historical completion survives reopen");
       store.credentials("https://rail.example.test/", "history-new-account", "test-only");
       check(!store.dayComplete(pastDay), "account change clears historical completion");
+      store.credentials("https://rail.example.test/", "stalled-checkpoint", "test-only");
+      long stalledNow = System.currentTimeMillis(), stalledAt = stalledNow - 3 * 86400000L;
+      var stalledRoute = new Rules.Route(List.of("100+000", "101+000"));
+      var trainFault = new Rules.Event("stalled-fault", stalledAt + 2000, "100+000", "Tàu chạy chậm", true, List.of());
+      store.saveForAccount(store.account(), new WebSource.DayData(List.of(
+          new Rules.Event("stalled-arrival", stalledAt, "100+000", "Tàu lẻ", false, List.of()),
+          new Rules.Event("stalled-passed", stalledAt + 1000, "100+000", "Tàu lẻ đã qua đường ngang", false, List.of()),
+          trainFault), stalledRoute));
+      store.prepareTravelState(store.account(), stalledNow);
+      check(new Store(context).travelState().journeys().stream().anyMatch(j -> j.stalled() && !j.reached()),
+          "interrupted train survives checkpoint serialization and reopen");
+      var followingVisit = new Rules.Event("stalled-following", stalledNow - 2000, "100+000", "Tàu lẻ", false, List.of());
+      store.saveForAccount(store.account(), new WebSource.DayData(List.of(followingVisit), stalledRoute));
+      var terminate = new Rules.Event("stalled-end", stalledNow - 1000, "100+000", "Khôi phục hệ thống", false, List.of());
+      store.saveForAccount(store.account(), new WebSource.DayData(List.of(terminate), stalledRoute));
+      store.updateActiveFaults(store.account(), stalledAt, stalledNow, 0, List.of());
+      check(Rules.trackSegments(stalledRoute, new Store(context).travelState())
+              .equals(List.of(new Rules.TrackSegment(null, "100+000", 1)))
+          && store.travelState().journeys().stream().anyMatch(j -> j.id().equals(followingVisit.id()) && !j.reached())
+          && store.events(stalledAt, stalledNow).stream().anyMatch(e -> e.id().equals(trainFault.id())),
+          "system recovery ends persisted interrupted leader, preserving following train and raw fault");
+      for (int legacy : new int[] {120, 300}) {
+        store.prefs.edit().putInt("interval", legacy).commit();
+        Store upgraded = new Store(context);
+        check(upgraded.prefs.getInt("interval", 0) == 30,
+            "legacy polling setting migrates to thirty seconds: " + legacy);
+      }
       result.putString("stream", checks + " account storage checks passed\n");
 
     } catch (Throwable failure) {

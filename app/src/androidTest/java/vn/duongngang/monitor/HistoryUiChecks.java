@@ -124,8 +124,8 @@ final class HistoryUiChecks {
       check(lit[0], "thirty-second diagram has real historical journey");
       for (int interval : new int[] {120, 300}) ui(() -> {
         fixture.prefs.edit().putInt("interval", interval).commit(); call("refreshContent");
-        check(((Rules.TravelState) call("diagramState")).journeys().isEmpty(), "slow interval removes train diagram " + interval);
-        check(((TextView) get("routeNote")).getText().toString().contains("30 giây"), "disabled diagram explains interval requirement");
+        check(!((Rules.TravelState) call("diagramState")).journeys().isEmpty(), "legacy interval cannot disable fixed thirty-second diagram " + interval);
+        check(!((TextView) get("routeNote")).getText().toString().contains("chỉ hoạt động"), "legacy interval cannot disable fixed diagram");
       });
       LocalDate pagingDay = day.minusDays(1);
       long pagingStart = pagingDay.atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
@@ -144,6 +144,27 @@ final class HistoryUiChecks {
         check(labels((View) get("content")).contains("00:01:00"), "load more exposes earliest event without losing records");
         check(find((View) get("content"), "Hiển thị thêm · 20/25 nhóm sự kiện") == null,
             "all twenty-five groups are available after expansion");
+      });
+      ui(() -> {
+        set("page", "settings"); call("render");
+        String shown = labels((View) get("content"));
+        check(shown.contains("Cố định 30 giây") && !shown.contains("2 phút") && !shown.contains("5 phút"),
+            "settings removes all polling choices");
+        AlarmSound alarm = new AlarmSound();
+        var audio = activity.getSystemService(android.media.AudioManager.class);
+        int volume = audio.getStreamVolume(android.media.AudioManager.STREAM_ALARM);
+        try {
+          check(alarm.play(activity) && alarm.isPlaying(), "stronger alarm plays");
+          Field player = AlarmSound.class.getDeclaredField("player"); player.setAccessible(true);
+          check(((android.media.MediaPlayer) player.get(alarm)).getDuration() == 12000,
+              "six chimes keep twelve-second duration");
+          Field vibration = AlarmSound.class.getDeclaredField("vibrator"); vibration.setAccessible(true);
+          check(vibration.get(alarm) != null, "alarm requests vibration service");
+          alarm.stop();
+          check(!alarm.isPlaying() && vibration.get(alarm) == null, "stop releases audio and cancels vibration");
+          check(audio.getStreamVolume(android.media.AudioManager.STREAM_ALARM) == volume,
+              "alarm never changes system alarm volume");
+        } finally { alarm.stop(); }
       });
       return checks;
     } finally {

@@ -34,6 +34,7 @@ public class RulesTest {
   }
 
   public static void main(String[] args) {
+    sectionContinuity026();
     var historyRoute = new Rules.Route(List.of("312+111", "313+800", "314+550"));
     List<Rules.Event> historyRaw = new ArrayList<>();
     for (int i = 0; i < 6; i++) historyRaw.add(axle(100000L + i * 60000L, "313+800", 3, 3));
@@ -614,9 +615,8 @@ public class RulesTest {
                         List.of(
                             event(1, "100+000", "Tàu lẻ", false),
                             event(2, "100+000", "Khôi phục hệ thống", false))))
-                .size()
-            == 1,
-        "known arrival plus restoration maintains continuity if passage message is missing");
+                .isEmpty(),
+        "restoration ends an unfinished arrival without fabricating an outgoing train");
     check(
         Rules.betweenCrossings(
                     Rules.travelState(
@@ -991,13 +991,8 @@ public class RulesTest {
             List.of(
                 event(2000, "101+000", "Tàu lẻ đã qua đường ngang", false),
                 event(2500, "101+000", "Khôi phục hệ thống", false)));
-    oneSegment(
-        line,
-        selfOutgoing,
-        "101+000",
-        "102+000",
-        1,
-        "self outgoing interval survives ordinary source restore before manual reset");
+    check(Rules.trackSegments(line, selfOutgoing).isEmpty(),
+        "system restore closes a self-triggered outgoing trail");
     check(
         Rules.trackSegments(line, Rules.travelState(line, selfOutgoing, List.of(manualReset)))
             .isEmpty(),
@@ -1011,8 +1006,8 @@ public class RulesTest {
         "other crossing reset does not recover this self fault");
     var realTrip = Rules.travelState(line, Rules.TravelState.empty(), List.of(selfArrival));
     check(
-        Rules.travelState(line, realTrip, List.of(manualReset)).equals(realTrip),
-        "manual button alone does not erase an unflagged real train");
+        Rules.trackSegments(line, Rules.travelState(line, realTrip, List.of(manualReset))).isEmpty(),
+        "local manual command ends the waiting train without fabricating continuation");
     var restarted =
         Rules.travelState(line, selfReset, List.of(event(5000, "101+000", "Tàu lẻ", false)));
     oneSegment(
@@ -1950,17 +1945,12 @@ public class RulesTest {
                 event(1200, "100+000", "Khôi phục hệ thống", false),
                 event(2000, "101+000", "Cần chắn 1 đã nâng", false),
                 event(3000, "101+000", "Khôi phục hệ thống", false)));
-    oneSegment(
-        line,
-        middle,
-        "101+000",
-        "102+000",
-        1,
-        "motion and restore switch a middle crossing interval instead of deleting the train");
+    check(Rules.trackSegments(line, middle).isEmpty(),
+        "activity plus restoration ends waiting visit without a fabricated outgoing leg");
     var independent =
         Rules.travelState(line, middle, List.of(event(4000, "103+000", "Tàu chẵn", false)));
     check(
-        Rules.trackSegments(line, independent).size() == 2,
+        Rules.trackSegments(line, independent).size() == 1,
         "sparse recovery preserves independent train in another section");
     var future =
         Rules.travelState(
@@ -2161,6 +2151,87 @@ public class RulesTest {
       check(Rules.suspectedSelfTriggers(line, series, 0).equals(List.of(arrival)),
           "local actions cannot justify a real arrival with no upstream proof: " + d);
     }
+  }
+
+  static void sectionContinuity026() {
+    var route = new Rules.Route(List.of("100+000", "101+000", "102+000", "103+000", "104+000"));
+    for (int d : List.of(1, -1)) {
+      String source = d == 1 ? "100+000" : "104+000";
+      String target = d == 1 ? "103+000" : "101+000";
+      String train = d == 1 ? "Tàu lẻ" : "Tàu chẵn";
+      var a = event(1000, source, train, false);
+      var b = event(3000, target, train, false);
+      var following = event(4000, source, train, false);
+      check(Rules.suspectedSelfTriggers(route, List.of(a,b), 0).isEmpty(),
+          "ordered same-direction chain crosses missing intermediate reports " + d);
+      var raw = new ArrayList<>(List.of(a,b,following));
+      var travel = Rules.travelState(route, Rules.TravelState.empty(), raw);
+      check(travel.journeys().stream().anyMatch(j -> j.id().equals(a.id()) && j.reached()),
+          "distant real arrival takes ownership of source trail " + d);
+      check(travel.journeys().stream().anyMatch(j -> j.id().equals(following.id()) && !j.reached()),
+          "following train remains independent " + d);
+      check(Rules.travelState(route, Rules.travelState(route, Rules.TravelState.empty(), List.of(a)),
+          List.of(b,following)).equals(travel), "poll replay and full replay agree " + d);
+      var middle = event(1000, "102+000", train, false);
+      check(Rules.suspectedSelfTriggers(route, List.of(middle), 0).equals(List.of(middle)),
+          "isolated arrival remains a suspicion " + d);
+      check(Rules.suspectedSelfTriggers(route, List.of(middle,b), 0).isEmpty(),
+          "later real directional chain disproves the exact source suspicion " + d);
+      check(Rules.suspectedSelfTriggers(route, List.of(middle,
+          event(3000,target,train+" đã qua đường ngang",false)),0).isEmpty(),
+          "downstream passage alone corroborates ordered source arrival " + d);
+      var closeFollowing = event(2000, source, train, false);
+      var convoy = Rules.travelState(route, Rules.TravelState.empty(), List.of(a,
+          event(1500,source,train+" đã qua đường ngang",false), closeFollowing,b));
+      check(convoy.journeys().stream().anyMatch(j -> j.id().equals(a.id()) && j.reached())
+          && convoy.journeys().stream().anyMatch(j -> j.id().equals(closeFollowing.id()) && !j.reached()),
+          "missing-point chain preserves following source even before leader reaches destination " + d);
+      check(Rules.suspectedSelfTriggers(route,List.of(a,closeFollowing,b,
+          event(5000,target,train,false)),0).isEmpty(),"ordered sources support successive missing-point arrivals once each " + d);
+      var queued = Rules.travelState(route, Rules.TravelState.empty(), List.of(a,
+          event(1500,source,train+" đã qua đường ngang",false), following,
+          event(5000,source,"Ấn nút Duy tu",false)));
+      check(queued.journeys().stream().anyMatch(j -> j.id().equals(a.id()) && !j.reached())
+          && queued.journeys().stream().anyMatch(j -> j.id().equals(following.id()) && j.reached()),
+          "local command terminates its exact latest visit while preserving another train " + d);
+      for (String command : List.of("Ấn nút Phục hồi", "Ấn nút Duy tu", "Ấn nút cảnh báo", "Khôi phục hệ thống")) {
+        var interruptedLeader = Rules.travelState(route, Rules.TravelState.empty(), List.of(a,
+            event(1200,source,train+" đã qua đường ngang",false),
+            event(1500,source,"Tàu chạy chậm",true), closeFollowing,
+            event(5000,source,command,false)));
+        check(interruptedLeader.journeys().stream().anyMatch(j -> j.id().equals(a.id()) && j.reached())
+            && interruptedLeader.journeys().stream().anyMatch(j -> j.id().equals(closeFollowing.id()) && !j.reached()),
+            "terminate exact faulted leader without erasing normal following train " + d + command);
+      }
+      var second = event(5000, target, train, false);
+      check(Rules.suspectedSelfTriggers(route, List.of(a,b,second), 0).equals(List.of(second)),
+          "source cannot justify another following arrival " + d);
+      check(Rules.suspectedSelfTriggers(route, List.of(event(1000, source,
+          d==1 ? "Tàu chẵn" : "Tàu lẻ", false),b),0).contains(b),
+          "opposite-direction source cannot bridge missing reports " + d);
+      check(Rules.suspectedSelfTriggers(route, List.of(event(4000,source,train,false),b),0).contains(b),
+          "distant reversed timestamp is not an ordered chain " + d);
+      for (String reset : List.of("Ấn nút Phục hồi", "Ấn nút Duy tu", "Ấn nút cảnh báo", "Khôi phục hệ thống")) {
+        var fault=event(1500,source,"Tàu chạy chậm",true);
+        var end=event(2000,source,reset,false);
+        var waiting=Rules.travelState(route,Rules.TravelState.empty(),List.of(a,fault));
+        var ended=Rules.travelState(route,waiting,List.of(end));
+        check(Rules.trackSegments(route,ended).isEmpty(), "local command ends interrupted train " + d + reset);
+        check(Rules.trackSegments(route,Rules.travelState(route,ended,
+            List.of(event(2500,source,train+" đã qua đường ngang",false)))).isEmpty(),
+            "late passage cannot reopen ended train " + d + reset);
+        check(Rules.activeFaults(List.of(fault,end)).equals(List.of(fault)),
+            "termination preserves original red fault " + d + reset);
+        check(Rules.travelState(route,waiting,List.of(event(2000,target,reset,false))).equals(waiting),
+            "command at another crossing cannot end this train " + d + reset);
+      }
+    }
+    var station = new Rules.Route(List.of("100+000","101+000 (Ga)","102+000","103+000"));
+    var dest = event(3000,"103+000","Tàu lẻ",false);
+    check(Rules.suspectedSelfTriggers(station,List.of(event(1000,"100+000","Tàu lẻ",false),dest),0)
+        .equals(List.of(dest)),"chain never crosses station boundary");
+    check(!Rules.endsTrain("Cần chắn khôi phục tốt") && Rules.endsTrain("  Ấn nút   DUY TU  "),
+        "termination matches exact normalized commands only");
   }
 
 }

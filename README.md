@@ -1,4 +1,4 @@
-# Đường Ngang — Android 0.25
+# Đường Ngang — Android 0.26
 
 **[Bàn giao phiên mới nhất — tiếp tục ở tài khoản khác](docs/TIEP_TUC_SAU_0.23.md)**.
 
@@ -7,6 +7,14 @@
 **[Tải gói sao lưu phiên làm việc 23/10/2026](backups/README.md)** — mã nguồn, APK, ngữ cảnh và lịch sử Git; khóa ký cần giữ riêng.
 
 Ứng dụng theo dõi đường ngang CBTĐ, giao diện tiếng Việt navy, xanh cyan và xanh lá. [Tải APK](downloads/README.md). Không nhúng tài khoản hay mật khẩu thử nghiệm vào mã nguồn hoặc APK.
+
+## Thay đổi 0.26
+
+- Đối chiếu chuỗi tàu cùng hướng trong khu đoạn giữa hai ga, chấp nhận thiếu bản tin ở điểm giữa; đủ bằng chứng thì bỏ đúng suy luận Nghi tự kích và chuyển dấu tàu, giữ tàu nối tiếp.
+- Bốn bản tin nút/khôi phục tại chính điểm kết thúc lượt treo; không tạo đoạn đi tiếp giả hoặc xóa lỗi thiết bị gốc. Chi tiết tại [kiểm chứng 0.26](docs/UI_REVIEW_0.26.md).
+- Bỏ toàn bộ lựa chọn chu kỳ, luôn 30 giây; chuyển cấu hình 2/5 phút cũ về 30 giây.
+- Chuông rõ hơn, giữ sáu hồi/12 giây, thêm rung. Tắt cảnh báo chung dừng cả chuông/rung; không ép âm lượng tối đa và không báo khi xem lịch sử.
+- Giọng đọc để bản sau theo lựa chọn của chủ dự án.
 
 ## Thay đổi 0.25
 
@@ -166,7 +174,7 @@
 
 Tổng quan gồm sơ đồ, tàu gần nhất và sự cố, tự chia chiều cao để vừa màn hình. Chạm để xem danh sách/chi tiết đầy đủ. Thanh dưới: Tổng quan / Đường ngang / Sự cố / Cài đặt. Mục Sự cố chọn ngày, lọc chưa/đã khôi phục, tick xanh khi có bản tin khôi phục tương ứng. Chỉ một nút tắt chuông chung; tắt chuông vẫn giữ lỗi đỏ. **“Designed by Cao Xuân Cường” chỉ hiển thị trong Cài đặt.**
 
-Foreground service đọc theo chu kỳ 30 giây / 2 phút / 5 phút, có thông báo thường trực. Khi mới kết nối, tải ngày trước và ngày hiện tại, đọc hết phân trang rồi kiểm tra lại đầu trang; sau đó đọc chồng tới bản tin đã biết và làm mới toàn bộ định kỳ. Phiên hết hạn được đăng nhập lại; sai tài khoản/mật khẩu dừng dịch vụ để tránh thử liên tục. Tải lịch sử riêng không phát cảnh báo.
+Foreground service đọc cố định mỗi 30 giây, có thông báo thường trực. Khi mới kết nối, tải ngày trước và ngày hiện tại, đọc hết phân trang rồi kiểm tra lại đầu trang; sau đó đọc chồng tới bản tin đã biết và làm mới toàn bộ định kỳ. Phiên hết hạn được đăng nhập lại; sai tài khoản/mật khẩu dừng dịch vụ để tránh thử liên tục. Tải lịch sử riêng không phát cảnh báo.
 
 Khi dữ liệu gián đoạn/cũ, sơ đồ giữ trạng thái cuối và đoạn tàu màu xanh, kèm nhãn cảnh báo dữ liệu cũ/thời điểm cập nhật; không giữ nhãn LIVE. Chu kỳ đọc web không phải dữ liệu liên tục tại hiện trường. Các bản ghi hoàn toàn giống nhau cùng giây được gộp do web không cung cấp ID sự kiện độc lập.
 

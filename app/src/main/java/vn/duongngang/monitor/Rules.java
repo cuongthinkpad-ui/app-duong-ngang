@@ -4,6 +4,7 @@ import java.util.*;
 
 /** Domain rules independent of Android. All timestamps are epoch milliseconds. */
 public final class Rules {
+  public static final int POLL_SECONDS = 30;
   private static final Set<Long> AXLE_EXEMPT_CHAINAGES =
       Set.of(280500L, 307507L, 309056L, 320445L, 338900L, 343350L);
   private static final java.util.regex.Pattern POINT =
@@ -268,6 +269,24 @@ public final class Rules {
     return WHITESPACE.matcher(text.trim()).replaceAll(" ").equalsIgnoreCase("Ấn nút Phục hồi");
   }
 
+  /** Exact local operator commands; never interpret hardware recovery as an operator action. */
+  public static boolean endsTrain(String text) {
+    String normalized = WHITESPACE.matcher(text.trim()).replaceAll(" ").toLowerCase(Locale.ROOT);
+    return Set.of("ấn nút phục hồi", "ấn nút duy tu", "ấn nút cảnh báo", "khôi phục hệ thống")
+        .contains(normalized);
+  }
+
+  /** Ordered crossings in one station-bounded section, nearest first. */
+  private static List<String> upstreamSection(Route route, String point, int direction) {
+    List<String> result = new ArrayList<>();
+    String next = route.upstream(point, direction);
+    while (next != null) {
+      result.add(next);
+      next = route.upstream(next, direction);
+    }
+    return result;
+  }
+
   private static int reportPhase(Event event) {
     if (direction(event.text()) != 0) return 0;
     if (event.red()) return 1;
@@ -290,7 +309,12 @@ public final class Rules {
       boolean reached,
       String successorId,
       long lastAt,
-      boolean selfTriggered) {
+      boolean selfTriggered,
+      boolean stalled) {
+    public Journey(String id, String from, String to, int direction, long at, boolean passed,
+        boolean released, boolean reached, String successorId, long lastAt, boolean selfTriggered) {
+      this(id, from, to, direction, at, passed, released, reached, successorId, lastAt, selfTriggered, false);
+    }
     public Journey(
         String id,
         String from,
@@ -381,7 +405,7 @@ public final class Rules {
         reached,
         successor,
         Math.max(j.lastAt(), at),
-        j.selfTriggered());
+        j.selfTriggered(), j.stalled());
   }
 
   private static Journey latestJourney(
@@ -415,21 +439,29 @@ public final class Rules {
    * unmatched trails there immediately. Sources after this arrival remain following trains.
    * Activity-only evidence retains single-source matching and cannot perform this cleanup.
    */
-  private static void linkPredecessor(Map<String, Journey> journeys, Journey current) {
+  private static void linkPredecessor(Route route, Map<String, Journey> journeys, Journey current) {
     boolean actualTrain = !current.id().startsWith(MOTION_JOURNEY);
     if (!actualTrain && claimed(journeys, current.id())) return;
     Journey previous = null;
+    List<String> upstream = actualTrain ? upstreamSection(route, current.from(), current.direction())
+        : List.of();
     for (Journey j : journeys.values())
-      if (current.from().equals(j.to())
+      if ((current.from().equals(j.to())
+              || actualTrain && upstream.contains(j.from()) && !j.id().startsWith(MOTION_JOURNEY))
           && current.direction() == j.direction()
           && !j.reached()
           && j.at() <= current.at()
-          && (previous == null || (actualTrain ? j.at() > previous.at() : j.at() < previous.at())))
+          && (previous == null || (actualTrain
+              ? upstream.indexOf(j.from()) < upstream.indexOf(previous.from())
+                  || j.from().equals(previous.from())
+                      && (current.from().equals(j.to()) ? j.at() > previous.at() : j.at() < previous.at())
+              : j.at() < previous.at())))
         previous = j;
     if (previous == null) return;
     for (Journey j : new ArrayList<>(journeys.values()))
-      if (current.from().equals(j.to()) && current.direction() == j.direction()
-          && !j.reached() && (j.id().equals(previous.id()) || actualTrain && j.at() <= previous.at()))
+      if (previous.from().equals(j.from()) && current.direction() == j.direction()
+          && !j.reached() && (j.id().equals(previous.id())
+              || actualTrain && current.from().equals(previous.to()) && j.at() <= previous.at()))
         journeys.put(j.id(),
             progress(j, j.passed(), j.released(), true, current.id(), current.at()));
   }
@@ -466,7 +498,7 @@ public final class Rules {
 
   /** Activity-only ownership must yield to the real approach, even after an activity reset. */
   private static boolean promoteMovement(
-      Map<String, Journey> journeys, Event event, int direction) {
+      Route route, Map<String, Journey> journeys, Event event, int direction) {
     String point = km(event.crossing());
     Journey motion = latestJourney(journeys, point, direction, false);
     if (motion == null
@@ -489,7 +521,7 @@ public final class Rules {
             motion.reached(),
             motion.successorId(),
             Math.max(event.at(), motion.lastAt()),
-            motion.selfTriggered());
+            motion.selfTriggered(), motion.stalled());
     journeys.put(current.id(), current);
     for (Journey j : new ArrayList<>(journeys.values()))
       if (motion.id().equals(j.successorId()))
@@ -497,7 +529,7 @@ public final class Rules {
             j.id(), progress(j, j.passed(), j.released(), j.reached(), current.id(), event.at()));
     // A tentative activity match may have selected the old trail. The explicit report
     // must still take ownership of the newest eligible real source.
-    linkPredecessor(journeys, current);
+    linkPredecessor(route, journeys, current);
     linkEarlierDownstream(journeys, current);
     return true;
   }
@@ -618,25 +650,50 @@ public final class Rules {
                   j.reached(),
                   j.successorId(),
                   j.lastAt(),
-                  true));
+                  true, j.stalled()));
         continue;
       }
-      if (e.red()) continue;
+      if (e.red()) {
+        // Remember an interrupted train across checkpoint/restart; never clear the original fault.
+        String lower = e.text().toLowerCase(Locale.ROOT);
+        if (lower.contains("tàu")) {
+          Journey affected = null;
+          for (Journey j : journeys.values())
+            if (j.from().equals(point) && !j.reached() && j.at() <= e.at()
+                && (affected == null || j.at() > affected.at())) affected = j;
+          if (affected != null)
+            journeys.put(affected.id(), new Journey(affected.id(), affected.from(), affected.to(),
+                affected.direction(), affected.at(), affected.passed(), affected.released(),
+                affected.reached(), affected.successorId(), e.at(), affected.selfTriggered(), true));
+        }
+        continue;
+      }
       int d = direction(e.text()), passed = passedDirection(e.text());
-      if (isManualRecovery(e.text())) {
-        for (Journey j : new ArrayList<>(journeys.values()))
-          if (j.from().equals(point) && j.selfTriggered() && !j.reached() && j.at() <= e.at())
-            journeys.put(j.id(), progress(j, j.passed(), true, true, j.successorId(), e.at()));
+      Journey local = latestJourney(journeys, point, 0, false);
+      // A known interrupted visit can coexist with a following normal train at this point.
+      // End that interrupted visit, never erase the newer independent arrival instead.
+      if (endsTrain(e.text())) {
+        Journey interrupted = null;
+        for (Journey j : journeys.values())
+          if (j.from().equals(point) && !j.reached() && j.at() <= e.at()
+              && (j.stalled() || j.selfTriggered())
+              && (interrupted == null || j.at() > interrupted.at())) interrupted = j;
+        if (interrupted != null) local = interrupted;
+      }
+      if (endsTrain(e.text()) && (!e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+          || local != null && (!local.passed() || local.selfTriggered() || local.stalled()))) {
+        if (local != null && !local.reached() && local.at() <= e.at())
+          journeys.put(local.id(), progress(local, local.passed(), true, true, local.successorId(), e.at()));
       } else if (barrierActivity(e) != 0) {
         Journey movement = movementJourney(route, journeys, e);
         if (movement != null) {
           journeys.put(movement.id(), movement);
-          linkPredecessor(journeys, movement);
+          linkPredecessor(route, journeys, movement);
           linkEarlierDownstream(journeys, movement);
         }
       } else if (d != 0) {
         retireContradictions(route, journeys, point, d, e.at());
-        if (promoteMovement(journeys, e, d)) continue;
+        if (promoteMovement(route, journeys, e, d)) continue;
         for (Journey j : new ArrayList<>(journeys.values()))
           if (j.from().equals(point) && !j.released()) {
             if (j.reached() || !j.passed() || j.direction() != d)
@@ -646,7 +703,7 @@ public final class Rules {
         Journey current =
             new Journey(e.id(), point, route.upstream(point, -d), d, e.at(), false, false, false);
         journeys.put(current.id(), current);
-        linkPredecessor(journeys, current);
+        linkPredecessor(route, journeys, current);
         linkEarlierDownstream(journeys, current);
       } else if (passed != 0 || e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")) {
         Journey current = latestJourney(journeys, point, passed, passed == 0);
@@ -676,7 +733,7 @@ public final class Rules {
         if (!current.released()) {
           if (!current.reached()) {
             if (passed != 0) retireContradictions(route, journeys, point, passed, e.at());
-            linkPredecessor(journeys, current);
+            linkPredecessor(route, journeys, current);
             linkEarlierDownstream(journeys, current);
           }
           // The next crossing may already own the visible interval before this passage.
@@ -901,8 +958,7 @@ public final class Rules {
   }
 
   private static boolean evidenceReset(Event event) {
-    return event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
-        || isManualRecovery(event.text());
+    return endsTrain(event.text());
   }
 
   /** One operating visit, irrespective of how many numbered barriers report movement. */
@@ -1014,28 +1070,41 @@ public final class Rules {
         previousTrains.put(point, visit);
       } else if (passed != 0) {
         visit.direction = passed;
+        if (visit.arrival == null && visit.passedAt == Long.MIN_VALUE) arrivals.add(visit);
         visit.passedAt = event.at();
         previousTrains.put(point, visit);
       }
     }
     Set<EvidenceVisit> used = new HashSet<>();
+    Set<String> corroborated = new HashSet<>();
     List<Event> suspects = new ArrayList<>();
     for (EvidenceVisit target : arrivals) {
-      String upstream = route.upstream(target.point, target.direction);
-      if (upstream != null) {
-        EvidenceVisit match = null;
-        for (EvidenceVisit candidate : evidence.getOrDefault(upstream, List.of()))
-          if (!used.contains(candidate) && candidate.supports(target)) {
+      List<String> section = upstreamSection(route, target.point, target.direction);
+      if (section.isEmpty()) continue;
+      long targetAt = target.arrival == null ? target.passedAt : target.arrival.at();
+      EvidenceVisit match = null;
+      for (String upstream : section) {
+        for (EvidenceVisit candidate : evidence.getOrDefault(upstream, List.of())) {
+          boolean distant = !upstream.equals(section.get(0));
+          long sourceAt = candidate.arrival == null ? candidate.passedAt : candidate.arrival.at();
+          if (!used.contains(candidate) && candidate.supports(target)
+              && (!distant || candidate.direction == target.direction
+                  && sourceAt != Long.MIN_VALUE && sourceAt <= targetAt)) {
             match = candidate;
             break;
           }
-        if (match == null) suspects.add(target.arrival);
-        else {
-          target.supportedBy = match;
-          used.add(match);
         }
+        if (match != null) break;
+      }
+      if (match == null && target.arrival != null) suspects.add(target.arrival);
+      else if (match != null) {
+        target.supportedBy = match;
+        used.add(match);
+        if (match.direction == target.direction && match.arrival != null
+            && match.arrival.at() <= targetAt) corroborated.add(match.arrival.id());
       }
     }
+    suspects.removeIf(e -> corroborated.contains(e.id()));
     return suspects;
   }
 
@@ -1144,7 +1213,7 @@ public final class Rules {
     return event.red()
         || event.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")
         || event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
-        || isManualRecovery(event.text());
+        || endsTrain(event.text());
   }
 
   /** Pair only explicit restoration messages with earlier faults of that device and crossing. */
@@ -1162,10 +1231,10 @@ public final class Rules {
         result.add(new Incident(event, null));
       } else if (event.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")
           || event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
-          || isManualRecovery(event.text())) {
+          || endsTrain(event.text())) {
         List<String> matches = new ArrayList<>();
         if (event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
-            || isManualRecovery(event.text())) matches.add(km(event.crossing()) + "|@self");
+            || endsTrain(event.text())) matches.add(km(event.crossing()) + "|@self");
         else matches.add(key);
         String lower = event.text().toLowerCase(Locale.ROOT);
         if (lower.contains("cần chắn") && faultKey(event.text()).equals(lower)) {
@@ -1195,7 +1264,7 @@ public final class Rules {
       String k = km(e.crossing()) + "|" + eventFaultKey(e);
       if (e.red()) faults.put(k, e);
       else if (e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
-          || isManualRecovery(e.text())) {
+          || endsTrain(e.text())) {
         faults.remove(km(e.crossing()) + "|@self");
       } else if (e.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")) {
         faults.remove(k);

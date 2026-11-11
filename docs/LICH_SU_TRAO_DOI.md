@@ -240,3 +240,11 @@ Hoàn thiện 0.25: chủ dự án gửi lại hai tệp sao lưu khóa riêng; 
 
 
 Mẫu đo callback dựng trang cùng 1.000 sự kiện trên giả lập phần mềm: danh sách đường ngang 8.331 → 3.729 ms, Sự cố 10.627 → 3.487 ms. Tổng quan 1.596 → 1.994 ms ở mẫu đơn; không khẳng định cải thiện mọi màn hình hoặc tốc độ trên điện thoại. Toàn bộ bảng và giới hạn phép đo trong UI_REVIEW_0.25.md.
+
+## 11/11/2026 — chuỗi tàu trong khu đoạn, lượt treo, 30 giây và chuông/rung
+
+Chủ dự án giao bốn mục đã duyệt và yêu cầu không hỏi lại: đối chiếu chuỗi cùng hướng khi thiếu điểm giữa, kết thúc lượt treo bằng bốn bản tin tại chỗ, bỏ lựa chọn chu kỳ và luôn 30 giây, tăng độ rõ chuông giữ sáu hồi và thêm rung. Chủ dự án nhắc bỏ cả ba nút 30 giây/2 phút/5 phút. Sau câu hỏi về giọng nói, chủ dự án chọn để bản sau. Đã nhận lại hai tệp sao lưu và khôi phục khóa gốc ngoài Git, fingerprint khớp bản 0.25. Chi tiết thay đổi, kiểm thử và phát hành xem UI_REVIEW_0.26.md.
+
+Làm rõ trong cùng phiên: chủ dự án xác nhận nguyên tắc “khi xóa dấu tàu bị treo thì không xóa nhầm dấu của tàu khác đang chạy trên sơ đồ”. Đây không phải một chức năng lưu tàu riêng hay giả định có hai lượt thật cách nhau hai phút; các giờ trong ví dụ chỉ minh họa trình tự. Bản tin báo tàu và đã qua trong cùng lượt không tạo thêm tàu. Đã bổ sung hồi quy chọn đúng lượt có lỗi/tự kích khi cùng điểm có lượt khác và giữ bản tin lỗi gốc.
+
+Hoàn tất 0.26: 737 quy tắc, 12 parser, 39 HTTP fixture, 193 lưu trữ và 24 giao diện lịch sử/âm/rung đạt trên bản cuối; build/lint 0 lỗi, 15 cảnh báo. Ca dịch vụ `--nontrain-only` đạt theo chu kỳ thật 30 giây. Cài đè 0.25 → 0.26 ký gốc giữ tệp private/cài đặt và chuyển chu kỳ cũ về 30 giây. 69 ca UI cập nhật đạt trước bước bổ sung chọn đúng lượt lỗi, chi tiết phạm vi tại UI_REVIEW_0.26.md. Chưa thử Xiaomi/website thật trong phiên này. APK và checksum ở downloads/.

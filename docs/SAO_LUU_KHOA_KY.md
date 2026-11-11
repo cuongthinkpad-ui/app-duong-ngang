@@ -51,3 +51,7 @@ Các kiểm tra đã đạt: giải mã qua CLI, khớp bytes khóa gốc, khớ
 ## Khôi phục tại môi trường mới — 31/10/2026
 
 Chủ dự án đã gửi lại đủ hai tệp và yêu cầu lưu. Đã lưu ngoài Git tại `/workspace/private-backups/duong-ngang-signing/`, quyền thư mục 700/tệp 600; giải mã bằng công cụ của repo vào thư mục riêng `restored/`. Đã xuất chứng chỉ trực tiếp từ keystore bằng keytool và đối chiếu đúng fingerprint khóa cũ nêu trên. Không ghi đè khóa debug hiện có của toolchain. Chưa đổi cấu hình ký build, chưa phát hành APK mới. Các ghi chú thiếu khóa trước thời điểm này là tình trạng lịch sử. Việc lưu ở workspace hiện tại không xác nhận đã xuất bản snapshot hoặc khôi phục ở một tác vụ mới.
+
+## Khôi phục cho bản 0.26 — 11/11/2026
+
+Chủ dự án gửi lại hai tệp sao lưu trong phiên này. Đã khôi phục vào thư mục riêng ngoài Git `/workspace/private-backups/duong-ngang-signing/restored/`, không ghi đè khóa phát triển do onboarding tạo. Fingerprint khóa khôi phục và APK 0.26 trùng chứng chỉ gốc của APK 0.25. Các tệp riêng có quyền hạn chế, không được đưa lên GitHub.

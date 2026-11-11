@@ -54,7 +54,31 @@ final class UiRefreshChecks {
     invoke("render");
   }
 
+  /** 0.25 loads daily rows on a worker. Wait for the real snapshot, never assert on placeholders. */
+  private void settleData() {
+    if (activity == null) return;
+    Throwable[] error = {null};
+    runner.runOnMainSync(() -> {
+      try { invoke("invalidateViewData"); invoke("allToday"); }
+      catch (Throwable t) { error[0] = t; }
+    });
+    if (error[0] != null) throw new AssertionError(error[0]);
+    long until = System.currentTimeMillis() + 30000;
+    while (System.currentTimeMillis() < until) {
+      boolean[] pending = {true};
+      runner.runOnMainSync(() -> {
+        try { pending[0] = !((Set<?>) field(activity, "pendingDays")).isEmpty(); }
+        catch (Throwable t) { error[0] = t; }
+      });
+      if (error[0] != null) throw new AssertionError(error[0]);
+      if (!pending[0]) return;
+      try { Thread.sleep(50); } catch (InterruptedException e) { throw new AssertionError(e); }
+    }
+    throw new AssertionError("Daily snapshot worker did not complete");
+  }
+
   private void ui(RunnableWithException action) {
+    settleData();
     Throwable[] error = {null};
     runner.runOnMainSync(
         () -> {
@@ -66,6 +90,7 @@ final class UiRefreshChecks {
         });
     if (error[0] != null) throw new AssertionError(error[0]);
     runner.waitForIdleSync();
+    settleData();
   }
 
   private interface RunnableWithException {
@@ -149,9 +174,13 @@ final class UiRefreshChecks {
                 "dashboard filled before drawing");
             String visible = labels(dashboard);
             check(
-                visible.indexOf("Chuông 3 hỏng") < visible.indexOf("Chuông 2 hỏng")
-                    && visible.indexOf("Chuông 2 hỏng") < visible.indexOf("Chuông 1 hỏng"),
-                "overview uses original fault times descending");
+                visible.contains("Chuông 3 hỏng")
+                    && (!visible.contains("Chuông 2 hỏng")
+                        || visible.indexOf("Chuông 3 hỏng") < visible.indexOf("Chuông 2 hỏng"))
+                    && (!visible.contains("Chuông 1 hỏng")
+                        || visible.contains("Chuông 2 hỏng")
+                            && visible.indexOf("Chuông 2 hỏng") < visible.indexOf("Chuông 1 hỏng")),
+                "adaptive overview prioritizes newest faults within available height");
             ((HorizontalScrollView) routeView.getParent()).scrollTo(200, 0);
           });
       View trainCard = dashboard.getChildAt(0), faultCard = dashboard.getChildAt(1);
@@ -507,13 +536,13 @@ final class UiRefreshChecks {
       store.updateActiveFaults(store.account(), 0, System.currentTimeMillis() + 10, 0, List.of());
       ui(
           () -> {
+            invoke("invalidateViewData");
             Method active = MainActivity.class.getDeclaredMethod("activeFaults");
             active.setAccessible(true);
             var faultsShown = (java.util.List<?>) active.invoke(activity);
             check(
-                faultsShown.stream().noneMatch(e -> Rules.isSelfTrigger((Rules.Event) e)),
-                "slower polling hides self-trigger inference while retaining actual website"
-                    + " faults");
+                faultsShown.stream().anyMatch(e -> Rules.isSelfTrigger((Rules.Event) e)),
+                "legacy preference cannot disable fixed-thirty-second inference");
           });
       store.discardInferences(store.account(), List.of("self:ui-disabled"));
       store.prefs.edit().putInt("interval", 30).commit();
@@ -547,8 +576,8 @@ final class UiRefreshChecks {
             invoke("refreshContent");
             String emptyPage = labels((View) field(activity, "content"));
             check(
-                emptyPage.contains("Không có sự cố") && !emptyPage.contains("sự cố phù hợp"),
-                "empty incident page uses the owner's exact requested wording");
+                emptyPage.contains("Chưa tải đủ dữ liệu") && !emptyPage.contains("Không có sự cố"),
+                "unread historical day does not falsely claim no incidents");
             follow.set(activity, true);
           });
       ui(() -> navigate("settings"));
@@ -988,7 +1017,7 @@ final class UiRefreshChecks {
         navigate("settings");
         String settingsVisible = labels((View) field(activity, "content"));
         check(!settingsVisible.contains("Thử chuông báo lỗi")
-                && settingsVisible.contains("Chuông sự cố"),
+                && settingsVisible.contains("Chuông và rung sự cố"),
             "settings removes trial playback and retains actual incident sound toggle");
       });
       ui(() -> navigate("crossingHistory"));

@@ -1,4 +1,14 @@
-# Đường Ngang — bản 0.25
+# Đường Ngang — bản 0.26
+
+**[Tải APK 0.26](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.26.apk)** — chọn **Download raw file**. Giữ nguyên ứng dụng hiện tại và cài đè; applicationId/chữ ký gốc không đổi, versionCode 26.
+
+- Đối chiếu chuỗi tàu cùng hướng giữa hai ga khi thiếu bản tin điểm giữa; hủy đúng suy luận khi đủ bằng chứng, giữ tàu nối tiếp và lỗi website.
+- Kết thúc dấu lượt treo bằng nút Phục hồi/Duy tu/cảnh báo hoặc Khôi phục hệ thống tại chính điểm; không tạo đoạn đi tiếp giả.
+- Không còn lựa chọn chu kỳ; luôn 30 giây, tự chuyển cấu hình 2/5 phút cũ.
+- Chuông rõ hơn, sáu hồi và rung; tắt cảnh báo chung dừng cả hai, không ép âm lượng hệ thống.
+- Giọng đọc để bản sau. Xem [kiểm chứng và giới hạn 0.26](../docs/UI_REVIEW_0.26.md).
+
+## Bản 0.25 trước đó
 
 **[Tải APK 0.25](https://github.com/cuongthinkpad-ui/app-duong-ngang/blob/main/downloads/DuongNgang-0.25.apk)** — chọn **Download raw file**. Cài đè bản cũ, **không gỡ ứng dụng**; cùng khóa ký, versionCode 25.
 

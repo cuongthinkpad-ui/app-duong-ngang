@@ -237,7 +237,8 @@ def main():
                 phase.update(nontrain_next=next_train)
                 unsupported = wait_for(lambda s: int(s.get('lastSuccess','0')) > (next_train+30)*1000
                                        and any(row[3]=='Nghi tự kích' and int(row[1])==next_train*1000
-                                               for row in faults(s)),
+                                               for row in faults(s))
+                                       and int(s.get('lastAlarm','0')) > 0,
                                        'the next unsupported real arrival cannot reuse the earlier source')
                 assert all(int(row[1]) != (operator_start+10)*1000 for row in faults(unsupported)), 'The first valid arrival must remain supported'
                 assert int(unsupported.get('lastAlarm','0')) > 0, 'A new real unsupported arrival must retain incident sound'

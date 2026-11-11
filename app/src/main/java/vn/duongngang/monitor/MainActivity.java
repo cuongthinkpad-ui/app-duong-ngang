@@ -71,7 +71,7 @@ public class MainActivity extends Activity {
   private String dataRevision() {
     return store.prefs.getLong("dataRevision", 0) + ":" + store.prefs.getLong("lastSuccess", 0)
         + ":" + store.prefs.getLong("historyReadAt", 0) + ":" + store.monitoringDay()
-        + ":" + store.prefs.getInt("interval", 30);
+        + ":" + Rules.POLL_SECONDS;
   }
   private boolean dayLoaded(LocalDate day) { return dayViews.containsKey(dayKey(day)); }
 
@@ -94,7 +94,7 @@ public class MainActivity extends Activity {
                 ? store.incidentEvents(from, to) : events;
             var travel = day.equals(store.monitoringDay()) && store.historicalMonitoring()
                 ? store.events(Rules.historyCutoff(System.currentTimeMillis()), to) : List.<Rules.Event>of();
-            var state = Rules.diagramEnabled(store.prefs.getInt("interval", 30))
+            var state = Rules.diagramEnabled(Rules.POLL_SECONDS)
                 ? Rules.travelState(store.route(), Rules.TravelState.empty(), travel) : Rules.TravelState.empty();
             loaded = new DayView(revision, events, incidents, travel, state);
           }
@@ -532,7 +532,7 @@ public class MainActivity extends Activity {
     String message = store.prefs.getString("status", "");
     return last == 0
         || System.currentTimeMillis() - last
-            > Math.max(60000L, 2000L * store.prefs.getInt("interval", 30))
+            > Math.max(60000L, 2000L * Rules.POLL_SECONDS)
         || !(message.equals("Đã cập nhật") || message.startsWith("Đã đặt lại theo dõi"));
   }
 
@@ -571,7 +571,7 @@ public class MainActivity extends Activity {
     if (demo) return viewFaults = Rules.activeFaults(samples());
     if (historicalView()) {
       var records = new ArrayList<>(allToday());
-      if (!Rules.selfTriggerEnabled(store.prefs.getInt("interval", 30))) records.removeIf(Rules::isSelfTrigger);
+      if (!Rules.selfTriggerEnabled(Rules.POLL_SECONDS)) records.removeIf(Rules::isSelfTrigger);
       return viewFaults = Rules.activeFaults(records);
     }
     long baseline =
@@ -581,7 +581,7 @@ public class MainActivity extends Activity {
         store.prefs.contains("activeFaults")
             ? store.activeFaults()
             : dayData(viewDay()).events();
-    boolean selfEnabled = Rules.selfTriggerEnabled(store.prefs.getInt("interval", 30));
+    boolean selfEnabled = Rules.selfTriggerEnabled(Rules.POLL_SECONDS);
     for (var event : records)
       if ((event.at() >= baseline
               || Rules.isAxleFault(event)
@@ -843,7 +843,7 @@ public class MainActivity extends Activity {
                 ? faults + " sự cố chưa khôi phục"
                 : total + " đường ngang · Chưa ghi nhận lỗi mới");
     long last = displayedLastSuccess();
-    int interval = store.prefs.getInt("interval", 30);
+    int interval = Rules.POLL_SECONDS;
     summaryTime.setText(
         (store.historicalMonitoring() ? "Lịch sử " + store.monitoringDay().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " · " : "")
             + (last == 0 ? "Chưa có dữ liệu từ website" : "Cập nhật " + time(last))
@@ -890,7 +890,7 @@ public class MainActivity extends Activity {
   }
 
   private Rules.TravelState diagramState() {
-    if (!demo && !Rules.diagramEnabled(store.prefs.getInt("interval", 30))) return Rules.TravelState.empty();
+    if (!demo && !Rules.diagramEnabled(Rules.POLL_SECONDS)) return Rules.TravelState.empty();
     if (!demo && store.historicalMonitoring())
       return dayData(store.monitoringDay()).travel();
     if (!demo) return store.travelState();
@@ -924,7 +924,7 @@ public class MainActivity extends Activity {
                 : last == 0
                     ? "Chưa cập nhật từ web"
                     : (staleData() ? "Dữ liệu cũ · " : "Theo bản tin web · ") + time(last));
-    if (!demo && !Rules.diagramEnabled(store.prefs.getInt("interval", 30)))
+    if (!demo && !Rules.diagramEnabled(Rules.POLL_SECONDS))
       routeNote.setText("Sơ đồ chạy tàu chỉ hoạt động ở chu kỳ 30 giây");
     routeNote.setTextColor(!demo && staleData() ? WARNING : MUTED);
   }
@@ -1287,7 +1287,7 @@ public class MainActivity extends Activity {
         if (!present.contains(event.id())) records.add(event);
       }
     }
-    if (!Rules.selfTriggerEnabled(store.prefs.getInt("interval", 30))) {
+    if (!Rules.selfTriggerEnabled(Rules.POLL_SECONDS)) {
       records = new ArrayList<>(records);
       records.removeIf(Rules::isSelfTrigger);
     }
@@ -1617,39 +1617,12 @@ public class MainActivity extends Activity {
     sectionHeading(options, "Theo dõi & Báo động", "bell");
     options.addView(text("CHU KỲ ĐỌC DỮ LIỆU", 10, MUTED, true));
     gap(options, 10);
-    int[] selectedInterval = {store.prefs.getInt("interval", 30)};
-    LinearLayout segments = row();
-    segments.setPadding(dp(4), dp(4), dp(4), dp(4));
-    segments.setBackground(shape(BG, 12, 0));
-    int[] intervals = {30, 120, 300};
-    String[] intervalNames = {"30 giây", "2 phút", "5 phút"};
-    for (int i = 0; i < 3; i++) {
-      int value = intervals[i];
-      TextView option =
-          text(intervalNames[i], 12, selectedInterval[0] == value ? BUTTON_TEXT : MUTED, true);
-      option.setGravity(Gravity.CENTER);
-      option.setPadding(0, dp(11), 0, dp(11));
-      if (selectedInterval[0] == value) option.setBackground(shape(BLUE, 8, 0));
-      segments.addView(option, new LinearLayout.LayoutParams(0, -2, 1));
-      touch(
-          option,
-          () -> {
-            selectedInterval[0] = value;
-            for (int j = 0; j < 3; j++) {
-              TextView v = (TextView) segments.getChildAt(j);
-              v.setTextColor(intervals[j] == value ? BUTTON_TEXT : MUTED);
-              v.setBackground(shape(intervals[j] == value ? BLUE : Color.TRANSPARENT, 8, 0));
-            }
-          });
-    }
-    options.addView(segments);
-    gap(options, 7);
-    options.addView(text("Tự kích chỉ theo dõi ở chu kỳ 30 giây", 10, MUTED, false));
+    options.addView(text("Cố định 30 giây", 12, INK, true));
     divider(options);
     Switch sound =
         toggle(
-            "Chuông sự cố",
-            "Tắt để chỉ hiển thị cảnh báo",
+            "Chuông và rung sự cố",
+            "Tắt để dừng cả chuông và rung",
             store.prefs.getBoolean("sound", true),
             options);
     sound.setOnCheckedChangeListener((b, on) -> setAlarmSound(on));
@@ -1704,7 +1677,7 @@ public class MainActivity extends Activity {
                 store
                     .prefs
                     .edit()
-                    .putInt("interval", selectedInterval[0])
+                    .putInt("interval", Rules.POLL_SECONDS)
                     .putBoolean("sound", sound.isChecked())
                     .putBoolean("demoUi", false)
                     .apply();

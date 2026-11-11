@@ -110,7 +110,7 @@ public class MonitorService extends Service {
       wake.acquire(600000L);
       worker = Executors.newSingleThreadScheduledExecutor();
       worker.scheduleAtFixedRate(
-          this::poll, 0, store.prefs.getInt("interval", 30), TimeUnit.SECONDS);
+          this::poll, 0, Rules.POLL_SECONDS, TimeUnit.SECONDS);
     }
     store.prefs.edit().putBoolean("running", true).apply();
     resetDailyFaults();
@@ -211,7 +211,7 @@ public class MonitorService extends Service {
         List<Rules.Event> cached = store.events(Math.max(previousStart, coverage), now + 1);
         List<Rules.Event> original = new ArrayList<>();
         for (var event : cached) if (!Rules.isGenerated(event)) original.add(event);
-        boolean detectSelf = Rules.selfTriggerEnabled(store.prefs.getInt("interval", 30));
+        boolean detectSelf = Rules.selfTriggerEnabled(Rules.POLL_SECONDS);
         List<Rules.Event> candidates =
             detectSelf ? Rules.suspectedSelfTriggers(data.route(), original, coverage) : List.of();
         Set<String> candidateIds = new HashSet<>();
@@ -252,7 +252,7 @@ public class MonitorService extends Service {
                 pending,
                 now,
                 0,
-                Math.max(30000L, 1000L * store.prefs.getInt("interval", 30)));
+                Math.max(30000L, 1000L * Rules.POLL_SECONDS));
         added.addAll(store.saveForAccount(account, new WebSource.DayData(confirmed, data.route())));
         long baseline = Rules.faultBaseline(store.prefs.getLong("baselineFrom", 0), now);
         long replayFrom = incoming.stream().mapToLong(Rules.Event::at).min().orElse(now);
