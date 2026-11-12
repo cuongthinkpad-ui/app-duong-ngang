@@ -136,6 +136,12 @@ class Fixture(BaseHTTPRequestHandler):
         self.respond(datetime.strptime(fields['date'][0], '%d/%m/%Y').date())
 
     def respond(self, selected):
+        if phase.get('network_down'):
+            self.send_response(503)
+            self.end_headers()
+            return
+        if phase.get('slow_read'):
+            time.sleep(10)
         # The emulator uses Asia/Ho_Chi_Minh timestamps, independent of the host timezone.
         now = datetime.fromtimestamp(time.time(), timezone.utc).replace(tzinfo=None) + timedelta(hours=7)
         point_options = "<select name='route'><option value='all' selected>-- Tất cả --</option>" + ''.join(
@@ -291,6 +297,9 @@ def main():
         for name, value in [('demoUi', 'false'), ('running', 'true'), ('sound', 'true')]:
             ET.SubElement(root, 'boolean', name=name, value=value)
         ET.SubElement(root, 'int', name='interval', value='30')  # Self-trigger detection intentionally runs only at the real 30-second setting.
+        if '--reconnect-only' in sys.argv or '--reconnect-ui-only' in sys.argv:
+            next(n for n in root if n.get('name') == 'sound').set('value', 'false')
+            ET.SubElement(root, 'string', name='alertMode').text = 'silent'
         (folder/'fixture.xml').write_bytes(ET.tostring(root, encoding='utf-8'))
         def install(local, remote):
             adb('push', str(local), '/data/local/tmp/rail-e2e-file')
@@ -304,6 +313,85 @@ def main():
             assert int(empty.get('lastAlarm', '0')) == 0, 'Empty snapshot must not sound'
             assert not faults(empty), 'Exempt axle reports must not create faults'
             print('PASS: six qualifying errors and one large deviation at all six exempt points remain silent', flush=True)
+            if '--reconnect-only' in sys.argv or '--reconnect-ui-only' in sys.argv:
+                phase.update(audio_stage=1, audio_at=int(time.time())-1)
+                populated = wait_for(lambda s: len(faults(s)) == 2, 'cache contains unresolved faults before outage')
+                phase['network_down'] = True
+                failed = wait_for(lambda s: s.get('connectionLost') == 'true'
+                    and s.get('connectionRetrying') == 'false', 'failed request records connection loss')
+                if '--reconnect-ui-only' in sys.argv:
+                    failed_again = failed
+                else:
+                    adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
+                    retry = wait_for(lambda s: int(s.get('lastConnectionAttempt','0')) > int(failed['lastConnectionAttempt']),
+                        'background automatically retries after outage', timeout=180)
+                    assert int(retry['lastConnectionAttempt']) - int(failed['lastConnectionAttempt']) >= 119500, 'Retry occurred before two minutes'
+                    assert retry.get('lastSuccess') == failed.get('lastSuccess'), 'Outage overwrote last good timestamp'
+                    assert faults(retry) == faults(populated), 'Outage erased cached faults'
+                    completed = wait_for(lambda s: s.get('connectionRetrying') == 'false', 'failed background retry completes')
+                    phase['network_down'] = False
+                    recovered = wait_for(lambda s: s.get('connectionLost') == 'false'
+                        and int(s.get('lastSuccess','0')) > int(failed['lastSuccess']),
+                        'automatic background retry recovers without opening Activity', timeout=180)
+                    assert int(recovered['lastConnectionAttempt']) - int(completed['lastConnectionAttempt']) >= 119500
+                    normal = wait_for(lambda s: int(s.get('lastConnectionAttempt','0')) > int(recovered['lastConnectionAttempt']),
+                        'normal thirty-second polling resumes', timeout=85)
+                    gap = int(normal['lastConnectionAttempt']) - int(recovered['lastConnectionAttempt'])
+                    assert 29500 <= gap < 85000, 'Recovered polling did not return to thirty seconds'
+                    phase['network_down'] = True
+                    failed_again = wait_for(lambda s: s.get('connectionLost') == 'true'
+                        and s.get('connectionRetrying') == 'false', 'another outage exposes manual reconnect')
+                adb('shell', 'am', 'start', '-n', PKG+'/.MainActivity')
+                deadline = time.monotonic() + 35
+                button = None
+                while time.monotonic() < deadline:
+                    adb('shell', 'uiautomator', 'dump', '/data/local/tmp/rail-reconnect.xml')
+                    ui = ET.fromstring(adb('shell', 'cat', '/data/local/tmp/rail-reconnect.xml'))
+                    button = next((n for n in ui.iter('node') if n.get('text') == 'Kết nối lại'), None)
+                    if button is not None: break
+                    time.sleep(0.5)
+                assert button is not None, 'Reconnect button did not appear on Overview'
+                warning = next(n for n in ui.iter('node') if n.get('text') == 'Mất kết nối')
+                x1,y1,x2,y2 = map(int,re.findall(r'\d+',button.get('bounds')))
+                assert int(re.findall(r'\d+',warning.get('bounds'))[1]) >= y2, 'Warning must be below reconnect button'
+                summary = next(n for n in ui.iter('node') if n.get('text') == 'CẦN KIỂM TRA CẬP NHẬT')
+                diagram = next(n for n in ui.iter('node') if n.get('content-desc','').startswith('Toàn tuyến, gồm'))
+                assert y1 > int(re.findall(r'\d+',summary.get('bounds'))[3]), 'Connection strip must follow fault summary'
+                assert int(re.findall(r'\d+',warning.get('bounds'))[3]) <= int(re.findall(r'\d+',diagram.get('bounds'))[1]), 'Connection strip must precede train diagram'
+                pathlib.Path('/tmp/rail-reconnect.png').write_bytes(adb('exec-out','screencap','-p',binary=True))
+                phase['network_down'] = False
+                adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2))
+                manual = wait_for(lambda s: s.get('connectionLost') == 'false'
+                    and int(s.get('lastSuccess','0')) > int(failed_again['lastSuccess']), 'manual reconnect succeeds immediately')
+                assert int(manual['lastConnectionAttempt']) - int(failed_again['lastConnectionAttempt']) < 90000, 'Button did not bypass pending two-minute timer'
+                assert faults(manual) == faults(populated) and manual.get('running') == 'true'
+                deadline = time.monotonic() + 10
+                while time.monotonic() < deadline:
+                    adb('shell','uiautomator','dump','/data/local/tmp/rail-reconnected.xml')
+                    ui = ET.fromstring(adb('shell','cat','/data/local/tmp/rail-reconnected.xml'))
+                    if any(n.get('text','').startswith('Đã kết nối') for n in ui.iter('node')): break
+                assert not any(n.get('text') in ('Kết nối lại','Mất kết nối') for n in ui.iter('node')), 'Recovered UI still shows connection loss'
+                assert any(n.get('text','').startswith('Đã kết nối') for n in ui.iter('node')), 'Online status must remain visible'
+                phase['slow_read'] = True
+                loading = wait_for(lambda s: s.get('dataLoading') == 'true', 'real data read publishes loading progress', timeout=85)
+                deadline = time.monotonic() + 8
+                while time.monotonic() < deadline:
+                    adb('shell','uiautomator','dump','/data/local/tmp/rail-loading.xml')
+                    ui = ET.fromstring(adb('shell','cat','/data/local/tmp/rail-loading.xml'))
+                    if any(n.get('text') == 'Đang tải dữ liệu…' for n in ui.iter('node')): break
+                assert any(n.get('text') == 'Đang tải dữ liệu…' for n in ui.iter('node')), 'Loading text is missing'
+                assert any(n.get('class') == 'android.widget.ProgressBar' for n in ui.iter('node')), 'Loading indicator is missing'
+                pathlib.Path('/tmp/rail-loading.png').write_bytes(adb('exec-out','screencap','-p',binary=True))
+                phase['slow_read'] = False
+                wait_for(lambda s: s.get('dataLoading') == 'false'
+                    and s.get('connectionLost') == 'false'
+                    and int(s.get('lastSuccess','0')) > int(loading['lastSuccess']), 'loading progress ends after successful read', timeout=85)
+                if '--reconnect-ui-only' not in sys.argv:
+                    print('Measured retry/normal/manual gaps (ms):',
+                          int(retry['lastConnectionAttempt']) - int(failed['lastConnectionAttempt']),
+                          gap, int(manual['lastConnectionAttempt']) - int(failed_again['lastConnectionAttempt']), flush=True)
+                print('Reconnect background and UI checks passed', flush=True)
+                return
             if '--notification-stop-only' in sys.argv:
                 adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
                 phase.update(audio_stage=1, audio_at=int(time.time())-1)

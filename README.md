@@ -1,4 +1,6 @@
-# Đường Ngang — Android 0.27.2
+# Đường Ngang — Android 0.27.3
+
+**[Bàn giao và kiểm chứng 0.27.3](docs/UI_REVIEW_0.27.3.md)** — tự thử kết nối lại sau 2 phút khi lỗi, kể cả chạy nền. Ô nhỏ **giữa CÓ SỰ CỐ và sơ đồ** hiện trạng thái kết nối/tiến trình tải; chỉ khi mất kết nối mới hiện nút đỏ **Kết nối lại** và cảnh báo **Mất kết nối**. Khi đọc được dữ liệu sẽ ẩn cảnh báo và trở về chu kỳ 30 giây. Thu gọn phần trên để dành chỗ cho ô này; không thêm mục phía dưới. Giữ dữ liệu cũ và các nút **XÁC NHẬN**.
 
 **[Bàn giao và kiểm chứng 0.27.2](docs/UI_REVIEW_0.27.2.md)** — nhánh `codex/0.27-notification-stop`, main hiện giữ 0.26. Sửa mở lại app/khởi động lại dịch vụ đọc lại sự cố cũ. Nút **XÁC NHẬN** trên thông báo dừng đợt chuông/giọng đọc/rung khi app ở nền, giữ theo dõi/lỗi và cho cảnh báo mới phát tiếp. Cách cảnh báo chỉ còn ba nhãn **Giọng nói**, **Chỉ chuông**, **Im lặng**, giữ cách phát của bản cũ. [Bàn giao 0.27 trước đó](docs/TIEP_TUC_0.27_AI_STUDIO.md).
 

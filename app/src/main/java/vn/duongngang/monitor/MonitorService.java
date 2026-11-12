@@ -11,6 +11,11 @@ import org.json.JSONObject;
 public class MonitorService extends Service {
   public static final String UPDATE = "vn.duongngang.monitor.UPDATE";
   private ScheduledExecutorService worker;
+  private final Object pollLock = new Object();
+  private ScheduledFuture<?> nextPoll;
+  private boolean polling, retryRequested;
+  private long pollGeneration;
+  private static final long RECONNECT_SECONDS = 120;
   private PowerManager.WakeLock wake;
   private Store store;
   private final AlarmSound alarm = new AlarmSound();
@@ -54,6 +59,7 @@ public class MonitorService extends Service {
   public void onCreate() {
     super.onCreate();
     store = new Store(this);
+    store.prefs.edit().putBoolean("connectionRetrying", false).putBoolean("dataLoading", false).apply();
     voice = new VoiceAlarm(this, message -> store.prefs.edit().putString("voiceStatus", message).apply());
     store.prefs.edit().putString("voiceStatus", AlertOptions.SILENT.equals(store.alertMode())
         ? "Đã tắt âm thanh cảnh báo" : AlertOptions.BELL.equals(store.alertMode())
@@ -114,6 +120,19 @@ public class MonitorService extends Service {
 
   @Override
   public int onStartCommand(Intent intent, int flags, int id) {
+    if (intent != null && "RETRY_CONNECTION".equals(intent.getAction())) {
+      synchronized (pollLock) {
+        if (worker != null) {
+          if (polling) retryRequested = true;
+          else schedulePoll(worker, 0);
+          return START_STICKY;
+        }
+      }
+      if (!store.prefs.getBoolean("running", false)) {
+        stopSelf();
+        return START_NOT_STICKY;
+      }
+    }
     if (intent != null && "MUTE_ALARM".equals(intent.getAction())) {
       // Serialize with poll's alert dispatch. A queued TTS introduction also checks
       // ringingFaults before starting, so late callbacks cannot revive this batch.
@@ -131,8 +150,11 @@ public class MonitorService extends Service {
     }
     if (intent != null && "RESTART".equals(intent.getAction())) stopAlerts();
     if (intent != null && "RESTART".equals(intent.getAction()) && worker != null) {
-      worker.shutdownNow();
-      worker = null;
+      synchronized (pollLock) {
+        worker.shutdownNow();
+        worker = null;
+        polling = retryRequested = false;
+      }
       source = null;
       firstPoll = true;
     }
@@ -153,8 +175,7 @@ public class MonitorService extends Service {
       wake.setReferenceCounted(false);
       wake.acquire(600000L);
       worker = Executors.newSingleThreadScheduledExecutor();
-      worker.scheduleAtFixedRate(
-          this::poll, 0, Rules.POLL_SECONDS, TimeUnit.SECONDS);
+      schedulePoll(worker, 0);
     }
     store.prefs.edit().putBoolean("running", true).apply();
     resetDailyFaults();
@@ -165,6 +186,44 @@ public class MonitorService extends Service {
   private WebSource source;
   private String sourceAccount = "";
   private boolean firstPoll = true;
+
+  private void schedulePoll(ScheduledExecutorService executor, long seconds) {
+    synchronized (pollLock) {
+      if (worker != executor || executor.isShutdown()) return;
+      if (nextPoll != null) nextPoll.cancel(false);
+      long token = ++pollGeneration;
+      nextPoll = executor.schedule(() -> runPoll(executor, token), seconds, TimeUnit.SECONDS);
+    }
+  }
+
+  private void runPoll(ScheduledExecutorService executor, long token) {
+    long started = SystemClock.elapsedRealtime();
+    synchronized (pollLock) {
+      if (worker != executor || token != pollGeneration) return;
+      polling = true;
+      store.prefs.edit().putLong("lastConnectionAttempt", System.currentTimeMillis())
+          .putBoolean("dataLoading", true)
+          .putBoolean("connectionRetrying", store.prefs.getBoolean("connectionLost", false)).apply();
+    }
+    sendBroadcast(new Intent(UPDATE).setPackage(getPackageName()));
+    try {
+      poll();
+    } finally {
+      synchronized (pollLock) {
+        if (worker == executor && !executor.isShutdown()) {
+          polling = false;
+          store.prefs.edit().putBoolean("connectionRetrying", false).putBoolean("dataLoading", false).apply();
+          long delay = retryRequested ? 0
+              : store.prefs.getBoolean("connectionLost", false) ? RECONNECT_SECONDS
+                  : Math.max(0, Rules.POLL_SECONDS
+                      - TimeUnit.MILLISECONDS.toSeconds(SystemClock.elapsedRealtime() - started));
+          retryRequested = false;
+          schedulePoll(executor, delay);
+        }
+      }
+      sendBroadcast(new Intent(UPDATE).setPackage(getPackageName()));
+    }
+  }
 
   private void poll() {
     String account = store.account();
@@ -189,7 +248,7 @@ public class MonitorService extends Service {
         stopAlerts();
         ringingFaults.clear();
         // A completed past day needs no full two-day download on every 30-second tick.
-        if (store.dayComplete(selected) && selected.toString().equals(store.prefs.getString("historyReadDay", ""))
+        if (!store.prefs.getBoolean("connectionLost", false) && store.dayComplete(selected) && selected.toString().equals(store.prefs.getString("historyReadDay", ""))
             && System.currentTimeMillis() - store.prefs.getLong("historyReadAt", 0) < 15 * 60000L)
           return;
         var data = pollSource.readDay(selected);
@@ -201,6 +260,7 @@ public class MonitorService extends Service {
               || !store.monitoringDay().equals(selected)) return;
           store.saveHistoricalDay(account, selected, new WebSource.DayData(historical, data.route()));
           store.prefs.edit().putString("historyReadDay", selected.toString())
+              .putBoolean("connectionLost", false)
               .putLong("historyReadAt", System.currentTimeMillis())
               .putString("status", "Đã tải lịch sử · " + selected.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")))
               .apply();
@@ -345,6 +405,7 @@ public class MonitorService extends Service {
             store
                 .prefs
                 .edit()
+                .putBoolean("connectionLost", false)
                 .putLong("lastSuccess", now)
                 .putLong("coverage", coverage)
                 .putLong("selfFrom", selfFrom)
@@ -363,6 +424,8 @@ public class MonitorService extends Service {
           .putString(
               "status", error.getMessage() == null ? "Gián đoạn theo dõi" : error.getMessage())
           .apply();
+      if (error instanceof java.io.IOException)
+        store.prefs.edit().putBoolean("connectionLost", true).apply();
       if (error instanceof WebSource.AuthenticationException) stopSelf();
     }
     sendBroadcast(new Intent(UPDATE).setPackage(getPackageName()));
@@ -398,7 +461,12 @@ public class MonitorService extends Service {
     stopAlerts();
     if (voice != null) voice.close();
     ringingFaults.clear();
-    if (worker != null) worker.shutdownNow();
+    synchronized (pollLock) {
+      if (worker != null) worker.shutdownNow();
+      worker = null;
+      polling = retryRequested = false;
+      store.prefs.edit().putBoolean("connectionRetrying", false).putBoolean("dataLoading", false).apply();
+    }
     if (wake != null && wake.isHeld()) wake.release();
     store.prefs.edit().putBoolean("running", false).apply();
     sendBroadcast(new Intent(UPDATE).setPackage(getPackageName()));

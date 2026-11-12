@@ -1,4 +1,8 @@
-# Đường Ngang — cập nhật 0.27.2
+# Đường Ngang — cập nhật 0.27.3
+
+**[Tải APK 0.27.3](DuongNgang-0.27.3.apk)** — ký khóa gốc, versionCode 30; cài đè, **không gỡ app cũ**. Tự thử lại sau 2 phút khi mất kết nối. Ô nhỏ giữa **CÓ SỰ CỐ** và sơ đồ hiện trạng thái/tải dữ liệu; chỉ khi mất kết nối mới hiện nút đỏ **Kết nối lại** và dòng **Mất kết nối**. Kết nối thành công sẽ trở về đọc 30 giây. [Kiểm chứng và bàn giao](../docs/UI_REVIEW_0.27.3.md).
+
+## Bản 0.27.2 trước đó
 
 **[Tải APK 0.27.2](DuongNgang-0.27.2.apk)** — cài đè, **không gỡ app cũ**. Ký khóa gốc, versionCode 29. Sửa mở lại app đọc lại sự cố cũ; nút trên thông báo đổi thành **XÁC NHẬN**, vẫn dừng đợt chuông/đọc/rung hiện tại và giữ theo dõi/lỗi. Sự cố mới vẫn báo bình thường. [Kiểm chứng và bàn giao](../docs/UI_REVIEW_0.27.2.md).
 

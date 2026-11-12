@@ -30,7 +30,7 @@ final class UpgradeChecks {
       }
       return "Upgrade fixture seeded on original 0.27\n";
     }
-    if (version != 29) throw new AssertionError("Verify must run against 0.27.2 APK");
+    if (version != 30) throw new AssertionError("Verify must run against 0.27.3 APK");
     if (!store.password().equals("synthetic-upgrade-password")) throw new AssertionError("Encrypted password or Android Keystore lost");
     if (!store.prefs.getString("user", "").equals("upgrade-fixture")
         || !store.prefs.getString("url", "").equals("http://127.0.0.1:9/")) throw new AssertionError("Account lost");
@@ -48,6 +48,6 @@ final class UpgradeChecks {
       if (size < 0 || !new String(bytes, 0, size, StandardCharsets.UTF_8).equals("preserve-private-data"))
         throw new AssertionError("Private file lost");
     }
-    return "6 install-over data checks passed (0.27 -> 0.27.1 -> 0.27.2)\n";
+    return "6 install-over data checks passed (0.27 through 0.27.3)\n";
   }
 }

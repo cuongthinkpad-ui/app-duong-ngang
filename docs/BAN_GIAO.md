@@ -1,4 +1,4 @@
-> Bàn giao mới nhất 12/11/2026: [0.27.2 — không đọc lại sự cố cũ khi mở app](UI_REVIEW_0.27.2.md), nhánh `codex/0.27-notification-stop`, tiếp tục từ `247f8d2`. Nút thông báo đổi thành **XÁC NHẬN**, thêm cùng nút trong ô **CÓ SỰ CỐ** đầu Tổng quan; dừng đợt hiện tại, giữ theo dõi/lỗi và cho cảnh báo mới phát bình thường. Main vẫn giữ 0.26.
+> Bàn giao mới nhất: [0.27.3 — tự kết nối lại](UI_REVIEW_0.27.3.md), nhánh `codex/0.27-notification-stop`, tiếp tục từ `527fc3d`. Lỗi kết nối tự thử lại sau 2 phút ở nền. Ô nhỏ **giữa CÓ SỰ CỐ và sơ đồ** luôn hiện trạng thái/tiến trình tải; chỉ khi mất kết nối mới hiện nút đỏ **Kết nối lại** và dòng **Mất kết nối**. Thu gọn phần trên để dành chỗ, không thêm mục phía dưới. Kết nối thành công trở lại đọc 30 giây; giữ XÁC NHẬN, dữ liệu và không đọc lại lỗi cũ. Main vẫn giữ 0.26.
 
 > Bản kiểm thử 0.27 từ `48bdc1d`: ba chế độ giọng nói/chỉ chuông/im lặng và hai cặp lỗi nguồn theo yêu cầu. Đã ký gốc/kiểm thử/cài đè; chờ đối chiếu web thật vì môi trường còn chặn miền. Nhánh `codex/0.27-voice-alerts`, main vẫn 0.26. Đọc [UI_REVIEW_0.27.md](UI_REVIEW_0.27.md) trước khi tiếp tục; thông tin truy cập đã lưu riêng, không cần xin lại.
 

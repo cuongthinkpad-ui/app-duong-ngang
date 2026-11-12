@@ -1,5 +1,7 @@
 # Bàn giao phiên 11/11/2026 — tiếp tục bằng Google AI Studio hoặc công cụ khác
 
+> Mới nhất: [0.27.3](UI_REVIEW_0.27.3.md), versionCode 30, thêm thử lại 2 phút khi lỗi mạng. Ô nhỏ giữa **CÓ SỰ CỐ và sơ đồ** hiện trạng thái/tiến trình tải; chỉ mất kết nối mới hiện nút đỏ **Kết nối lại**, cảnh báo **Mất kết nối**. Thu gọn phần trên để dành chỗ, không thêm mục phía dưới. Nhánh `codex/0.27-notification-stop`; giữ toàn bộ chức năng 0.27.2 bên dưới.
+
 > Mới nhất: [0.27.2](UI_REVIEW_0.27.2.md) sửa mở lại app đọc lại lỗi cũ, đổi nút thông báo thành **XÁC NHẬN** và thêm nút cùng chức năng trong ô **CÓ SỰ CỐ** đầu Tổng quan; versionCode 29, cùng nhánh `codex/0.27-notification-stop`. Yêu cầu này thay phần phát lại lỗi hiện có khi bắt đầu phiên trong tài liệu cũ.
 
 > Cập nhật 12/11: tiếp tục trên `codex/0.27-notification-stop`, bản 0.27.1/versionCode 28. Đã thêm nút dừng đợt chuông/giọng đọc/rung từ thông báo, giữ theo dõi/lỗi/chế độ âm; rút gọn ba nhãn lựa chọn theo yêu cầu. Đọc [biên bản và bàn giao 0.27.1](UI_REVIEW_0.27.1.md) trước phần lịch sử bên dưới.

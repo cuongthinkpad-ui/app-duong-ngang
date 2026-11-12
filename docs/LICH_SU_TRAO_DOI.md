@@ -1,5 +1,11 @@
 # Nhật ký trao đổi và các quyết định của chủ dự án
 
+## Bổ sung — 0.27.3
+
+Sau các phản hồi connect timeout và dữ liệu cũ từ 14:00, chủ dự án yêu cầu app chạy nền tự thử kết nối lại mỗi 2 phút khi lỗi. Đầu trang Tổng quan phải có nút nhỏ màu đỏ **Kết nối lại**, bên dưới cảnh báo **Mất kết nối**. Triển khai nút thử ngay, giữ dữ liệu và trở về nhịp đọc 30 giây sau khi cập nhật thành công; không thay URL/tài khoản, không tự xóa dữ liệu để chữa lỗi mạng. Xem [biên bản 0.27.3](UI_REVIEW_0.27.3.md).
+
+Chốt bố cục tiếp theo: thu gọn CÓ SỰ CỐ và sơ đồ để dành chỗ, không thêm mục phía dưới. Ô kết nối nhỏ đặt **giữa CÓ SỰ CỐ và sơ đồ**; bình thường hiện trạng thái kết nối và tiến trình tải dữ liệu, chỉ khi mất kết nối mới hiện nút đỏ Kết nối lại. Tiến trình tải phản ánh công việc đang chạy, không hiển thị phần trăm giả.
+
 ## Tiếp theo 12/11/2026 — 0.27.2
 
 Chủ dự án phản hồi mở lại app đọc lại sự cố cũ. Đã tái hiện khi tiến trình/dịch vụ được tạo lại; bỏ việc phát lại toàn bộ lỗi tồn tại lúc firstPoll, giữ hiển thị lỗi và chỉ báo sự cố mới đủ điều kiện. Chủ dự án yêu cầu đổi chữ trên nút thông báo thành đúng **XÁC NHẬN**, giữ chức năng dừng đợt hiện tại và theo dõi bình thường. Xem [biên bản 0.27.2](UI_REVIEW_0.27.2.md).

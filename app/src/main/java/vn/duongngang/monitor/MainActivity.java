@@ -37,6 +37,10 @@ public class MainActivity extends Activity {
   private TextView status, routeNote, summaryTitle, summaryDetail, summaryTime, voiceState;
   private LinearLayout summaryCard;
   private View summaryConfirm;
+  private LinearLayout reconnectPanel;
+  private View reconnectButton;
+  private TextView connectionState, connectionWarning;
+  private ProgressBar connectionProgress;
   private SummaryRing summaryRing;
   private ImageView headerMark;
   private TextView liveBadge;
@@ -135,11 +139,14 @@ public class MainActivity extends Activity {
           prepareLocalData();
           if (page.equals("settings") && voiceState != null)
             voiceState.setText(store.prefs.getString("voiceStatus", "Giọng đọc sử dụng tiếng Việt của điện thoại"));
+          if (page.equals("overview")) updateReconnect();
           String state =
               store.prefs.getString("status", "")
                   + store.prefs.getLong("lastSuccess", 0)
                   + store.prefs.getLong("historyReadAt", 0)
                   + store.prefs.getLong("dataRevision", 0)
+                  + store.prefs.getBoolean("running", false)
+                  + store.prefs.getBoolean("connectionLost", false)
                   + store.monitoringDay()
                   + staleData()
                   + LocalDate.now(WebSource.ZONE);
@@ -622,6 +629,8 @@ public class MainActivity extends Activity {
     invalidateViewData();
     summaryCard = null;
     summaryConfirm = null;
+    reconnectPanel = null;
+    reconnectButton = null;
     summaryRing = null;
     routeWrapper = null;
     routeView = null;
@@ -690,12 +699,13 @@ public class MainActivity extends Activity {
     content.setPadding(dp(14), page.equals("overview") ? 0 : dp(8), dp(14), 0);
     if (page.equals("overview")) {
       LinearLayout summaryWrapper = column();
-      summaryWrapper.setPadding(dp(14), dp(6), dp(14), 0);
+      summaryWrapper.setPadding(dp(14), dp(3), dp(14), 0);
       summaryWrapper.addView(overviewSummary());
       screen.addView(summaryWrapper);
+      screen.addView(reconnectControls());
       LinearLayout map = routeCard();
       routeWrapper = column();
-      routeWrapper.setPadding(dp(14), dp(8), dp(14), 0);
+      routeWrapper.setPadding(dp(14), dp(4), dp(14), 0);
       routeWrapper.addView(map);
       screen.addView(routeWrapper);
     }
@@ -738,12 +748,67 @@ public class MainActivity extends Activity {
   private void updateLiveBadge() {
     boolean known = displayedLastSuccess() > 0;
     boolean running = store.prefs.getBoolean("running", false);
-    boolean live = known && running && !staleData();
+    boolean live = known && running && !staleData() && !store.prefs.getBoolean("connectionLost", false);
     liveBadge.setText(historicalView() ? "LỊCH SỬ" : !known ? "CHỜ" : !running ? "DỪNG" : live ? "LIVE" : "CŨ");
     liveBadge.setTextColor(live ? BLUE : WARNING);
     liveBadge.setContentDescription(live ? "Dữ liệu web đang cập nhật" : "Dữ liệu chưa trực tuyến");
     navHasFault = !scopedFaults().isEmpty();
     if (incidentTabIcon != null) incidentTabIcon.invalidate();
+  }
+
+  private View reconnectControls() {
+    LinearLayout wrapper = column();
+    wrapper.setPadding(dp(14), 0, dp(14), dp(2));
+    reconnectPanel = column();
+    reconnectPanel.setPadding(dp(8), dp(3), dp(8), dp(3));
+    LinearLayout line = row();
+    connectionProgress = new ProgressBar(this, null, android.R.attr.progressBarStyleSmall);
+    connectionProgress.setIndeterminate(true);
+    connectionProgress.setContentDescription("Đang tải dữ liệu");
+    var progressSize = new LinearLayout.LayoutParams(dp(14), dp(14));
+    progressSize.rightMargin = dp(6);
+    line.addView(connectionProgress, progressSize);
+    connectionState = text("", 10, MUTED, false);
+    line.addView(connectionState, new LinearLayout.LayoutParams(0, -2, 1));
+    TextView retry = text("Kết nối lại", 10, RED, true);
+    retry.setGravity(Gravity.CENTER);
+    retry.setPadding(dp(9), dp(5), dp(9), dp(5));
+    retry.setMinimumHeight(dp(34));
+    retry.setBackground(shape(FAULT_TINT, 7, RED));
+    retry.setContentDescription("Kết nối lại");
+    touch(retry, () -> startForegroundService(
+        new Intent(this, MonitorService.class).setAction("RETRY_CONNECTION")));
+    reconnectButton = retry;
+    line.addView(retry, new LinearLayout.LayoutParams(-2, -2));
+    line.setMinimumHeight(dp(24));
+    reconnectPanel.addView(line);
+    connectionWarning = text("Mất kết nối", 9, RED, true);
+    connectionWarning.setGravity(Gravity.END);
+    reconnectPanel.addView(connectionWarning);
+    wrapper.addView(reconnectPanel);
+    updateReconnect();
+    return wrapper;
+  }
+
+  private void updateReconnect() {
+    if (reconnectPanel == null) return;
+    boolean running = store.prefs.getBoolean("running", false);
+    boolean lost = running && store.prefs.getBoolean("connectionLost", false);
+    boolean loading = running && store.prefs.getBoolean("dataLoading", false);
+    reconnectButton.setVisibility(lost ? View.VISIBLE : View.GONE);
+    connectionWarning.setVisibility(lost ? View.VISIBLE : View.GONE);
+    reconnectButton.setEnabled(!loading);
+    reconnectButton.setAlpha(loading ? 0.5f : 1f);
+    connectionProgress.setVisibility(loading ? View.VISIBLE : View.GONE);
+    connectionProgress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(lost ? RED : BLUE));
+    connectionState.setText(!running ? "Đã dừng theo dõi"
+        : lost ? loading ? "Đang kết nối lại…" : "Tự thử lại mỗi 2 phút"
+        : loading ? "Đang tải dữ liệu…"
+        : store.historicalMonitoring() && store.prefs.getLong("historyReadAt", 0) > 0 ? "Đã tải lịch sử"
+        : displayedLastSuccess() > 0 && !staleData() ? "Đã kết nối · " + time(displayedLastSuccess())
+        : "Chờ cập nhật dữ liệu");
+    connectionState.setTextColor(lost ? RED : loading ? BLUE : MUTED);
+    reconnectPanel.setBackground(shape(TINT, 7, lost ? RED : LINE));
   }
 
   private void updateStatusLine() {
@@ -768,6 +833,7 @@ public class MainActivity extends Activity {
     invalidateViewData();
     updateLiveBadge();
     if (page.equals("overview")) {
+      updateReconnect();
       updateSummary();
       if (!renderedRoute.equals(route().points())) {
         routeWrapper.removeAllViews();
@@ -802,19 +868,21 @@ public class MainActivity extends Activity {
 
   private LinearLayout overviewSummary() {
     summaryCard = card(GOOD);
+    summaryCard.setPadding(dp(10), dp(7), dp(10), dp(7));
+    ((LinearLayout.LayoutParams) summaryCard.getLayoutParams()).bottomMargin = dp(4);
     summaryCard.setOrientation(LinearLayout.HORIZONTAL);
     summaryCard.setGravity(Gravity.CENTER_VERTICAL);
     summaryRing = new SummaryRing();
-    summaryCard.addView(summaryRing, new LinearLayout.LayoutParams(dp(42), dp(42)));
+    summaryCard.addView(summaryRing, new LinearLayout.LayoutParams(dp(36), dp(36)));
     LinearLayout words = column();
-    words.setPadding(dp(12), 0, 0, 0);
+    words.setPadding(dp(9), 0, 0, 0);
     summaryTitle = text("", 10, GREEN, true);
     summaryDetail = text("", 14, INK, true);
     summaryTime = text("", 9, MUTED, false);
     words.addView(summaryTitle);
-    gap(words, 4);
+    gap(words, 2);
     words.addView(summaryDetail);
-    gap(words, 4);
+    gap(words, 2);
     words.addView(summaryTime);
     summaryCard.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
     summaryConfirm = action("XÁC NHẬN", null, false, () -> {
@@ -823,6 +891,8 @@ public class MainActivity extends Activity {
       Toast.makeText(this, "Đã xác nhận lượt cảnh báo hiện tại", Toast.LENGTH_SHORT).show();
     });
     summaryConfirm.setTag("confirm-current-alerts");
+    summaryConfirm.setPadding(dp(10), dp(8), dp(10), dp(8));
+    summaryConfirm.setMinimumHeight(dp(44));
     summaryConfirm.setContentDescription("XÁC NHẬN lượt cảnh báo hiện tại");
     summaryCard.addView(summaryConfirm, new LinearLayout.LayoutParams(-2, -2));
     updateSummary();
@@ -864,7 +934,8 @@ public class MainActivity extends Activity {
         (store.historicalMonitoring() ? "Lịch sử " + store.monitoringDay().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " · " : "")
             + (last == 0 ? "Chưa có dữ liệu từ website" : "Cập nhật " + time(last))
             + " · "
-            + (interval < 60 ? interval + " giây" : interval / 60 + " phút"));
+            + (store.prefs.getBoolean("connectionLost", false) ? "Thử lại mỗi 2 phút"
+                : interval < 60 ? interval + " giây" : interval / 60 + " phút"));
     summaryRing.number = faults > 0 ? faults : total;
     summaryRing.color = color;
     summaryRing.alert = faults > 0;
@@ -894,9 +965,11 @@ public class MainActivity extends Activity {
       paint.setColor(color);
       canvas.drawCircle(cx, cy, radius, paint);
       paint.setStyle(Paint.Style.FILL);
-      paint.setTextSize(dp(17));
+      paint.setTextSize(dp(16));
       paint.setTypeface(face);
       String text = "" + number;
+      if (paint.measureText(text) > dp(23))
+        paint.setTextSize(paint.getTextSize() * dp(23) / paint.measureText(text));
       canvas.drawText(
           text,
           cx - paint.measureText(text) / 2,
@@ -947,9 +1020,10 @@ public class MainActivity extends Activity {
 
   private LinearLayout routeCard() {
     LinearLayout c = card(SURFACE);
+    c.setPadding(dp(12), dp(7), dp(12), dp(7));
     c.setBackground(panel(SURFACE, BLUE));
     LinearLayout compass = row();
-    compass.setPadding(0, dp(2), 0, 0);
+    compass.setPadding(0, 0, 0, 0);
     compass.addView(text("BẮC", 9, MUTED, true));
     compass.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
     compass.addView(text("NAM", 9, MUTED, true));
@@ -962,8 +1036,8 @@ public class MainActivity extends Activity {
       routeView.setMinimumWidth(routeWidth);
       HorizontalScrollView scroll = new HorizontalScrollView(this);
       scroll.setFillViewport(true);
-      scroll.addView(routeView, new HorizontalScrollView.LayoutParams(routeWidth, dp(101)));
-      c.addView(scroll, new LinearLayout.LayoutParams(-1, dp(105)));
+      scroll.addView(routeView, new HorizontalScrollView.LayoutParams(routeWidth, routeView.preferredHeight()));
+      c.addView(scroll, new LinearLayout.LayoutParams(-1, routeView.preferredHeight() + dp(4)));
     }
     routeNote = text("", 8, MUTED, false);
     routeNote.setGravity(Gravity.END);
@@ -2110,6 +2184,11 @@ public class MainActivity extends Activity {
       updateOccupancy();
     }
 
+    int preferredHeight() {
+      // Empty diagrams need no upper label lanes. Keep the original space for trains.
+      return dp(segments.isEmpty() ? 76 : 101);
+    }
+
     void updateOccupancy() {
       Arrays.fill(occupied, 0);
       Rules.TravelState state = diagramState();
@@ -2117,6 +2196,18 @@ public class MainActivity extends Activity {
       for (Rules.Occupancy report : Rules.approachingCrossings(state)) {
         int index = points.indexOf(report.crossing());
         if (index >= 0) occupied[index] = report.direction();
+      }
+      var own = getLayoutParams();
+      if (own != null && own.height != preferredHeight()) {
+        own.height = preferredHeight();
+        setLayoutParams(own);
+      }
+      if (getParent() instanceof HorizontalScrollView scroll) {
+        var size = scroll.getLayoutParams();
+        if (size != null && size.height != preferredHeight() + dp(4)) {
+          size.height = preferredHeight() + dp(4);
+          scroll.setLayoutParams(size);
+        }
       }
       invalidate();
     }
@@ -2160,7 +2251,7 @@ public class MainActivity extends Activity {
       float left = points.size() == 1 ? getWidth() / 2f : dp(25),
           right = points.size() == 1 ? left : getWidth() - dp(35),
           step = points.size() > 1 ? (right - left) / (points.size() - 1) : 0,
-          y = dp(50);
+          y = dp(segments.isEmpty() ? 25 : 50);
       p.setStrokeCap(Paint.Cap.ROUND);
       p.setStrokeWidth(dp(3));
       p.setColor(LINE);
