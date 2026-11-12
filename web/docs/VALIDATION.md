@@ -9,8 +9,8 @@ Bản web độc lập 1.0.0, quy tắc gốc từ Android commit `ee1affe5ea024
 | Quy tắc Java gốc | 772 tình huống qua |
 | Parser HTML và đọc website có đăng nhập/phân trang (fixture HTTP) | 16 + 39 tình huống qua |
 | Tùy chọn chuông/giọng Việt | 17 kiểm tra qua |
-| Backend Python trên SQLite cục bộ | 10 bài tích hợp qua |
-| Backend trên PostgreSQL 16 thật trong Docker | 10 bài tích hợp qua |
+| Backend Python trên SQLite cục bộ | 12 bài tích hợp qua |
+| Backend trên PostgreSQL 16 thật trong Docker | 12 bài tích hợp qua |
 | Chromium + HTTP server + Java parser thật | 320/390/430 px, đúng thứ tự summary → kết nối → sơ đồ, không tràn ngang; retry, xác nhận, chi tiết cảm biến, đổi chế độ và reload qua; không lỗi JavaScript |
 | Hủy âm đợt cũ đồng thời có đợt mới | Qua: callback đợt cũ không dừng nhầm đợt mới |
 | Docker build | Python 3.12, Java 21, ffmpeg, espeak-ng; build và khởi động bằng user không phải root |
@@ -18,7 +18,7 @@ Bản web độc lập 1.0.0, quy tắc gốc từ Android commit `ee1affe5ea024
 | Build giao diện/syntax | `npm run build`, JS syntax và Python compile qua |
 | ZIP | Xuất whitelist; không keystore, bản sao khóa, mật khẩu vận hành, DB hay virtualenv |
 
-Backend tích hợp bao gồm: mã hóa thông tin website, tách phiên tài khoản, từ chối URL/Push endpoint ngoài phạm vi, CSRF và static path, 30 ngày/checkpoint trước prune, giữ sự cố khi lỗi TCP và retry sau 120 giây, quay lại 30 giây khi thành công, không báo lỗi cũ khi mở lại, worker tự đọc khi không có trình duyệt, dừng khi sai đăng nhập, hàng đợi Push không gửi lại, lỗi mới vẫn đủ điều kiện, nối Java lịch sử/cảm biến/đếm trục/loại trừ/Ga NL và giữ suy luận lịch sử cũ. Phần gửi tới dịch vụ Push được mock trong kiểm thử hàng đợi; chưa phải kiểm thử Apple Push thật.
+Backend tích hợp bao gồm: mã hóa thông tin website, tách phiên tài khoản, từ chối URL/Push endpoint ngoài phạm vi, CSRF và static path, 30 ngày/checkpoint trước prune, giữ sự cố khi lỗi TCP và retry sau 120 giây, quay lại 30 giây khi thành công, không báo lỗi cũ khi mở lại, worker tự đọc khi không có trình duyệt, dừng khi sai đăng nhập, hàng đợi Push không gửi lại, lỗi mới vẫn đủ điều kiện, nối Java lịch sử/cảm biến/đếm trục/loại trừ/Ga NL và giữ suy luận lịch sử cũ lưu suy luận backfill trước khi dựng lại checkpoint hiện tại, và danh sách tàu đúng ngày không cắt còn 100 bản tin. Phần gửi tới dịch vụ Push được mock trong kiểm thử hàng đợi; chưa phải kiểm thử Apple Push thật.
 
 ## Chưa xác minh — không được đánh dấu đã đạt
 

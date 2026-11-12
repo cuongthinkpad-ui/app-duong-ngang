@@ -106,6 +106,26 @@ class Backend(unittest.TestCase):
         s=self.app.engine(dict(op='analyze',now=now_ms(),user='fixture',route=['100+000','101+000'],events=[archived],previous={}))
         self.assertNotIn('self:archived',s['discard'],'rolling inference correction must not delete older retained history')
 
+    def test_imported_history_persists_inference_before_checkpoint_rebuild(self):
+        from server import ZONE
+        from datetime import timedelta
+        mid=self.config();day=today()-timedelta(days=3);start=int(datetime.combine(day,datetime.min.time(),ZONE).timestamp()*1000)
+        arrival=event('archived-arrival','Tàu lẻ',at=start+60000,red=False);real=self.app.engine
+        def fixture(request):
+            if request['op']=='fetch':return dict(ok=True,route=['100+000','101+000','102+000'],events=[arrival],connected=True)
+            return real(request)
+        self.app.engine=fixture;self.app.history(self.s,day.isoformat())
+        self.assertTrue(any(e['id']=='self:archived-arrival' for e in self.app.event_rows(mid)),'backfilled self inference must participate in live checkpoint replay')
+        self.assertEqual(self.state()['seq'],0,'history import stays silent')
+
+    def test_train_list_uses_selected_day_without_truncation(self):
+        from server import ZONE
+        start=int(datetime.combine(today(),datetime.min.time(),ZONE).timestamp()*1000)
+        rows=[event('train'+str(i),'Tàu lẻ',at=start+(i+1)*1000,red=False) for i in range(125)]
+        rows.append(event('yesterday','Tàu lẻ',at=start-1000,red=False))
+        result=self.app.engine(dict(op='analyze',now=now_ms(),route=['100+000','101+000','102+000'],events=rows,previous={}))
+        self.assertEqual(len(result['trains']),125);self.assertNotIn('yesterday',[e['id'] for e in result['trains']])
+
     def test_security_url_and_push(self):
         for url in ['http://169.254.169.254/','file:///etc/passwd','https://visitec.vn.evil/','http://user:pass@127.0.0.1/','http://127.0.0.1/?token=x']:
             with self.assertRaises(PublicError):self.app.validate_url(url)

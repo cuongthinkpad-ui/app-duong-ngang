@@ -56,9 +56,10 @@ public final class Engine {
     var existing=raw.stream().map(Rules.Event::id).collect(Collectors.toSet());
     for(var e:confirmed) if(existing.add(e.id())) raw.add(e);
     var daily=Rules.dailyRecords(route,between(raw,dayStart,now+1));
+    var historyGuesses=List.<Rules.Event>of();
     if(historical) {
-      var guesses=Rules.historicalSelfTriggers(route,originals,Math.max(floor,boundary),dayStart,now+1,30);
-      for(var e:guesses) if(existing.add(e.id())) raw.add(e);
+      historyGuesses=Rules.historicalSelfTriggers(route,originals,Math.max(floor,boundary),dayStart,now+1,30);
+      for(var e:historyGuesses) if(existing.add(e.id())) raw.add(e);
       daily=Rules.dailyRecords(route,between(raw,dayStart,now+1));
     }
     var faults=Rules.activeFaults(daily.stream().filter(e->e.at()>=baseline).toList());
@@ -81,10 +82,10 @@ public final class Engine {
     var out=new JSONObject();
     out.put("route",json(route.points())).put("points",json(pointInfo)).put("faults",json(faults)).put("incidents",json(Rules.incidentHistory(daily)))
       .put("segments",json(Rules.trackSegments(route,current))).put("occupancies",json(Rules.occupancies(route,raw)))
-      .put("trains",json(raw.stream().filter(e->Rules.direction(e.text())!=0).sorted(Comparator.comparingLong(Rules.Event::at).reversed()).limit(100).toList()))
+      .put("trains",json(between(raw,dayStart,now+1).stream().filter(e->Rules.direction(e.text())!=0).sorted(Comparator.comparingLong(Rules.Event::at).reversed()).toList()))
       .put("devices",json(devices)).put("groups",json(groups)).put("axles",json(Rules.axleErrors(route,between(raw,dayStart,now+1))))
       .put("checkpoint",json(cp.journeys())).put("checkpointAt",boundary).put("travel",json(current.journeys()))
-      .put("pending",json(pending)).put("derived",json(confirmed)).put("discard",json(discard)).put("floor",floor).put("baseline",baseline)
+      .put("pending",json(pending)).put("derived",json(historical?historyGuesses:confirmed)).put("discard",json(discard)).put("floor",floor).put("baseline",baseline)
       .put("records",json(daily)).put("announcements",json(announcements));
     return out;
   }

@@ -369,6 +369,18 @@ class App:
             monitor=self.monitor(mid);credentials=self.open(monitor['credentials'])
             self.save_rows(mid,data['events'])
             previous=json.loads(monitor['state']);rows=self.event_rows(mid)
+            selected=self.valid_day(day)
+            if selected<today():
+                start=int(datetime.combine(selected,datetime.min.time(),ZONE).timestamp()*1000)
+                end=int(datetime.combine(selected+timedelta(days=1),datetime.min.time(),ZONE).timestamp()*1000)
+                # Historical inference must be stored before replaying the live checkpoint.
+                # Replace only that day's derived self evidence; retain original equipment faults.
+                historical_rows=[e for e in rows if e['at']<end and not (start<=e['at'] and e['id'].startswith('self:'))]
+                historical=self.engine({'op':'analyze','now':end-1,'historical':True,'events':historical_rows,'previous':{},'route':data['route'],'user':credentials['user']})
+                with self.db() as db:
+                    db.execute("DELETE FROM events WHERE monitor=? AND at>=? AND at<? AND id LIKE ?",(mid,start,end,'self:%'))
+                    for e in historical['derived']:db.execute('INSERT OR IGNORE INTO events VALUES(?,?,?,?)',(mid,e['id'],e['at'],encode(e)))
+                rows=self.event_rows(mid)
             state=self.analyze(mid,rows,previous,data['route'],credentials['user'],earliest=min((e['at'] for e in data['events']),default=now_ms()))
             state.update({k:previous.get(k) for k in ('lastSuccess','status','connectionLost','loading','coverage','alarmBasis','lastFull')})
             self.update_analysis(mid,state,previous,rows)
