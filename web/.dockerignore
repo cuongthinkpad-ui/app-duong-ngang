@@ -1,0 +1,11 @@
+**
+!Dockerfile
+!requirements.txt
+!requirements.lock
+!build-engine.sh
+!server.py
+!database.py
+!audio.py
+!engine-core/**
+!engine/**
+!public/**

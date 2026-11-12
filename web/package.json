@@ -1,0 +1,10 @@
+{
+  "name": "giam-sat-duong-ngang-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "python3 -m unittest discover -s tests -v && node tests/test-alarm.mjs"
+  },
+  "description": "Standalone PWA and persistent Python/Java monitor. Deploy Dockerfile, not static dist alone."
+}

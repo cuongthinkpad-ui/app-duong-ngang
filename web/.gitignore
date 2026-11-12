@@ -1,0 +1,11 @@
+.venv/
+.deps/
+build/
+data/
+__pycache__/
+test-results/
+*.sqlite*
+*.pem
+
+dist/
+.bundle/

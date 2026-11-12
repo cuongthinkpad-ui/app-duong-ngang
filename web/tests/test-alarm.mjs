@@ -1,0 +1,12 @@
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+const text=await readFile(new URL('../public/app.js',import.meta.url),'utf8');
+const code=text.slice(text.indexOf('class Alarm {'),text.indexOf('const alarm=new Alarm();'));
+const context={Audio:class {setAttribute(){}},snapshot:{options:{mode:'bell'},faults:[{id:'a'},{id:'b'}]},streamActive:false,document:{visibilityState:'visible'},navigator:{},speechSynthesis:{cancel(){}},setInterval(){return 1},clearInterval(){},clearTimeout(){},window:{},$:()=>({textContent:''}),toast(){}};
+context.window=context;vm.createContext(context);vm.runInContext(code+';globalThis.Alarm=Alarm;',context);
+const alarm=new context.Alarm();alarm.ready=true;const pending=[];alarm.audio=()=>new Promise(resolve=>pending.push(resolve));
+alarm.enqueue([{id:'a'}],{});assert.equal(alarm.active,true);alarm.stop();alarm.enqueue([{id:'b'}],{});const generation=alarm.generation;
+pending[0](false);await new Promise(resolve=>setImmediate(resolve));assert.equal(alarm.generation,generation,'cancelled prior batch cannot cancel a newly started batch');assert.equal(alarm.active,true);
+alarm.stop();pending[1](false);await new Promise(resolve=>setImmediate(resolve));assert.equal(alarm.active,false);assert.equal(alarm.queue.length,0);
+console.log('PASS confirmation cancellation race: current batch stops; next new alarm remains active');
