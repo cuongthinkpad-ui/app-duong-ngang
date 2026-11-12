@@ -1,5 +1,7 @@
 # Continuing this project
 
+- 12/11 owner-approved 0.27.1: notification action “Dừng chuông/giọng đọc” stops the current sound/TTS queue/vibration without opening the app, changing alert mode, clearing faults or stopping monitoring; new faults still alert. Settings mode labels are exactly “Giọng nói”, “Chỉ chuông”, “Im lặng”, without suffix descriptions. Continue from 370bce9 on codex/0.27-notification-stop; see docs/UI_REVIEW_0.27.1.md. Original signing remains mandatory; private backups stay outside Git.
+
 Read `docs/BAN_GIAO.md`, `docs/LICH_SU_TRAO_DOI.md` and `README.md` before editing. They contain the owner's agreed requirements, the current app version, build commands and remaining verification. Historical review documents describe earlier behavior; the latest user instructions take precedence.
 
 - This is a Vietnamese native Android railway crossing monitoring app. Preserve the exact website fault text and equipment identities.

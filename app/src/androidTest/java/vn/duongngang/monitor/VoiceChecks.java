@@ -65,6 +65,16 @@ final class VoiceChecks {
     Context context = runner.getTargetContext();
     var audio = context.getSystemService(AudioManager.class);
     int volume = audio.getStreamVolume(AudioManager.STREAM_ALARM);
+    AlarmSound bell = new AlarmSound();
+    try {
+      ui(() -> bell.play(context));
+      check(bell.isPlaying(), "bell-only warning starts");
+      ui(bell::stop);
+      check(!bell.isPlaying() && field(bell, "player") == null && field(bell, "vibrator") == null,
+          "stop releases bell-only audio and vibration");
+      ui(() -> bell.play(context));
+      check(bell.isPlaying(), "new bell warning can start after stopping the previous one");
+    } finally { ui(bell::stop); }
     List<String> statuses = new CopyOnWriteArrayList<>(), delivered = new CopyOnWriteArrayList<>();
     VoiceAlarm voice = new VoiceAlarm(context, message -> { statuses.add(message); android.util.Log.i("VoiceCheck", message); }, e -> delivered.add(e.id()));
     AtomicInteger starts = new AtomicInteger();

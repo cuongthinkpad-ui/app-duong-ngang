@@ -42,12 +42,21 @@ fi
 cd /workspace/app-duong-ngang
 source scripts/env.sh
 mkdir -p "$ANDROID_USER_HOME"
+# sdkmanager does not automatically use the inherited HTTP proxy or Java CA store.
+rail_sdk_options=(--sdk_root="$ANDROID_HOME")
+if [[ -n "${HTTPS_PROXY:-}" ]]; then
+  read -r rail_proxy_host rail_proxy_port < <(node -e 'const u=new URL(process.env.HTTPS_PROXY); console.log(u.hostname,u.port || 80)')
+  rail_sdk_options+=(--proxy=http --proxy_host="$rail_proxy_host" --proxy_port="$rail_proxy_port")
+fi
+if [[ -f /etc/ssl/certs/java/cacerts ]]; then
+  export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts"
+fi
 # SDK terms are accepted for this user-requested Android build environment.
 set +o pipefail
-yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses > "$rail_tmp/licenses.log" 2>&1
+yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "${rail_sdk_options[@]}" --licenses > "$rail_tmp/licenses.log" 2>&1
 rail_license_status=${PIPESTATUS[1]}
 set -o pipefail
 if [[ "$rail_license_status" != 0 ]]; then cat "$rail_tmp/licenses.log"; exit "$rail_license_status"; fi
-"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" 'platforms;android-35' 'build-tools;34.0.0' 'build-tools;35.0.0' 'platform-tools'
+"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "${rail_sdk_options[@]}" 'platforms;android-35' 'build-tools;34.0.0' 'build-tools;35.0.0' 'platform-tools'
 ./scripts/test-rules.sh
 ./scripts/build-cloud.sh assembleDebug lintDebug

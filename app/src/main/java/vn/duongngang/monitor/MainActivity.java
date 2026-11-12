@@ -1630,8 +1630,7 @@ public class MainActivity extends Activity {
     options.addView(text("CÁCH CẢNH BÁO", 10, MUTED, true));
     RadioGroup alertModes = new RadioGroup(this);
     String[] modeValues = {AlertOptions.VOICE, AlertOptions.BELL, AlertOptions.SILENT};
-    String[] modeLabels = {"Giọng nói · 2 hồi chuông, đọc 6 lần, có rung",
-        "Chỉ chuông · 6 hồi chuông, có rung", "Im lặng · chỉ hiện thông báo"};
+    String[] modeLabels = {"Giọng nói", "Chỉ chuông", "Im lặng"};
     for (int i = 0; i < modeValues.length; i++) {
       RadioButton choice = new RadioButton(this);
       choice.setId(View.generateViewId());

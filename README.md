@@ -1,6 +1,6 @@
-# Đường Ngang — Android 0.27 (bản kiểm thử)
+# Đường Ngang — Android 0.27.1
 
-**[Bàn giao phiên mới nhất — tiếp tục với Google AI Studio hoặc công cụ khác](docs/TIEP_TUC_0.27_AI_STUDIO.md)**. Dùng nhánh `codex/0.27-voice-alerts` để lấy mã 0.27; main hiện giữ bản 0.26.
+**[Bàn giao và kiểm chứng 0.27.1](docs/UI_REVIEW_0.27.1.md)** — nhánh `codex/0.27-notification-stop`, main hiện giữ 0.26. Nút **Dừng chuông/giọng đọc** trên thông báo dừng đợt đang báo khi app ở nền, giữ theo dõi/lỗi và cho cảnh báo mới phát tiếp. Cách cảnh báo chỉ còn ba nhãn **Giọng nói**, **Chỉ chuông**, **Im lặng**, giữ cách phát của bản cũ. [Bàn giao 0.27 trước đó](docs/TIEP_TUC_0.27_AI_STUDIO.md).
 
 **Đổi phiên/tài khoản ChatGPT:** đọc [Bản bàn giao và cách tiếp tục](docs/BAN_GIAO.md) và [Nhật ký trao đổi, yêu cầu đã chốt](docs/LICH_SU_TRAO_DOI.md). [Sao lưu khóa ký APK](docs/SAO_LUU_KHOA_KY.md).
 

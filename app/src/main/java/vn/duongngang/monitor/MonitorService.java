@@ -103,11 +103,24 @@ public class MonitorService extends Service {
         PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
   }
 
+  private Notification.Action stopAlertAction() {
+    // Deliver directly to the service: no Activity or persistent mute setting is needed.
+    var pending = PendingIntent.getService(this, 1,
+        new Intent(this, MonitorService.class).setAction("MUTE_ALARM"),
+        PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+    return new Notification.Action.Builder(android.R.drawable.ic_media_pause,
+        "Dừng chuông/giọng đọc", pending).build();
+  }
+
   @Override
   public int onStartCommand(Intent intent, int flags, int id) {
     if (intent != null && "MUTE_ALARM".equals(intent.getAction())) {
-      stopAlerts();
-      ringingFaults.clear();
+      // Serialize with poll's alert dispatch. A queued TTS introduction also checks
+      // ringingFaults before starting, so late callbacks cannot revive this batch.
+      synchronized (Store.class) {
+        ringingFaults.clear();
+        stopAlerts();
+      }
       if (worker == null) stopSelf();
       return worker == null ? START_NOT_STICKY : START_STICKY;
     }
@@ -130,6 +143,7 @@ public class MonitorService extends Service {
             .setContentText("Chạm để xem tình trạng cập nhật")
             .setContentIntent(open())
             .setOngoing(true)
+            .addAction(stopAlertAction())
             .build();
     startForeground(1, notification);
     if (worker == null) {
@@ -381,6 +395,7 @@ public class MonitorService extends Service {
             .setContentText(e.text())
             .setStyle(new Notification.BigTextStyle().bigText(e.text()))
             .setContentIntent(open())
+            .addAction(stopAlertAction())
             .setAutoCancel(true)
             .build();
     getSystemService(NotificationManager.class).notify(notificationId(e), n);

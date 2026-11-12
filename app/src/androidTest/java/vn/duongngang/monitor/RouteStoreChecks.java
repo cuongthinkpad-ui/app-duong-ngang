@@ -9,6 +9,7 @@ import java.util.List;
 public final class RouteStoreChecks extends Instrumentation {
   private int checks;
   private boolean uiMode, previewMode, timingMode, telemetryMode, historyMode, voiceMode, voiceMissingMode;
+  private String upgradeMode;
 
   private void check(boolean result, String message) {
     checks++;
@@ -18,6 +19,7 @@ public final class RouteStoreChecks extends Instrumentation {
   @Override
   public void onCreate(Bundle arguments) {
     super.onCreate(arguments);
+    upgradeMode = arguments == null ? "" : arguments.getString("mode", "");
     voiceMissingMode = arguments != null && "voice-missing".equals(arguments.getString("mode"));
     voiceMode = arguments != null && "voice".equals(arguments.getString("mode"));
     historyMode = arguments != null && "history".equals(arguments.getString("mode"));
@@ -30,6 +32,16 @@ public final class RouteStoreChecks extends Instrumentation {
 
   @Override
   public void onStart() {
+    if (upgradeMode.startsWith("upgrade-")) {
+      Bundle result = new Bundle();
+      try {
+        result.putString("stream", UpgradeChecks.run(this, upgradeMode.equals("upgrade-seed")));
+        finish(-1, result);
+      } catch (Throwable failure) {
+        result.putString("stream", "FAILED: " + failure + "\n"); finish(0, result);
+      }
+      return;
+    }
     if (voiceMissingMode) {
       Bundle result = new Bundle();
       try {

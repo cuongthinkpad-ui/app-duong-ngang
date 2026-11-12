@@ -1,4 +1,12 @@
-# Đường Ngang — bản kiểm thử 0.27
+# Đường Ngang — cập nhật 0.27.1
+
+**[Tải APK 0.27.1](DuongNgang-0.27.1.apk)** — chọn **Download raw file**, cài đè và không gỡ bản cũ. Ký khóa gốc, versionCode 28. Nhánh `codex/0.27-notification-stop`; main hiện giữ 0.26.
+
+- Nút **Dừng chuông/giọng đọc** trên thông báo dừng đợt chuông/đọc/rung đang phát khi app ở nền. Giữ theo dõi, lỗi hiển thị và chế độ âm; lỗi mới vẫn báo bình thường.
+- Cách cảnh báo chỉ ghi **Giọng nói**, **Chỉ chuông**, **Im lặng**; cách phát giữ như 0.27.
+- [Kiểm chứng, cài đè và bàn giao 0.27.1](../docs/UI_REVIEW_0.27.1.md).
+
+## Bản kiểm thử 0.27 trước đó
 
 **[APK kiểm thử 0.27](DuongNgang-0.27.apk)** — chọn **Download raw file**; ký khóa gốc, versionCode 27, cài đè 0.26 không gỡ app. Bản này trên nhánh `codex/0.27-voice-alerts`, chưa thay bản 0.26 chính thức vì đối chiếu web thật còn bị chặn.
 

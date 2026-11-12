@@ -2,5 +2,6 @@
 export JAVA_HOME=/workspace/toolchains/jdk-21.0.8
 export ANDROID_HOME=/workspace/toolchains/android-sdk
 export ANDROID_USER_HOME=/workspace/toolchains/android-home
+export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
 export GRADLE_USER_HOME=/workspace/toolchains/gradle-home
 export PATH="/workspace/toolchains/gradle-8.9/bin:$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH"

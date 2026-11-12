@@ -51,6 +51,49 @@ def wait_for(predicate, label, timeout=110):
 def faults(state):
     return json.loads(state.get('activeFaults', '[]'))
 
+def assert_stopped_outputs():
+    pid = adb('shell', 'pidof', PKG).strip()
+    assert pid, 'Monitoring process disappeared after stop'
+    assert 'pid(' + pid + ')' not in adb('shell', 'dumpsys', 'media.player'), 'Chime player remains allocated'
+    assert 'mCurrentVibration=null' in adb('shell', 'dumpsys', 'vibrator'), 'Vibration continues after stop'
+
+def tap_stop_notification(title='101+000'):
+    # Exercise the actual System UI action with the Activity in the background.
+    adb('shell', 'cmd', 'statusbar', 'expand-notifications')
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        adb('shell', 'uiautomator', 'dump', '/data/local/tmp/rail-notifications.xml')
+        root = ET.fromstring(adb('shell', 'cat', '/data/local/tmp/rail-notifications.xml'))
+        candidates = [group for group in root.iter('node')
+                      if any(title in n.get('text', '') for n in group.iter('node'))
+                      and any(n.get('text', '').casefold() == 'Dừng chuông/giọng đọc'.casefold()
+                              for n in group.iter('node'))]
+        if not candidates:
+            collapsed = [group for group in root.iter('node')
+                         if any(title in n.get('text', '') for n in group.iter('node'))
+                         and any(n.get('resource-id', '').endswith(':id/expand_button')
+                                 for n in group.iter('node'))]
+            if collapsed:
+                header = min(collapsed, key=lambda n: len(list(n.iter())))
+                button = next(n for n in header.iter('node')
+                              if n.get('resource-id', '').endswith(':id/expand_button'))
+                x1, y1, x2, y2 = map(int, re.findall(r'\d+', button.get('bounds')))
+                adb('shell', 'input', 'tap', str((x1+x2)//2), str((y1+y2)//2))
+                continue
+            # Low-priority foreground notifications can be below the visible list.
+            adb('shell', 'input', 'swipe', '270', '700', '270', '330', '350')
+        # Smallest containing subtree identifies the requested notification, not
+        # another notification's identical action elsewhere in the shade.
+        group = min(candidates, key=lambda n: len(list(n.iter())), default=ET.Element('empty'))
+        for node in group.iter('node'):
+            if node.get('text', '').casefold() == 'Dừng chuông/giọng đọc'.casefold():
+                x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.get('bounds')))
+                adb('shell', 'input', 'tap', str((x1+x2)//2), str((y1+y2)//2))
+                adb('shell', 'cmd', 'statusbar', 'collapse')
+                return
+        time.sleep(0.5)
+    raise AssertionError('Stop action is not accessible in Android notification shade')
+
 AXLE_EXEMPT_POINTS = ('280+500', '307+507', '309+056', '320+445', '338+900', '343+350')
 
 phase = {'value': 0, 'at': int(time.time()), 'manual': False, 'pre_restore': False,
@@ -238,6 +281,38 @@ def main():
             assert int(empty.get('lastAlarm', '0')) == 0, 'Empty snapshot must not sound'
             assert not faults(empty), 'Exempt axle reports must not create faults'
             print('PASS: six qualifying errors and one large deviation at all six exempt points remain silent', flush=True)
+            if '--notification-stop-only' in sys.argv:
+                adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
+                phase.update(audio_stage=1, audio_at=int(time.time())-1)
+                voiced = wait_for(lambda s: len(faults(s)) == 2
+                    and s.get('voiceStatus', '').startswith('Đang đọc'),
+                    'background service begins reading two new faults')
+                tap_stop_notification()
+                stopped = wait_for(lambda s: s.get('voiceStatus') == 'Đã dừng giọng đọc',
+                    'notification action stops current voice batch without opening app')
+                assert_stopped_outputs()
+                assert stopped.get('running') == 'true' and stopped.get('sound') == 'true'
+                assert stopped.get('alertMode', 'voice') == voiced.get('alertMode', 'voice')
+                assert faults(stopped) == faults(voiced), 'Stopping audio must preserve active faults'
+                after = wait_for(lambda s: int(s.get('lastSuccess', '0')) > int(stopped['lastSuccess']),
+                    'monitoring continues after stop action')
+                assert after.get('lastAlarm') == stopped.get('lastAlarm'), 'Empty poll replayed stopped batch'
+                assert after.get('voiceStatus') == 'Đã dừng giọng đọc'
+                assert 'vn.duongngang.monitor/.MainActivity' not in '\n'.join(
+                    line for line in adb('shell', 'dumpsys', 'activity', 'activities').splitlines()
+                    if 'mResumedActivity' in line), 'Stop action opened Activity'
+                notes = adb('shell', 'dumpsys', 'notification', '--noredact')
+                assert 'channel=monitor' in notes and 'channel=faults_alerts_027' in notes
+                phase.update(audio_stage=2, bell_at=int(time.time())-1)
+                wait_for(lambda s: any(row[3] == 'Chuông 1 hỏng' for row in faults(s))
+                    and int(s.get('lastAlarm', '0')) > int(stopped['lastAlarm'])
+                    and s.get('voiceStatus', '').startswith('Đang đọc'),
+                    'new fault sounds and speaks normally after stopping previous batch')
+                tap_stop_notification('101+000')
+                wait_for(lambda s: s.get('voiceStatus') == 'Đã dừng giọng đọc', 'fault notification stop action is reusable')
+                assert_stopped_outputs()
+                print('Notification stop service checks passed', flush=True)
+                return
             if '--audio-modes-only' in sys.argv:
                 phase.update(audio_stage=1,audio_at=int(time.time())-1)
                 voiced=wait_for(lambda s: any(row[3]=='Cầu chì 50A bị đứt' for row in faults(s))

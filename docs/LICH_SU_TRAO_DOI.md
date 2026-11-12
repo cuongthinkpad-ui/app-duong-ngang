@@ -1,5 +1,9 @@
 # Nhật ký trao đổi và các quyết định của chủ dự án
 
+## Bổ sung 12/11/2026 — cập nhật 0.27.1
+
+Chủ dự án yêu cầu tiếp tục từ `370bce9`, thêm nút **Dừng chuông/giọng đọc** trên thông báo Android để dừng đợt chuông/đọc/rung mà không mở app; giữ theo dõi, lỗi hiển thị và cho lỗi mới báo bình thường. Triển khai, kiểm thử, ký gốc, thử cài đè giữ dữ liệu và đưa mã/APK/bàn giao lên GitHub đã được duyệt. Không xin lại cùng phê duyệt. Sau đó yêu cầu ba lựa chọn **Cách cảnh báo** chỉ ghi **Giọng nói**, **Chỉ chuông**, **Im lặng**, bỏ mô tả phía sau và giữ cách phát của bản cũ. Khóa được cung cấp riêng và khôi phục ngoài Git. Chi tiết kết quả: [biên bản 0.27.1](UI_REVIEW_0.27.1.md).
+
 Tổng hợp đến 23/10/2026, giờ Việt Nam. Mục đích là giữ ngữ cảnh và lý do để người tiếp tục dự án hiểu yêu cầu mà không phải hỏi lại từ đầu. Đây là **bản tổng hợp các trao đổi chính**, không phải tệp xuất nguyên văn của ChatGPT. Không chứa mật khẩu, cookie hoặc các ảnh gốc đã đính kèm trong chat. Thông số và hành vi hiện tại xem thêm [bàn giao](BAN_GIAO.md); yêu cầu mới của chủ dự án được ưu tiên.
 
 ## 1. Bắt đầu bằng trao đổi nghiệp vụ

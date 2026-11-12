@@ -1,5 +1,7 @@
 # Bàn giao phiên 11/11/2026 — tiếp tục bằng Google AI Studio hoặc công cụ khác
 
+> Cập nhật 12/11: tiếp tục trên `codex/0.27-notification-stop`, bản 0.27.1/versionCode 28. Đã thêm nút dừng đợt chuông/giọng đọc/rung từ thông báo, giữ theo dõi/lỗi/chế độ âm; rút gọn ba nhãn lựa chọn theo yêu cầu. Đọc [biên bản và bàn giao 0.27.1](UI_REVIEW_0.27.1.md) trước phần lịch sử bên dưới.
+
 ## Lấy đúng mã nguồn
 
 - Repository: https://github.com/cuongthinkpad-ui/app-duong-ngang
