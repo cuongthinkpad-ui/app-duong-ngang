@@ -1,4 +1,4 @@
-> Bàn giao mới nhất 12/11/2026: [0.27.1 — dừng đợt cảnh báo từ thông báo](UI_REVIEW_0.27.1.md), nhánh `codex/0.27-notification-stop`, tiếp tục từ `370bce9`. Giữ theo dõi/lỗi và cho cảnh báo mới phát bình thường; ba nhãn Cách cảnh báo đã rút gọn theo yêu cầu. Main vẫn giữ 0.26.
+> Bàn giao mới nhất 12/11/2026: [0.27.2 — không đọc lại sự cố cũ khi mở app](UI_REVIEW_0.27.2.md), nhánh `codex/0.27-notification-stop`, tiếp tục từ `247f8d2`. Nút thông báo đổi thành **XÁC NHẬN**, thêm cùng nút trong ô **CÓ SỰ CỐ** đầu Tổng quan; dừng đợt hiện tại, giữ theo dõi/lỗi và cho cảnh báo mới phát bình thường. Main vẫn giữ 0.26.
 
 > Bản kiểm thử 0.27 từ `48bdc1d`: ba chế độ giọng nói/chỉ chuông/im lặng và hai cặp lỗi nguồn theo yêu cầu. Đã ký gốc/kiểm thử/cài đè; chờ đối chiếu web thật vì môi trường còn chặn miền. Nhánh `codex/0.27-voice-alerts`, main vẫn 0.26. Đọc [UI_REVIEW_0.27.md](UI_REVIEW_0.27.md) trước khi tiếp tục; thông tin truy cập đã lưu riêng, không cần xin lại.
 

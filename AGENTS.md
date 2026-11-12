@@ -1,5 +1,8 @@
 # Continuing this project
 
+- 0.27.2 owner follow-up: reopening the app or recreating/restarting MonitorService must not replay cached unresolved faults. Only newly imported eligible faults may start audio. The phone notification action label is exactly “XÁC NHẬN”; it stops current chime/TTS/vibration without changing mode, clearing faults or stopping monitoring. See docs/UI_REVIEW_0.27.2.md. This supersedes older instructions to sound existing faults on every monitoring session start.
+- The owner also requested “XÁC NHẬN” in the top overview “CÓ SỰ CỐ” card. It uses the same current-batch stop action as the phone notification, keeps faults/mode/monitoring intact, and leaves new faults eligible for audio. Hide it when no current faults, monitoring is stopped, or viewing history.
+
 - 12/11 owner-approved 0.27.1: notification action “Dừng chuông/giọng đọc” stops the current sound/TTS queue/vibration without opening the app, changing alert mode, clearing faults or stopping monitoring; new faults still alert. Settings mode labels are exactly “Giọng nói”, “Chỉ chuông”, “Im lặng”, without suffix descriptions. Continue from 370bce9 on codex/0.27-notification-stop; see docs/UI_REVIEW_0.27.1.md. Original signing remains mandatory; private backups stay outside Git.
 
 Read `docs/BAN_GIAO.md`, `docs/LICH_SU_TRAO_DOI.md` and `README.md` before editing. They contain the owner's agreed requirements, the current app version, build commands and remaining verification. Historical review documents describe earlier behavior; the latest user instructions take precedence.

@@ -1,4 +1,10 @@
-# Đường Ngang — cập nhật 0.27.1
+# Đường Ngang — cập nhật 0.27.2
+
+**[Tải APK 0.27.2](DuongNgang-0.27.2.apk)** — cài đè, **không gỡ app cũ**. Ký khóa gốc, versionCode 29. Sửa mở lại app đọc lại sự cố cũ; nút trên thông báo đổi thành **XÁC NHẬN**, vẫn dừng đợt chuông/đọc/rung hiện tại và giữ theo dõi/lỗi. Sự cố mới vẫn báo bình thường. [Kiểm chứng và bàn giao](../docs/UI_REVIEW_0.27.2.md).
+
+Thêm **XÁC NHẬN** trong ô **CÓ SỰ CỐ** ở đầu Tổng quan, cùng chức năng dừng lượt đang báo.
+
+## Bản 0.27.1 trước đó
 
 **[Tải APK 0.27.1](DuongNgang-0.27.1.apk)** — chọn **Download raw file**, cài đè và không gỡ bản cũ. Ký khóa gốc, versionCode 28. Nhánh `codex/0.27-notification-stop`; main hiện giữ 0.26.
 

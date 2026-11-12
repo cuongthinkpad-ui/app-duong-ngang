@@ -1,5 +1,11 @@
 # Nhật ký trao đổi và các quyết định của chủ dự án
 
+## Tiếp theo 12/11/2026 — 0.27.2
+
+Chủ dự án phản hồi mở lại app đọc lại sự cố cũ. Đã tái hiện khi tiến trình/dịch vụ được tạo lại; bỏ việc phát lại toàn bộ lỗi tồn tại lúc firstPoll, giữ hiển thị lỗi và chỉ báo sự cố mới đủ điều kiện. Chủ dự án yêu cầu đổi chữ trên nút thông báo thành đúng **XÁC NHẬN**, giữ chức năng dừng đợt hiện tại và theo dõi bình thường. Xem [biên bản 0.27.2](UI_REVIEW_0.27.2.md).
+
+Trong lúc triển khai 0.27.2, chủ dự án bổ sung nút **XÁC NHẬN** trong ô **CÓ SỰ CỐ** đầu Tổng quan để xác nhận và tắt chuông/giọng đọc/rung của lượt hiện tại. Giữ lỗi hiện có, chế độ âm và cảnh báo mới.
+
 ## Bổ sung 12/11/2026 — cập nhật 0.27.1
 
 Chủ dự án yêu cầu tiếp tục từ `370bce9`, thêm nút **Dừng chuông/giọng đọc** trên thông báo Android để dừng đợt chuông/đọc/rung mà không mở app; giữ theo dõi, lỗi hiển thị và cho lỗi mới báo bình thường. Triển khai, kiểm thử, ký gốc, thử cài đè giữ dữ liệu và đưa mã/APK/bàn giao lên GitHub đã được duyệt. Không xin lại cùng phê duyệt. Sau đó yêu cầu ba lựa chọn **Cách cảnh báo** chỉ ghi **Giọng nói**, **Chỉ chuông**, **Im lặng**, bỏ mô tả phía sau và giữ cách phát của bản cũ. Khóa được cung cấp riêng và khôi phục ngoài Git. Chi tiết kết quả: [biên bản 0.27.1](UI_REVIEW_0.27.1.md).

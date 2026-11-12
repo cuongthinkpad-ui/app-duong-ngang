@@ -109,7 +109,7 @@ public class MonitorService extends Service {
         new Intent(this, MonitorService.class).setAction("MUTE_ALARM"),
         PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     return new Notification.Action.Builder(android.R.drawable.ic_media_pause,
-        "Dừng chuông/giọng đọc", pending).build();
+        "XÁC NHẬN", pending).build();
   }
 
   @Override
@@ -336,17 +336,8 @@ public class MonitorService extends Service {
               ringingFaults.add(event.id());
               audibleNew.put(event.id(), event);
             }
-        // A newly started monitoring session must also sound for current, unresolved faults.
-        // Merely returning to an already-running Activity does not replay old alerts.
-        if (firstPoll)
-          for (var event : active)
-            if (notificationIds.contains(notificationId(event))
-                && (detectSelf || !Rules.isSelfTrigger(event))
-                && store.claimAxleNotice(event, now)) {
-              if (Rules.isAxleFault(event)) notifyFault(event);
-              ringingFaults.add(event.id());
-              audibleNew.put(event.id(), event);
-            }
+        // Reopening/recreating the service must not replay cached unresolved faults.
+        // Only newly imported eligible faults above may start an audible batch.
         if (!audibleNew.isEmpty() && store.prefs.getBoolean("sound", true))
           playAlerts(account, new ArrayList<>(audibleNew.values()), now);
         firstPoll = false;

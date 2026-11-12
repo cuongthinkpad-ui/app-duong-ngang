@@ -36,6 +36,7 @@ public class MainActivity extends Activity {
   private LinearLayout screen, content;
   private TextView status, routeNote, summaryTitle, summaryDetail, summaryTime, voiceState;
   private LinearLayout summaryCard;
+  private View summaryConfirm;
   private SummaryRing summaryRing;
   private ImageView headerMark;
   private TextView liveBadge;
@@ -620,6 +621,7 @@ public class MainActivity extends Activity {
   private void render() {
     invalidateViewData();
     summaryCard = null;
+    summaryConfirm = null;
     summaryRing = null;
     routeWrapper = null;
     routeView = null;
@@ -815,6 +817,14 @@ public class MainActivity extends Activity {
     gap(words, 4);
     words.addView(summaryTime);
     summaryCard.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
+    summaryConfirm = action("XÁC NHẬN", null, false, () -> {
+      if (!store.prefs.getBoolean("running", false)) return;
+      startService(new Intent(this, MonitorService.class).setAction("MUTE_ALARM"));
+      Toast.makeText(this, "Đã xác nhận lượt cảnh báo hiện tại", Toast.LENGTH_SHORT).show();
+    });
+    summaryConfirm.setTag("confirm-current-alerts");
+    summaryConfirm.setContentDescription("XÁC NHẬN lượt cảnh báo hiện tại");
+    summaryCard.addView(summaryConfirm, new LinearLayout.LayoutParams(-2, -2));
     updateSummary();
     return summaryCard;
   }
@@ -826,6 +836,8 @@ public class MainActivity extends Activity {
     int faults = scopedFaults().size();
     boolean known = displayedLastSuccess() > 0;
     boolean running = store.prefs.getBoolean("running", false);
+    summaryConfirm.setVisibility(faults > 0 && running && !store.historicalMonitoring()
+        ? View.VISIBLE : View.GONE);
     int color = !known || staleData() ? WARNING : faults > 0 ? RED : running ? GREEN : WARNING;
     summaryCard.setBackground(
         panel(

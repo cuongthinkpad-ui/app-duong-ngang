@@ -64,9 +64,10 @@ def tap_stop_notification(title='101+000'):
     while time.monotonic() < deadline:
         adb('shell', 'uiautomator', 'dump', '/data/local/tmp/rail-notifications.xml')
         root = ET.fromstring(adb('shell', 'cat', '/data/local/tmp/rail-notifications.xml'))
+        labels = {'xác nhận'}
         candidates = [group for group in root.iter('node')
                       if any(title in n.get('text', '') for n in group.iter('node'))
-                      and any(n.get('text', '').casefold() == 'Dừng chuông/giọng đọc'.casefold()
+                      and any(n.get('text', '').casefold() in labels
                               for n in group.iter('node'))]
         if not candidates:
             collapsed = [group for group in root.iter('node')
@@ -86,13 +87,35 @@ def tap_stop_notification(title='101+000'):
         # another notification's identical action elsewhere in the shade.
         group = min(candidates, key=lambda n: len(list(n.iter())), default=ET.Element('empty'))
         for node in group.iter('node'):
-            if node.get('text', '').casefold() == 'Dừng chuông/giọng đọc'.casefold():
+            if node.get('text', '').casefold() in labels:
                 x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.get('bounds')))
                 adb('shell', 'input', 'tap', str((x1+x2)//2), str((y1+y2)//2))
                 adb('shell', 'cmd', 'statusbar', 'collapse')
                 return
         time.sleep(0.5)
     raise AssertionError('Stop action is not accessible in Android notification shade')
+
+def tap_overview_confirmation():
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        adb('shell', 'uiautomator', 'dump', '/data/local/tmp/rail-overview.xml')
+        root = ET.fromstring(adb('shell', 'cat', '/data/local/tmp/rail-overview.xml'))
+        cards = [n for n in root.iter('node')
+                 if any(c.get('text') == 'CÓ SỰ CỐ' for c in n.iter('node'))
+                 and any(c.get('content-desc') == 'XÁC NHẬN lượt cảnh báo hiện tại' for c in n.iter('node'))]
+        if cards:
+            card = min(cards, key=lambda n: len(list(n.iter())))
+            button = next(c for c in card.iter('node')
+                          if c.get('content-desc') == 'XÁC NHẬN lượt cảnh báo hiện tại')
+            assert button.get('clickable') == 'true', 'Summary confirmation must be an actual button'
+            x1, y1, x2, y2 = map(int, re.findall(r'\d+', button.get('bounds')))
+            cx1, cy1, cx2, cy2 = map(int, re.findall(r'\d+', card.get('bounds')))
+            assert cx1 <= x1 < x2 <= cx2 and cy1 <= y1 < y2 <= cy2, 'Summary button is clipped'
+            pathlib.Path('/tmp/rail-0272-summary.png').write_bytes(adb('exec-out', 'screencap', '-p', binary=True))
+            adb('shell', 'input', 'tap', str((x1+x2)//2), str((y1+y2)//2))
+            return
+        time.sleep(0.5)
+    raise AssertionError('XÁC NHẬN is missing from the CÓ SỰ CỐ summary card')
 
 AXLE_EXEMPT_POINTS = ('280+500', '307+507', '309+056', '320+445', '338+900', '343+350')
 
@@ -303,13 +326,33 @@ def main():
                     if 'mResumedActivity' in line), 'Stop action opened Activity'
                 notes = adb('shell', 'dumpsys', 'notification', '--noredact')
                 assert 'channel=monitor' in notes and 'channel=faults_alerts_027' in notes
+                adb('shell', 'am', 'start', '-n', PKG+'/.MainActivity')
+                warm = wait_for(lambda s: int(s.get('lastSuccess', '0')) > int(after['lastSuccess']),
+                    'reopening Activity keeps monitoring')
+                assert warm.get('lastAlarm') == stopped.get('lastAlarm'), 'Activity reopen replayed old faults'
+                stop_service()  # Abrupt process loss preserves data and running=true.
+                adb('shell', 'am', 'start', '-n', PKG+'/.MainActivity')
+                restarted = wait_for(lambda s: int(s.get('lastSuccess', '0')) > int(warm['lastSuccess']),
+                    'monitoring resumes after process restart')
+                settled = wait_for(lambda s: int(s.get('lastSuccess', '0')) > int(restarted['lastSuccess']),
+                    'first and next polls complete after process restart')
+                assert settled.get('lastAlarm') == stopped.get('lastAlarm'), 'Process restart replayed old faults'
+                assert faults(settled) == faults(stopped), 'Reopening changed existing faults'
+                assert settled.get('running') == 'true' and settled.get('sound') == 'true'
+                assert_stopped_outputs()
+                print('PASS: warm reopen and process restart preserve faults without replaying audio', flush=True)
+                adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
                 phase.update(audio_stage=2, bell_at=int(time.time())-1)
-                wait_for(lambda s: any(row[3] == 'Chuông 1 hỏng' for row in faults(s))
+                fresh = wait_for(lambda s: any(row[3] == 'Chuông 1 hỏng' for row in faults(s))
                     and int(s.get('lastAlarm', '0')) > int(stopped['lastAlarm'])
                     and s.get('voiceStatus', '').startswith('Đang đọc'),
                     'new fault sounds and speaks normally after stopping previous batch')
-                tap_stop_notification('101+000')
-                wait_for(lambda s: s.get('voiceStatus') == 'Đã dừng giọng đọc', 'fault notification stop action is reusable')
+                adb('shell', 'am', 'start', '-n', PKG+'/.MainActivity')
+                tap_overview_confirmation()
+                confirmed = wait_for(lambda s: s.get('voiceStatus') == 'Đã dừng giọng đọc',
+                    'overview confirmation stops current batch')
+                assert faults(confirmed) == faults(fresh), 'Summary confirmation cleared faults'
+                assert confirmed.get('running') == 'true' and confirmed.get('sound') == 'true'
                 assert_stopped_outputs()
                 print('Notification stop service checks passed', flush=True)
                 return
