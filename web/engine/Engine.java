@@ -52,7 +52,8 @@ public final class Engine {
     raw.removeIf(e->discard.contains(e.id()));
     var eligible=historical ? List.<Rules.Event>of() : candidates.stream().filter(e->last>0&&!reset&&(fresh.contains(e.id())||pending.containsKey(e.id()))).toList();
     if (last==0||reset) pending.clear();
-    var confirmed=Rules.confirmedSelfTriggers(eligible,pending,now,0,30000);
+    // Poll cadence is independent of the original 30-second inference delay.
+    var confirmed=in.optBoolean("maintenance") ? List.<Rules.Event>of() : Rules.confirmedSelfTriggers(eligible,pending,now,0,30000);
     var existing=raw.stream().map(Rules.Event::id).collect(Collectors.toSet());
     for(var e:confirmed) if(existing.add(e.id())) raw.add(e);
     var daily=Rules.dailyRecords(route,between(raw,dayStart,now+1));

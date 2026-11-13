@@ -1,50 +1,24 @@
-# Giám sát Đường ngang — Web iPhone 1.0.0
+# Giám sát Đường ngang — gói web 1.1.0 bàn giao AI Studio
 
-Bản web độc lập từ Android 0.27.3 (`ee1affe5`). Không sửa Android/APK. Giữ giao diện tối, bốn tab, quy tắc gốc và ô kết nối nhỏ giữa tóm tắt sự cố và sơ đồ.
+Gói mới ngày 13/11/2026 thay gói tham khảo 1.0.0. Chuẩn Android 0.27.3 (`ee1affe5ea024590ce356e0f1e23aafbf17df669`); không sửa Android/APK. Dùng nguyên byte Rules.java, WebSource.java, AlertOptions.java. Chỉ đổi lịch lấy nguồn thành công thành **10 giây**; Nghi tự kích vẫn chờ **30 giây**, retry mạng **120 giây từ khi lỗi kết thúc**, stale **60 giây**, full refresh **15 phút**, lịch sử **30 ngày**. Không có luồng âm thanh liên tục.
 
-**Gửi toàn bộ ZIP cho AI Studio, kèm [AI_STUDIO_HANDOFF.md](AI_STUDIO_HANDOFF.md).** Đây là ứng dụng máy chủ + PWA, không phải bản HTML tĩnh. Dùng Dockerfile làm entrypoint Cloud Run. `npm run build` chỉ kiểm tra/đóng gói giao diện; đưa riêng `dist/` lên mạng sẽ không theo dõi được.
+Gửi `releases/DuongNgang-Web-1.1.0-source.zip` cùng SHA-256 cho AI Studio. Đọc **AI_STUDIO_HANDOFF.md**, **docs/INTEGRATION.md**, **docs/VALIDATION.md** và đặc tả đầy đủ trong ZIP trước. Thông báo, chạy nền iPhone và cấu hình máy chủ do AI Studio tích hợp/nghiệm thu. Gói có backend và PWA chạy cục bộ; build mã nguồn không đồng nghĩa đã triển khai HTTPS hay đã thử iPhone/website thật.
 
-## Chạy tại máy phát triển
+## Chạy và kiểm thử
 
-Cần Python 3.12+, Java/Javac 21, curl. ffmpeg và espeak-ng nếu dùng phiên nghe trực tiếp. Trong ZIP đã có `engine-core/`; trong kho Android, script dùng ba file Java gốc.
+Cần Python 3.12+, JDK 21 (`java` và `javac`), Node 20+, curl.
 
 ```sh
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.lock
-bash build-engine.sh
-.venv/bin/python server.py
-```
-
-Mở http://127.0.0.1:8080. SQLite chỉ dùng phát triển cục bộ. Nhập tài khoản website hợp lệ trong Cài đặt; không có mật khẩu mặc định hoặc dữ liệu giả trong sản phẩm.
-
-## Triển khai thật
-
-Đọc [deploy/README.md](deploy/README.md). Bắt buộc HTTPS, Cloud SQL PostgreSQL, khóa mã hóa và VAPID ổn định trong Secret Manager, Cloud Run CPU luôn cấp và ít nhất một instance. Máy chủ cần truy cập `visitec.vn:7447`; kiểm tra từ chính Cloud Run trước khi quy lỗi cho tài khoản. Không dùng SQLite trên đĩa tạm Cloud Run.
-
-## iPhone
-
-Safari iOS/iPadOS 16.4 trở lên → Chia sẻ → Thêm vào Màn hình chính → mở từ biểu tượng → lưu tài khoản → Bật thông báo. Việc đọc website chạy ở máy chủ 30 giây/lần; lỗi mạng thử lại sau 120 giây hoặc nút Kết nối lại. Mở lại web không đọc lại lỗi cũ.
-
-- Khi đang mở: giọng Việt thiết bị, hai tiếng chuông rồi sáu lần đọc mỗi cảnh báo; chế độ Chỉ chuông/Im lặng giữ đúng ý nghĩa. Web không điều khiển được rung iPhone qua Vibration API.
-- XÁC NHẬN nằm trong giao diện web; không giả lập nút hành động Android trên thông báo iOS.
-- Khi khóa máy: Web Push là kênh độc lập, âm/rung do iOS và quyền thông báo quản lý. Push không thể tự chạy TTS tùy ý hoặc tự bật sáng màn hình theo lệnh JavaScript.
-- Có phiên **Bắt đầu nghe cảnh báo nền** do người dùng bấm phát: MP3 trực tiếp từ máy chủ, chuông/giọng Việt máy chủ. Đây là tính năng cần nghiệm thu trên iPhone thật. iOS, đổi mạng, cuộc gọi và giới hạn request Cloud Run có thể ngắt; một phiên tối đa 55 phút, mở web và bấm phát lại khi ngắt.
-
-Chỉ “Thêm vào Màn hình chính” không cho JavaScript chạy timer 15/30 giây mãi khi khóa máy. Không được tuyên bố đã thử iPhone thật nếu chỉ chạy trình duyệt giả lập. Xem [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) và [docs/VALIDATION.md](docs/VALIDATION.md).
-
-## Kiểm thử lại
-
-Với Java 21 trên PATH, Python dùng virtualenv đã cài dependencies:
-
-```sh
+.venv/bin/pip install -r requirements.lock -r requirements-dev.txt
 bash tests/test-core.sh
 .venv/bin/python -m unittest discover -s tests -v
 node tests/test-alarm.mjs
 npm run build
+.venv/bin/python tools/test-browser.py
+.venv/bin/python server.py
 ```
 
-Chạy cùng bộ backend trên PostgreSQL bằng biến DATABASE_URL của database **kiểm thử riêng**, không dùng DB vận hành. Bài kiểm thử tạo dữ liệu fixture, không xóa dữ liệu vận hành nhưng không nên trộn namespace.
+Máy chủ cục bộ cổng 8080, SQLite trong `data/` (không đưa dữ liệu này vào Git/ZIP). Trong ZIP có `engine-core/` và `tests/core/`, không cần Android SDK/APK. Trong repository build đọc core gốc từ `../app/`. Kiểm thử trình duyệt dùng Chromium hệ thống hoặc `CHROMIUM_PATH`; `TEST_WEBKIT=1` để thử WebKit khi đã cài browser. Không có tài khoản/dữ liệu vận hành mặc định. Test dùng website HTTP fixture riêng, không tự nạp demo vào sản phẩm.
 
-Kiểm thử trình duyệt: cài `requirements-dev.txt`, cài Chromium của Playwright (hoặc đặt CHROMIUM_PATH tới Chromium hệ thống), chạy `tools/test-browser.py`. `TEST_WEBKIT=1` bật thêm WebKit khi đã cài được browser. Kiểm tra media thực trong Docker: chuyển nội dung `tests/test_audio_stream.py` qua stdin của `docker run --rm -i IMAGE python -`.
-
-Ảnh trong `docs/screenshots/` dùng dữ liệu fixture, không phải chụp tài khoản vận hành. Chưa có dữ liệu demo/fixture tự nạp trong UI sản phẩm.
+`npm run build` xuất shell ở dist; backend/Java/DB vẫn bắt buộc. `deploy/README.md` là cấu hình mẫu để AI Studio hoàn thiện theo hạ tầng của anh. Không đưa riêng dist lên host tĩnh rồi coi là đã theo dõi nền.

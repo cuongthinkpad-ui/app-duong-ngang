@@ -1,37 +1,27 @@
-# Kết quả kiểm thử — 12/11/2026
+# Kiểm chứng gói web 1.1.0 — 13/11/2026
 
-Bản web độc lập 1.0.0, quy tắc gốc từ Android commit `ee1affe5ea024590ce356e0f1e23aafbf17df669`. Không chỉnh mã Android, APK, tài liệu hay script phát hành Android. Ba file Java trong ZIP khớp nguyên byte với nguồn app; checksum từng file ở `SOURCE_SHA256.json`.
+Kết quả của phiên hiện tại; không kế thừa tuyên bố hoàn tất từ ZIP 1.0.0. Chỉ web thay đổi, không Android/APK. Rules.java, WebSource.java, AlertOptions.java so nguyên byte với commit Android 0.27.3 `ee1affe5ea024590ce356e0f1e23aafbf17df669`: khớp.
 
-## Đã chạy
-
-| Kiểm tra | Kết quả |
+| Kiểm tra thực thi | Kết quả |
 |---|---|
-| Quy tắc Java gốc | 772 tình huống qua |
-| Parser HTML và đọc website có đăng nhập/phân trang (fixture HTTP) | 16 + 39 tình huống qua |
-| Tùy chọn chuông/giọng Việt | 17 kiểm tra qua |
-| Backend Python trên SQLite cục bộ | 12 bài tích hợp qua |
-| Backend trên PostgreSQL 16 thật trong Docker | 12 bài tích hợp qua |
-| Chromium + HTTP server + Java parser thật | 320/390/430 px, đúng thứ tự summary → kết nối → sơ đồ, không tràn ngang; retry, xác nhận, chi tiết cảm biến, đổi chế độ và reload qua; không lỗi JavaScript |
-| Hủy âm đợt cũ đồng thời có đợt mới | Qua: callback đợt cũ không dừng nhầm đợt mới |
-| Docker build | Python 3.12, Java 21, ffmpeg, espeak-ng; build và khởi động bằng user không phải root |
-| Luồng media HTTP trong Docker | Luồng MP3 đang mở nhận sự cố mới không cần JavaScript; MP3 giọng Việt sáu lần đọc được ffmpeg giải mã |
-| Build giao diện/syntax | `npm run build`, JS syntax và Python compile qua |
-| ZIP | Xuất whitelist; không keystore, bản sao khóa, mật khẩu vận hành, DB hay virtualenv |
+| Core Java gốc | 772 ca nghiệp vụ đạt |
+| Parser và HTTP reader fixture | 16 + 39 ca đạt |
+| AlertOptions gốc | 17 ca đạt |
+| Backend SQLite + Java/HTTP thật cục bộ | 14 bài đạt |
+| Scheduler/suy luận mới | Nhịp thành công 10 giây; retry mạng 120 giây; pending ở giây 10/20/29, xác nhận giây 30; maintenance offline không xác nhận suy luận |
+| Dữ liệu web | AxleError lọc scope qua source; history backfill/checkpoint, không replay lỗi cũ, account isolation, CSRF, chặn static private files; endpoint audio/stream trả 404 |
+| Âm foreground | Test hủy generation cũ không dừng batch mới; recovery loại cảnh báo hết hiệu lực |
+| Chromium với server HTTP và parser thật | 320/375/390/430 px không tràn trang; thứ tự summary→kết nối→sơ đồ; retry, confirm, sáu nhóm, ba bộ lọc đường ngang, settings/mode/reload không lỗi JS |
+| Build | Java compile, npm run build, JS syntax đạt |
+| ZIP độc lập | Giải nén ngoài checkout, build core và chạy lại 772/16/39/17 + 14 backend + tests âm + npm build đạt; không cần Android SDK |
+| Máy chủ local | /health 200 ok:true; /api/session khởi tạo được; worker chạy không cần browser trong test |
 
-Backend tích hợp bao gồm: mã hóa thông tin website, tách phiên tài khoản, từ chối URL/Push endpoint ngoài phạm vi, CSRF và static path, 30 ngày/checkpoint trước prune, giữ sự cố khi lỗi TCP và retry sau 120 giây, quay lại 30 giây khi thành công, không báo lỗi cũ khi mở lại, worker tự đọc khi không có trình duyệt, dừng khi sai đăng nhập, hàng đợi Push không gửi lại, lỗi mới vẫn đủ điều kiện, nối Java lịch sử/cảm biến/đếm trục/loại trừ/Ga NL và giữ suy luận lịch sử cũ lưu suy luận backfill trước khi dựng lại checkpoint hiện tại, và danh sách tàu đúng ngày không cắt còn 100 bản tin. Phần gửi tới dịch vụ Push được mock trong kiểm thử hàng đợi; chưa phải kiểm thử Apple Push thật.
+Ảnh bốn tab/chi tiết và mất kết nối trong `screenshots/` được tạo lại từ fixture của phiên này. Không phải dữ liệu vận hành. Luồng MP3 đã xóa cả backend/UI/dependency Docker; hai WAV hữu hạn giữ cho cảnh báo foreground.
 
-## Chưa xác minh — không được đánh dấu đã đạt
+## Ranh giới bàn giao
 
-- **Website visitec.vn thật**: môi trường hiện tại từ chối domain theo chính sách mạng; fixture không thay thế kiểm tra tài khoản/báo cáo thật từ Cloud Run.
-- **Safari/WebKit**: đã thử cài WebKit bằng Playwright, máy chủ tải browser trả HTTP 403 “Domain forbidden”. Không dùng kết quả Chromium để nhận là Safari đã đạt.
-- **iPhone vật lý / màn hình khóa / Apple Web Push**: chưa có máy thực trong môi trường này. Cần chủ sở hữu hoặc người triển khai thực hiện `ACCEPTANCE.md` sau khi có URL HTTPS.
-- **Cloud Run thực tế**: chưa triển khai tài nguyên của người dùng. Gói dành cho AI Studio triển khai theo `deploy/README.md`, không có URL sản phẩm công khai ở giai đoạn bàn giao mã.
-- iOS không cho timer web/TTS tự do khi khóa máy; phiên MP3 là native media do người dùng bấm phát, có thể bị ngắt bởi iOS/cuộc gọi/đổi mạng và tối đa 55 phút/request. Push là kênh độc lập, quyền âm/rung do hệ điều hành quyết định.
+**Chưa thử trong phiên này:** tài khoản/website vận hành thật, Safari/WebKit, iPhone vật lý, Apple Push thật, PostgreSQL production, Docker image mới và Google Cloud triển khai thật. Không có URL HTTPS sản phẩm đã nghiệm thu. Những kết quả Docker/PostgreSQL/media được ghi trong biên bản cũ không được dùng để xác nhận bản 1.1.0.
 
-## Ảnh giao diện từ fixture
+Theo yêu cầu chủ sở hữu, AI Studio tích hợp thông báo, chạy nền iPhone và cấu hình máy chủ theo `INTEGRATION.md`, rồi thực hiện nghiệm thu thực tế ở đặc tả gốc và `ACCEPTANCE.md`. Gói mã nguồn build được không đồng nghĩa mọi ID nghiệm thu đã đạt. Core tests chứng minh bộ quy tắc gốc; backend/browser tests chứng minh những đường đi được liệt kê, không tự phủ toàn bộ native instrumentation hay mọi tổ hợp vận hành.
 
-![Tổng quan 390px](screenshots/chromium-overview-390.png)
-
-![Mất kết nối](screenshots/chromium-connection-lost.png)
-
-![Chi tiết cảm biến](screenshots/chromium-detail.png)
+Không sửa ngưỡng nghiệp vụ: Nghi tự kích 30 giây, retry mạng 120 giây từ kết thúc lỗi, stale 60 giây, full refresh 15 phút, retention 30 ngày. Chỉ lịch đọc nguồn đổi 30→10 giây. Bản web trước dùng stale 90 giây; bản này sửa về 60 giây theo đặc tả Android. Bổ sung nối UI bị thiếu: Đếm trục lỗi, ba filter, Áp dụng phạm vi, Ngày/phạm vi đứng trước tài khoản; sửa lọc AxleError và không xác nhận self từ maintenance/cache. Không thay core.

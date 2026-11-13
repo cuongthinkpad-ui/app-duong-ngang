@@ -24,7 +24,7 @@ try:
    assert page.locator('#confirm').is_visible();assert not page.locator('#retry').is_visible()
    page.route('**/api/state*',lambda route:route.abort());refresh();assert page.locator('#retry').is_visible();assert 'Mất kết nối' in page.locator('#connection').inner_text();page.unroute('**/api/state*');page.locator('#retry').click();page.wait_for_timeout(800);assert not page.locator('#retry').is_visible()
    assert page.locator('#summary').bounding_box()['y']<page.locator('#connection').bounding_box()['y']<page.locator('#diagram-scroll').bounding_box()['y']
-   for width in [320,390,430]:
+   for width in [320,375,390,430]:
     page.set_viewport_size({'width':width,'height':844});page.wait_for_timeout(200);assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),str(width)+' overflow'
     page.locator('#toast').evaluate('(e)=>e.hidden=true');page.screenshot(path=str(out/(name+'-overview-'+str(width)+'.png')))
    with app.db() as db:mid=db.execute('SELECT id FROM monitors').fetchone()[0]
@@ -33,16 +33,16 @@ try:
    refresh();assert page.locator('#retry').is_visible();page.locator('#retry').click();page.wait_for_timeout(500);assert app.monitor(mid)['next_due']<=time.time();page.screenshot(path=str(out/(name+'-connection-lost.png')))
    app.announce(mid,before,before['faults']);page.locator('#confirm').click();page.wait_for_timeout(500);assert len(json.loads(app.monitor(mid)['state'])['faults'])==2
    session=list(context.cookies())[0]['value'];s,_=app.session(session);assert json.loads(s['options'])['running'];assert json.loads(s['options'])['confirmedThrough']>0
-   page.locator('.navigation [data-go=crossings]').click();page.locator('[data-crossing="101+000"]').click();page.locator('#device-groups .device').first.wait_for();page.wait_for_timeout(1200)
+   page.locator('.navigation [data-go=crossings]').click();page.locator('#crossing-filter').select_option('fault');assert page.locator('#crossings-list [data-crossing]').count()==2;page.locator('#crossing-filter').select_option('clear');assert page.locator('#crossings-list [data-crossing]').count()==1;page.locator('#crossing-filter').select_option('all');page.screenshot(path=str(out/(name+'-crossings.png')));page.locator('#crossings-list [data-crossing="101+000"]').click();page.locator('#device-groups .device').first.wait_for();page.wait_for_timeout(1200)
    assert page.locator('#device-groups').inner_text().count('Cảm biến')>=1
    assert 'Điện áp cảm biến 7 < 5V' in page.locator('#device-groups').inner_text();page.screenshot(path=str(out/(name+'-detail.png')))
-   page.locator('.navigation [data-go=settings]').click();assert page.locator('#site-password').input_value()==''
-   assert page.locator('label.radio').all_text_contents()==['Giọng nói','Chỉ chuông','Im lặng']
+   page.locator('.navigation [data-go=incidents]').click();page.wait_for_timeout(800);page.screenshot(path=str(out/(name+'-incidents.png')));page.locator('.navigation [data-go=settings]').click();page.screenshot(path=str(out/(name+'-settings.png')));assert page.locator('#site-password').input_value()==''
+   assert page.locator('[data-action=stream]').count()==0;assert '10 giây' in page.locator('#page-settings').inner_text();assert page.locator('label.radio').all_text_contents()==['Giọng nói','Chỉ chuông','Im lặng']
    page.locator('input[value=silent]').check();page.locator('#save').click();page.wait_for_timeout(1000)
    s,_=app.session(session);assert json.loads(s['options'])['mode']=='silent'
    # Reload returns cached faults but does not include old notification audio.
    page.reload();page.wait_for_timeout(700);assert not errors,errors
-   print('PASS',name,'real DOM, 3 mobile widths, layout, retry, confirm, device groups, settings, reload; no JS exceptions')
+   print('PASS',name,'real DOM, 4 mobile widths, layout, retry, confirm, device groups, settings, reload; no JS exceptions')
    browser.close()
 finally:
  app.stop.set();app.pool.shutdown();server.shutdown();server.server_close();site.shutdown();site.server_close();tmp.cleanup()

@@ -1,27 +1,22 @@
-# Lệnh bàn giao cho Google AI Studio — đọc trước khi sửa
+# Bàn giao AI Studio — web 1.1.0, 13/11/2026
 
-Bạn nhận gói **DuongNgang-Web-1.0.0-source.zip**. Chủ sở hữu đã duyệt triển khai bản web riêng. Hãy mở toàn bộ dự án, chạy backend hiện có và triển khai Dockerfile lên Google Cloud Run; sau đó trả URL HTTPS hoạt động. **Không yêu cầu gửi lại app Android để suy đoán giao diện. Không thiết kế lại, không tạo demo thay thế.**
+## Yêu cầu mới nhất của chủ sở hữu
 
-## Phải giữ nguyên
+Giữ giao diện và toàn bộ nghiệp vụ Android 0.27.3. Không sửa Android/APK. Chỉ đổi chu kỳ lấy nguồn của web từ 30 xuống **10 giây**. Không đổi thuật toán/ngưỡng/mốc chờ: đặc biệt Nghi tự kích vẫn ≥30 giây và có lần đọc thành công tiếp theo, retry lỗi mạng 120 giây từ kết thúc lỗi. Bỏ hoàn toàn luồng âm thanh liên tục; không đưa lại MP3, audio im lặng hoặc keep-alive media.
 
-1. Giao diện `public/index.html`, `app.css`, `app.js`: tông tối, Tổng quan/Đường ngang/Sự cố/Cài đặt. Tóm tắt Có sự cố nhỏ gọn có **XÁC NHẬN**. Ô kết nối nhỏ nằm **giữa tóm tắt và sơ đồ**; bình thường hiện trạng thái/tải thực tế, mất kết nối mới có nút đỏ **Kết nối lại**, dưới nút ghi **Mất kết nối**. Không thêm ô phía dưới.
-2. XÁC NHẬN dừng âm của lượt hiện tại, giữ lỗi, chế độ và theo dõi; lượt mới vẫn báo. Không phát lại lỗi cũ khi mở lại. Ba nhãn đúng: **Giọng nói**, **Chỉ chuông**, **Im lặng**.
-3. Giữ Python server và Java Engine. `engine-core/Rules.java`, `WebSource.java`, `AlertOptions.java` là bản nguyên gốc lấy từ Android 0.27.3, có checksum. Không viết lại quy tắc bằng suy đoán/AI: mất lỗi gốc, gộp nhầm thiết bị hoặc xóa nhầm tàu đang chạy đều không đạt.
-4. Toàn tuyến tài khoản, Ga NL bổ sung chỉ Chosy; tàu xanh/ga vàng; 30 ngày Việt Nam; checkpoint trước xóa raw; sáu điểm loại trừ đếm trục. Backend 30 giây thành công, lỗi mạng chờ 120 giây kể từ kết thúc lần lỗi; retry tay không tạo hai lần đọc song song.
-5. Không nhúng tài khoản/mật khẩu/khóa riêng vào frontend, Git, log hay ZIP. Không sửa Android hoặc ký lại APK. Không dùng localStorage làm kho mật khẩu. Không dùng cache Service Worker chứa `/api/`.
+Đặc tả đầy đủ: `docs/BAN_GIAO_DAY_DU_VIET_LAI_WEB_0.27.3.txt`. Các câu 30 giây về nhịp lấy nguồn trong tài liệu này được yêu cầu mới thay bằng 10 giây; 30 giây nghiệp vụ suy luận giữ nguyên. Phần đề xuất media liên tục đã hủy. Không coi ZIP cũ 1.0.0 là bản đáp ứng yêu cầu hiện tại.
 
-## Triển khai cụ thể
+## Phần đã có trong gói
 
-- Dùng [deploy/README.md](deploy/README.md), dựng Docker từ thư mục giải nén chứa Dockerfile. Không chỉ chạy `npm run build` rồi host `dist/`.
-- Tạo Cloud SQL PostgreSQL riêng, Secret Manager cho `APP_KEY`, `VAPID_PRIVATE_KEY`, `DATABASE_URL`, service account chỉ đọc các secret cần thiết và Cloud SQL Client.
-- Cloud Run: CPU always allocated (`--no-cpu-throttling`), min/max instance 1, timeout 3600, bộ nhớ 2 GiB, concurrency 40, HTTPS đúng `PUBLIC_ORIGIN`. Không tạo loop trong trình duyệt để giả lập worker.
-- Xác minh truy cập website từ backend. Nếu lỗi DNS/TCP/7447, kiểm tra nguồn mạng/log trạng thái đã làm sạch; **không bảo chủ sở hữu cấu hình lại tài khoản khi chưa xác định nguyên nhân**.
-- Không tự thêm `/reset` xóa cookie hoặc thay khóa VAPID khi cập nhật. Giữ hostname, DB và secret qua các revision để không mất tài khoản/đăng ký Push.
+Backend Python bền vững, adapter Java gọi nguyên core chuẩn, ASP.NET parser/đọc nguồn, scheduler 10/120, giao diện bốn tab, sáu nhóm thiết bị, Đếm trục lỗi, lịch sử/ga/phạm vi, queue cảnh báo và adapter Web Push tham khảo. Quy tắc không viết lại bằng logic rút gọn. Foreground có chuông/TTS tiếng Việt và XÁC NHẬN. Đọc kết quả thực tế của phiên tại `docs/VALIDATION.md`; không dùng biên bản cũ để nhận đã thử bản này.
 
-## Nghiệm thu trước khi nói “xong”
+## AI Studio phải tích hợp
 
-Chạy [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md). Cung cấp URL HTTPS, ảnh giao diện, kết quả kiểm thử, revision triển khai, kết quả kiểm tra dữ liệu thật và các mục iPhone chưa thử. Gửi thông báo thử bằng cơ chế Web Push thật; kiểm tra khi PWA bị đóng và khóa màn hình.
+1. Thông báo: nối queue/seq với dịch vụ Push, lưu subscription, xác nhận/mute và chống trùng; đọc hợp đồng `docs/INTEGRATION.md`.
+2. Chạy nền iPhone: worker máy chủ luôn chạy, PWA/permission/Web Push theo iOS thật. Không chạy timer 10 giây trong Service Worker. Không cam kết TTS/rung/action khóa màn hình khi chưa kiểm chứng. Không dùng luồng âm thanh liên tục.
+3. Máy chủ: HTTPS/origin, PostgreSQL, APP_KEY/VAPID ổn định, backup, always-on CPU/worker, allowlist nguồn/Push, giám sát và tải thực. Có Dockerfile và mẫu triển khai; AI Studio lựa chọn/cấu hình tài nguyên thật.
+4. Kiểm thử website có tài khoản hợp lệ trên hạ tầng thật; kiểm tra iPhone vật lý và các ID còn chưa thử trong ma trận gốc. Không xin mật khẩu trong source/chat; nhập qua UI/secret settings.
 
-Đối với iPhone, không hứa “100% chạy ngầm đọc giọng/rung như Android”. Web Push cần iOS 16.4+, cài PWA và quyền. Giọng đọc khóa máy là **phiên phát MP3 người dùng chủ động bật**, không phải TTS trong Service Worker; request tối đa 55 phút, có thể bị iOS/ngắt mạng dừng. Phải thử thật trên iPhone trước khi xác nhận. Không dùng audio im lặng làm bằng chứng rằng timer JavaScript chạy nền.
+## Cách tiếp tục
 
-Nếu cần sửa để phù hợp môi trường triển khai, chỉ sửa cấu hình/adapter có lỗi đã chứng minh, ghi diff cụ thể và chạy lại kiểm thử; giữ nguyên giao diện và hành vi đã bàn giao.
+Giải nén ZIP, chạy đầy đủ các lệnh README, đọc hợp đồng API trước khi nối frontend/backend khác. Giữ ba core Java nguyên bản; nếu port ngôn ngữ phải đối chiếu toàn bộ fixture gốc. Không sửa gói APK. Giao URL HTTPS, revision triển khai, ảnh và kết quả thật sau khi tích hợp. Gói mã build/test cục bộ chưa phải nghiệm thu vận hành thực địa.

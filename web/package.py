@@ -3,7 +3,7 @@
 import hashlib,json,shutil,zipfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent
-FILES=['server.py','database.py','audio.py','requirements.txt','requirements.lock','requirements-dev.txt','build-engine.sh','Dockerfile','.dockerignore','.gitignore','package.json','README.md','AI_STUDIO_HANDOFF.md']
+FILES=['server.py','database.py','requirements.txt','requirements.lock','requirements-dev.txt','build-engine.sh','Dockerfile','.dockerignore','.gitignore','package.json','README.md','AI_STUDIO_HANDOFF.md']
 DIRS=['public','engine','tools','deploy','docs','tests']
 def bundle():
     out=ROOT/'.bundle/DuongNgang-Web';shutil.rmtree(out.parent,ignore_errors=True);out.mkdir(parents=True)
@@ -18,9 +18,11 @@ def bundle():
         (out/'tests/core').mkdir(exist_ok=True)
         for name in ['RulesTest.java','ParserTest.java','WebSourceReadTest.java','AlertOptionsTest.java']:shutil.copy2(coretests/name,out/'tests/core'/name)
     shutil.copy2(ROOT/'package.py',out/'package.py')
+    spec=ROOT.parent/'handoff-web/BAN_GIAO_DAY_DU_VIET_LAI_WEB_0.27.3.txt'
+    if spec.is_file():shutil.copy2(spec,out/'docs'/spec.name)
     sums={str(p.relative_to(out)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(out.rglob('*')) if p.is_file()}
     (out/'SOURCE_SHA256.json').write_text(json.dumps(sums,indent=2)+'\n')
-    target=ROOT/'releases/DuongNgang-Web-1.0.0-source.zip';target.parent.mkdir(exist_ok=True)
+    target=ROOT/'releases/DuongNgang-Web-1.1.0-source.zip';target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target,'w',zipfile.ZIP_DEFLATED) as z:
         for p in sorted(out.rglob('*')):
             if p.is_file():z.write(p,Path('DuongNgang-Web')/p.relative_to(out))

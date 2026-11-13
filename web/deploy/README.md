@@ -19,17 +19,17 @@ Mật khẩu phải percent-encode ký tự đặc biệt. Không in chuỗi k�
 ## 2. Build từ thư mục ZIP đã giải nén
 
 ```sh
-gcloud builds submit --tag REGION-docker.pkg.dev/PROJECT/REPOSITORY/duong-ngang-web:1.0.0 .
+gcloud builds submit --tag REGION-docker.pkg.dev/PROJECT/REPOSITORY/duong-ngang-web:1.1.0 .
 ```
 
-Thay các tên PROJECT/REGION/REPOSITORY bằng tài nguyên thật. Dockerfile tự biên dịch đúng Java core bằng Java 21, cài ffmpeg/espeak-ng. Không deploy thư mục `dist/` riêng.
+Thay các tên PROJECT/REGION/REPOSITORY bằng tài nguyên thật. Dockerfile tự biên dịch đúng Java core bằng Java 21. Không deploy thư mục `dist/` riêng.
 
 ## 3. Deploy và đặt đúng origin
 
 Lần đầu triển khai riêng tư, đặt PUBLIC_ORIGIN tạm `https://pending.invalid`, sau đó lấy URL thật và cập nhật trước khi cấp truy cập công khai. Điều này tránh đoán URL Cloud Run. VAPID_SUBJECT phải là email quản trị thật dạng `mailto:...`.
 
 ```sh
-gcloud run deploy SERVICE --image REGION-docker.pkg.dev/PROJECT/REPOSITORY/duong-ngang-web:1.0.0 --region REGION --service-account RUNTIME_SERVICE_ACCOUNT --no-allow-unauthenticated --min-instances 1 --max-instances 1 --no-cpu-throttling --timeout 3600 --concurrency 40 --cpu 2 --memory 2Gi --add-cloudsql-instances PROJECT:REGION:INSTANCE --set-secrets APP_KEY=rail-app-key:1,VAPID_PRIVATE_KEY=rail-vapid-key:1,DATABASE_URL=rail-database-url:1 --set-env-vars PUBLIC_ORIGIN=https://pending.invalid,VAPID_SUBJECT=mailto:ADMIN_EMAIL,WEBSITE_HOSTS=visitec.vn
+gcloud run deploy SERVICE --image REGION-docker.pkg.dev/PROJECT/REPOSITORY/duong-ngang-web:1.1.0 --region REGION --service-account RUNTIME_SERVICE_ACCOUNT --no-allow-unauthenticated --min-instances 1 --max-instances 1 --no-cpu-throttling --timeout 300 --concurrency 40 --cpu 2 --memory 2Gi --add-cloudsql-instances PROJECT:REGION:INSTANCE --set-secrets APP_KEY=rail-app-key:1,VAPID_PRIVATE_KEY=rail-vapid-key:1,DATABASE_URL=rail-database-url:1 --set-env-vars PUBLIC_ORIGIN=https://pending.invalid,VAPID_SUBJECT=mailto:ADMIN_EMAIL,WEBSITE_HOSTS=visitec.vn
 ```
 
 Lấy `status.url` bằng `gcloud run services describe SERVICE --region REGION --format='value(status.url)'`. Cập nhật biến bằng `gcloud run services update SERVICE --region REGION --update-env-vars PUBLIC_ORIGIN=ACTUAL_HTTPS_ORIGIN`. Sau khi kiểm tra cấu hình và `/health`, cấp invoker public theo chính sách dự án. Không thay các secret phiên bản gốc khi chỉ cập nhật code.
@@ -38,6 +38,6 @@ Không dùng request-based CPU hoặc min=0: worker sẽ bị đóng băng khi n
 
 ## 4. Kiểm tra ngoài cloud
 
-Kiểm tra backend truy cập visitec.vn:7447 trước; ở môi trường tạo mã hiện tại domain bị chặn nên chưa xác minh website thật. Không thay ID/mật khẩu chỉ để chữa TCP timeout. Lưu tài khoản qua HTTPS UI, chờ ít nhất hai lần đọc thật; thực hiện toàn bộ `docs/ACCEPTANCE.md` trên iPhone.
+Kiểm tra backend truy cập visitec.vn:7447 trước; phiên này chưa kiểm thử bằng tài khoản vận hành nên chưa xác minh website thật. Không thay ID/mật khẩu chỉ để chữa TCP timeout. Lưu tài khoản qua HTTPS UI, chờ ít nhất hai lần đọc thật; thực hiện toàn bộ `docs/ACCEPTANCE.md` trên iPhone.
 
-Web Push dùng endpoint Apple/Google/Mozilla/Microsoft. Cho phép HTTPS outbound đến các endpoint tương ứng. PWA cập nhật code giữ domain/VAPID/DB, không `/reset` tự động. Phiên MP3 request tối đa 55 phút; Cloud Run timeout 3600 là cấu hình bắt buộc cho phiên này, không bảo đảm iOS sẽ giữ phiên xuyên đêm.
+Web Push dùng endpoint Apple/Google/Mozilla/Microsoft. Cho phép HTTPS outbound đến các endpoint tương ứng. PWA cập nhật code giữ domain/VAPID/DB, không `/reset` tự động. Không dùng luồng MP3 liên tục. AI Studio tích hợp và nghiệm thu Push/chạy nền iPhone theo docs/INTEGRATION.md.

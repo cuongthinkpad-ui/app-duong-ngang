@@ -48,7 +48,7 @@ class Backend(unittest.TestCase):
         start=time.time();self.app.poll(mid);m=self.app.monitor(mid);s=self.state()
         self.assertTrue(s['connectionLost']);self.assertEqual(s['lastSuccess'],initial['lastSuccess']);self.assertEqual(len(s['faults']),1)
         self.assertGreaterEqual(m['next_due'],start+120);self.assertLess(m['next_due'],time.time()+121)
-        self.app.retry(mid);self.assertLessEqual(self.app.monitor(mid)['next_due'],time.time());Website.down=False;self.app.poll(mid);self.assertFalse(self.state()['connectionLost']);self.assertLess(self.app.monitor(mid)['next_due'],time.time()+31)
+        self.app.retry(mid);self.assertLessEqual(self.app.monitor(mid)['next_due'],time.time());Website.down=False;self.app.poll(mid);self.assertFalse(self.state()['connectionLost']);self.assertGreater(self.app.monitor(mid)['next_due'],time.time()+8);self.assertLessEqual(self.app.monitor(mid)['next_due'],time.time()+10)
     def test_only_new_alerts_confirmation_keeps_faults(self):
         Website.rows=[event('old',at=now_ms()-10000)];mid=self.config();self.app.poll(mid);self.assertEqual(self.state()['seq'],0)
         Website.rows.append(event('new','Đèn 1 hỏng',at=now_ms()-1000));self.app.poll(mid);s=self.state();self.assertGreater(s['seq'],0)
@@ -126,6 +126,26 @@ class Backend(unittest.TestCase):
         result=self.app.engine(dict(op='analyze',now=now_ms(),route=['100+000','101+000','102+000'],events=rows,previous={}))
         self.assertEqual(len(result['trains']),125);self.assertNotIn('yesterday',[e['id'] for e in result['trains']])
 
+    def test_ten_second_poll_keeps_thirty_second_self_trigger_delay(self):
+        now=now_ms();arrival=event('missing-source','Tàu lẻ',at=now-1000,red=False)
+        request=dict(op='analyze',now=now,user='fixture',route=['100+000','101+000','102+000'],events=[arrival],previous={'lastSuccess':now-10000},added=[arrival['id']])
+        result=self.app.engine(request)
+        self.assertIn(arrival['id'],result['pending'])
+        for seconds in (10,20,29,30):
+            request.update(now=now+seconds*1000,previous=dict(result,lastSuccess=now),added=[])
+            result=self.app.engine(request)
+            self.assertEqual(any(e['id']=='self:missing-source' for e in result['derived']),seconds==30)
+        request.update(now=now+40000,maintenance=True)
+        self.assertEqual(self.app.engine(request)['derived'],[],'offline maintenance is not a successful source read')
+
+    def test_snapshot_with_axle_statistics_and_scope(self):
+        mid=self.config();state=json.loads(self.app.monitor(mid)['state'])
+        state['axles']=[dict(source=event('counts'),sensor=1,standard=40,observed=50,delta=10,dailyCount=1,missing=0,extra=10)]
+        with self.app.db() as db:db.execute('UPDATE monitors SET state=? WHERE id=?',(encode(state),mid))
+        self.assertEqual(self.state()['axles'][0]['sensor'],1)
+        opts=json.loads(self.s['options']);opts.update(rangeFrom='100+000',rangeTo='100+000');self.s['options']=encode(opts)
+        self.assertEqual(self.state()['axles'],[])
+
     def test_security_url_and_push(self):
         for url in ['http://169.254.169.254/','file:///etc/passwd','https://visitec.vn.evil/','http://user:pass@127.0.0.1/','http://127.0.0.1/?token=x']:
             with self.assertRaises(PublicError):self.app.validate_url(url)
@@ -146,7 +166,7 @@ class Backend(unittest.TestCase):
             request=urllib.request.Request(base+'/api/config',data=b'{}',headers={'Content-Type':'application/json'})
             with self.assertRaises(urllib.error.HTTPError) as e:op.open(request)
             self.assertEqual(e.exception.code,403)
-            for path in ['/server.py','/../data/app.key','/data/app.key']:
+            for path in ['/api/audio/stream','/server.py','/../data/app.key','/data/app.key']:
                 with self.assertRaises(urllib.error.HTTPError):op.open(base+path)
             r=op.open(base+'/');self.assertIn("frame-ancestors 'none'",r.headers['Content-Security-Policy']);self.assertIn(b'X\xc3\x81C NH\xe1\xba\xacN',r.read())
         finally:http.shutdown();http.server_close()

@@ -12,9 +12,9 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 from database import connect
-from audio import Audio
 
 ROOT=Path(__file__).resolve().parent
+POLL_SECONDS=10
 ZONE=ZoneInfo('Asia/Ho_Chi_Minh')
 def now_ms(): return int(time.time()*1000)
 def today(): return datetime.now(ZONE).date()
@@ -67,8 +67,6 @@ class App:
         self.pool=concurrent.futures.ThreadPoolExecutor(max_workers=4,thread_name_prefix='website-reader')
         self.engine_slots=threading.BoundedSemaphore(2)
         self.owner=secrets.token_hex(16)
-        self.audio=Audio(ROOT,self.data)
-        self.audio_slots=threading.BoundedSemaphore(16)
         self.active=set();self.active_lock=threading.Lock()
         with self.db() as db:
             db.executescript('''
@@ -173,7 +171,7 @@ class App:
                 result.update(lastSuccess=now_ms(),lastFull=now_ms(),status='Đã cập nhật',connectionLost=False,loading=False)
                 result['alarmBasis']=[e['id'] for e in result['faults']]
                 with self.db() as db:
-                    db.execute('UPDATE monitors SET state=?,next_due=? WHERE id=?',(encode(result),time.time()+30,mid))
+                    db.execute('UPDATE monitors SET state=?,next_due=? WHERE id=?',(encode(result),time.time()+POLL_SECONDS,mid))
                     db.execute('INSERT OR IGNORE INTO days VALUES(?,?)',(mid,today().isoformat()))
         options=json.loads(session['options']);options.update({k:body[k] for k in ('mode','rangeFrom','rangeTo','monitorDate') if k in body})
         self.validate_options(options,self.monitor(mid))
@@ -223,13 +221,14 @@ class App:
 
     def poll(self,mid):
         with self.lock(mid):
+            started=time.time()
             monitor=self.monitor(mid);previous=json.loads(monitor['state']);creds=self.open(monitor['credentials'])
             loading=dict(previous,loading=True,lastAttempt=now_ms())
             with self.db() as db:db.execute('UPDATE monitors SET state=? WHERE id=?',(encode(loading),mid))
             try:
                 # Maintenance even while offline, with checkpoint persisted before deletion.
                 before=self.event_rows(mid)
-                maintained=self.analyze(mid,before,previous,previous.get('route',[]),creds['user'])
+                maintained=self.analyze(mid,before,previous,previous.get('route',[]),creds['user'],maintenance=True)
                 maintained.update({k:previous.get(k) for k in ('lastSuccess','status','connectionLost','coverage','alarmBasis','lastFull')});maintained['loading']=True
                 self.update_analysis(mid,maintained,previous,before)
                 known=[e['id'] for e in before if not e['id'].startswith(('self:','axle:'))]
@@ -245,7 +244,7 @@ class App:
                 self.update_analysis(mid,result,previous,all_rows)
                 with self.db() as db:
                     db.execute('INSERT OR IGNORE INTO days VALUES(?,?)',(mid,today().isoformat()))
-                    db.execute('UPDATE monitors SET next_due=? WHERE id=?',(time.time()+30,mid))
+                    db.execute('UPDATE monitors SET next_due=? WHERE id=?',(max(time.time(),started+POLL_SECONDS),mid))
                 old_faults=set(previous.get('alarmBasis') or [e['id'] for e in previous.get('faults',[])])
                 new=[e for e in result['faults'] if e['id'] not in old_faults] if previous.get('lastSuccess') else []
                 result['alarmBasis']=[e['id'] for e in result['faults']]
@@ -254,7 +253,7 @@ class App:
             except PublicError as error:
                 state=json.loads(self.monitor(mid)['state']);state.update(loading=False,connectionLost=error.kind=='network' or previous.get('connectionLost',False),status=str(error),lastAttempt=loading['lastAttempt'])
                 with self.db() as db:
-                    db.execute('UPDATE monitors SET state=?,next_due=? WHERE id=?',(encode(state),time.time()+(120 if error.kind=='network' else 30),mid))
+                    db.execute('UPDATE monitors SET state=?,next_due=? WHERE id=?',(encode(state),time.time()+(120 if error.kind=='network' else POLL_SECONDS),mid))
                     if error.kind=='auth':
                         for s in db.execute('SELECT id,options FROM sessions WHERE monitor=?',(mid,)).fetchall():
                             options=json.loads(s['options']);options['running']=False;db.execute('UPDATE sessions SET options=? WHERE id=?',(encode(options),s['id']))
@@ -335,7 +334,7 @@ class App:
 
     def snapshot(self,session,query):
         options=json.loads(session['options'])
-        if not session['monitor']:return {'configured':False,'options':options,'seq':0,'audioStreamAvailable':self.audio.available}
+        if not session['monitor']:return {'configured':False,'options':options,'seq':0}
         m=self.monitor(session['monitor']);creds=self.open(m['credentials']);state=json.loads(m['state'])
         selected=(query.get('day') or [options.get('monitorDate') or today().isoformat()])[0]
         day=self.valid_day(selected)
@@ -350,21 +349,24 @@ class App:
             end=int(datetime.combine(day+timedelta(days=1),datetime.min.time(),ZONE).timestamp()*1000)-1
             if not historical:end=now_ms()
             rows=[e for e in self.event_rows(m['id']) if e['at']<=end]
-            derived=self.engine({'op':'analyze','now':end,'historical':historical,'user':creds['user'],'route':state.get('route',[]),'events':rows,'previous':state,'crossing':(query.get('crossing') or [''])[0]})
+            derived=self.engine({'op':'analyze','now':end,'historical':historical,'maintenance':not historical,'user':creds['user'],'route':state.get('route',[]),'events':rows,'previous':state,'crossing':(query.get('crossing') or [''])[0]})
             for key in ('faults','incidents','segments','occupancies','trains','devices','groups','axles','records'):state[key]=derived[key]
         route=state.get('route',[])
         open_ids={e['id'] for e in state.get('faults',[])}
         for key in ('faults','records','trains','axles'):
-            if key in state:state[key]=[e for e in state[key] if self.in_scope(e,options,route)]
+            if key in state:state[key]=[e for e in state[key] if self.in_scope(e.get("source",e),options,route)]
         state['incidents']=[e for e in state.get('incidents',[]) if self.in_scope(e['fault'],options,route)]
-        alerts=[e for e in alerts if e['id'] in open_ids and self.in_scope(e,options,route)]
+        alerts=[e for e in alerts if e['id'] in open_ids and self.in_scope(e.get("source",e),options,route)]
         public={k:v for k,v in state.items() if k not in ('checkpoint','checkpointAt','travel','pending','derived','discard','floor','baseline','coverage','alarmBasis','ok')}
-        public.update(configured=True,options=options,settings={'url':creds['url'],'user':creds['user']},seq=seq,alerts=[] if historical else alerts,selectedDay=selected,historyReady=ready,historical=historical,pushEnabled=push,serverTime=now_ms(),audioStreamAvailable=self.audio.available)
+        public.update(configured=True,options=options,settings={'url':creds['url'],'user':creds['user']},seq=seq,alerts=[] if historical else alerts,selectedDay=selected,historyReady=ready,historical=historical,pushEnabled=push,serverTime=now_ms())
         return public
     def history(self,session,day):
         self.valid_day(day);mid=session['monitor'];self.rate('history:'+session['id'],4)
         credentials=self.open(self.monitor(mid)['credentials'])
         data=self.engine({'op':'fetch',**credentials,'day':day})
+        prior=self.engine({'op':'fetch',**credentials,'day':(self.valid_day(day)-timedelta(days=1)).isoformat()})
+        if data['route']!=prior['route']:raise PublicError('Tuyến thay đổi giữa các ngày. Dữ liệu cũ được giữ.')
+        data['events']=prior['events']+data['events']
         with self.lock(mid):
             monitor=self.monitor(mid);credentials=self.open(monitor['credentials'])
             self.save_rows(mid,data['events'])
@@ -421,7 +423,6 @@ class Handler(BaseHTTPRequestHandler):
                 session,cookie=self.session()
                 if path=='/api/session':return self.reply(200,{'csrf':session['csrf'],'vapidPublicKey':app.vapid_public,'configured':bool(session['monitor'])},cookie=cookie)
                 if path=='/api/state':return self.reply(200,app.snapshot(session,parse_qs(urlsplit(self.path).query)),cookie=cookie)
-                if path=='/api/audio/stream':return self.audio_stream(session)
                 raise PublicError('Không tìm thấy chức năng.',404)
             target=ROOT/'public'/('index.html' if path=='/' else path.lstrip('/'))
             target=target.resolve()
@@ -431,44 +432,6 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200,target.read_bytes(),kind,cache='no-cache' if target.suffix in ('.html','.js','.webmanifest') else 'public, max-age=3600')
         except PublicError as e:self.reply(e.status,{'error':str(e)})
         except Exception:self.reply(500,{'error':'Chưa hoàn tất yêu cầu. Thử lại sau.'})
-    def audio_stream(self,session):
-        app=self.server.app
-        if not session['monitor']:raise PublicError('Lưu tài khoản trước khi nghe cảnh báo.',409)
-        if not app.audio.available:raise PublicError('Máy chủ chưa có bộ giọng Việt/âm thanh.',503)
-        if not app.audio_slots.acquire(blocking=False):raise PublicError('Đã đủ số phiên nghe. Thử lại sau.',429)
-        try:
-            with app.db() as db:
-                cursor=db.execute('SELECT COALESCE(MAX(seq),0) FROM notices WHERE session=?',(session['id'],)).fetchone()[0]
-                options=json.loads(db.execute('SELECT options FROM sessions WHERE id=?',(session['id'],)).fetchone()[0]);token=secrets.token_urlsafe(16);options['streamToken']=token
-                db.execute('UPDATE sessions SET options=? WHERE id=?',(encode(options),session['id']))
-            silence=app.audio.silence()
-            self.send_response(200);self.send_header('Content-Type','audio/mpeg');self.send_header('Cache-Control','no-store');self.send_header('Transfer-Encoding','chunked');self.send_header('X-Content-Type-Options','nosniff');self.end_headers()
-            deadline=time.monotonic()+3300  # Cloud Run request timeout is 3600 seconds.
-            while not app.stop.is_set() and time.monotonic()<deadline:
-                with app.db() as db:
-                    current=db.execute('SELECT options FROM sessions WHERE id=? AND expires>?',(session['id'],time.time())).fetchone()
-                    notices=db.execute('SELECT seq,payload FROM notices WHERE session=? AND seq>? AND created>? ORDER BY seq LIMIT 1',(session['id'],cursor,time.time()-300)).fetchall()
-                if not current:break
-                options=json.loads(current[0])
-                if options.get('streamToken')!=token or not options.get('running') or options.get('mode')=='silent' or options.get('monitorDate') not in ('',today().isoformat()):break
-                data=silence
-                if notices:
-                    notice=notices[0];cursor=notice['seq'];state=json.loads(app.monitor(session['monitor'])['state'])
-                    open_ids={e['id'] for e in state.get('faults',[])}
-                    alerts=[e for e in json.loads(notice['payload']) if e['id'] in open_ids and app.in_scope(e,options,state.get('route',[]))]
-                    if alerts and cursor>int(options.get('confirmedThrough',0)):data=app.audio.clip(alerts,state.get('announcements',{}),options.get('mode','voice'))
-                # Pace MP3 bytes at 32 kbit/s; native media playback continues without page timers.
-                for offset in range(0,len(data),4096):
-                    with app.db() as db:active=db.execute('SELECT options FROM sessions WHERE id=?',(session['id'],)).fetchone()
-                    if not active:break
-                    active=json.loads(active[0])
-                    if active.get('streamToken')!=token or not active.get('running') or active.get('mode')!=options.get('mode') or (notices and cursor<=int(active.get('confirmedThrough',0))):break
-                    chunk=data[offset:offset+4096]
-                    self.wfile.write(f'{len(chunk):X}\r\n'.encode()+chunk+b'\r\n');self.wfile.flush()
-                    if app.stop.wait(len(chunk)/4000):break
-            self.wfile.write(b'0\r\n\r\n');self.wfile.flush()
-        except (BrokenPipeError,ConnectionResetError,OSError):pass
-        finally:app.audio_slots.release();self.close_connection=True
     def do_POST(self):
         app=self.server.app
         try:
