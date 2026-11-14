@@ -1,5 +1,11 @@
 # Nhật ký trao đổi và các quyết định của chủ dự án
 
+## Bổ sung — 0.27.4
+
+Chủ dự án đã duyệt hai sửa đổi hiển thị trên Android chính: chấm đường ngang đỏ khi còn sự cố chưa khôi phục và trở về màu sơ đồ khi hết lỗi; danh sách thay giờ bên phải bằng Tốt khi đã tải đủ dữ liệu và không lỗi, hoặc N sự cố màu đỏ theo lỗi còn tồn tại. Ga giữ nguyên, đoạn tàu/mũi tên xanh. Không sửa nghiệp vụ, âm thanh hay lịch đọc Android.
+
+Đã xác định nhánh Android 0.27.3 tại `ee1affe` trên `codex/0.27-notification-stop`, tách khỏi main cũ 0.26 và nhánh web. Chủ dự án cung cấp lại hai tệp khóa ký riêng; khôi phục ngoài Git, xác minh chứng chỉ gốc và thử cài đè giữ dữ liệu. Bản mới 0.27.4/versionCode 31; chi tiết kiểm chứng ở [UI_REVIEW_0.27.4.md](UI_REVIEW_0.27.4.md).
+
 ## Bổ sung — 0.27.3
 
 Sau các phản hồi connect timeout và dữ liệu cũ từ 14:00, chủ dự án yêu cầu app chạy nền tự thử kết nối lại mỗi 2 phút khi lỗi. Đầu trang Tổng quan phải có nút nhỏ màu đỏ **Kết nối lại**, bên dưới cảnh báo **Mất kết nối**. Triển khai nút thử ngay, giữ dữ liệu và trở về nhịp đọc 30 giây sau khi cập nhật thành công; không thay URL/tài khoản, không tự xóa dữ liệu để chữa lỗi mạng. Xem [biên bản 0.27.3](UI_REVIEW_0.27.3.md).

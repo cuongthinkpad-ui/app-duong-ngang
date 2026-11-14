@@ -1,4 +1,6 @@
-# Đường Ngang — Android 0.27.3
+# Đường Ngang — Android 0.27.4
+
+**[Bàn giao và kiểm chứng 0.27.4](docs/UI_REVIEW_0.27.4.md)** — chấm đường ngang đỏ khi còn sự cố chưa khôi phục; hết lỗi trở về màu sơ đồ. Danh sách thay giờ bên phải bằng **N sự cố** màu đỏ hoặc **Tốt** khi đã tải đủ dữ liệu. Giữ ga, đoạn tàu, nghiệp vụ, âm thanh và lịch đọc của Android 0.27.3. [Tải APK ký gốc](downloads/DuongNgang-0.27.4.apk).
 
 **[Bàn giao và kiểm chứng 0.27.3](docs/UI_REVIEW_0.27.3.md)** — tự thử kết nối lại sau 2 phút khi lỗi, kể cả chạy nền. Ô nhỏ **giữa CÓ SỰ CỐ và sơ đồ** hiện trạng thái kết nối/tiến trình tải; chỉ khi mất kết nối mới hiện nút đỏ **Kết nối lại** và cảnh báo **Mất kết nối**. Khi đọc được dữ liệu sẽ ẩn cảnh báo và trở về chu kỳ 30 giây. Thu gọn phần trên để dành chỗ cho ô này; không thêm mục phía dưới. Giữ dữ liệu cũ và các nút **XÁC NHẬN**.
 

@@ -32,6 +32,16 @@ public final class RouteStoreChecks extends Instrumentation {
 
   @Override
   public void onStart() {
+    if (upgradeMode.equals("fault-display")) {
+      Bundle result = new Bundle();
+      try {
+        result.putString("stream", new FaultDisplayChecks(this).run() + " fault display checks passed\n");
+        finish(-1, result);
+      } catch (Throwable failure) {
+        result.putString("stream", "FAILED: " + failure + "\n"); finish(0, result);
+      }
+      return;
+    }
     if (upgradeMode.startsWith("upgrade-")) {
       Bundle result = new Bundle();
       try {

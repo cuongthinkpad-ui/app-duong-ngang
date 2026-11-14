@@ -1912,7 +1912,9 @@ public class MainActivity extends Activity {
       reading.setEllipsize(android.text.TextUtils.TruncateAt.END);
       words.addView(reading);
       entry.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
-      entry.addView(text(events.isEmpty() ? "—" : time(events.get(0).at()), 11, MUTED, false));
+      entry.addView(text(fault ? faults.size() + " sự cố"
+          : viewDataComplete() ? "Tốt" : "Chưa tải đủ dữ liệu",
+          11, fault ? RED : viewDataComplete() ? GREEN : MUTED, fault));
       TextView more = text("  ›", 24, MUTED, false);
       entry.addView(more);
       touch(entry, () -> openCrossing(point));
@@ -1930,15 +1932,18 @@ public class MainActivity extends Activity {
     }
   }
 
+  private boolean viewDataComplete() {
+    return demo || dayLoaded(viewDay()) && (historicalView()
+        ? store.dayComplete(viewDay()) : displayedLastSuccess() > 0);
+  }
+
   private String deviceReading(List<Rules.Event> faults, String group) {
     List<String> active = new ArrayList<>();
     for (Rules.Event fault : faults)
       if (Rules.deviceGroup(fault).equals(group))
         active.add(fault.text() + " · " + time(fault.at()));
     if (!active.isEmpty()) return String.join("\n", active);
-    return demo || dayLoaded(viewDay()) && (historicalView()
-        ? store.dayComplete(viewDay()) : displayedLastSuccess() > 0)
-        ? "Tốt" : "Chưa tải đủ dữ liệu";
+    return viewDataComplete() ? "Tốt" : "Chưa tải đủ dữ liệu";
   }
 
   private void deviceRow(
@@ -2178,6 +2183,7 @@ public class MainActivity extends Activity {
     private final int[] occupied = new int[points.size()];
     private final boolean[] lit = new boolean[points.size()];
     private List<Rules.TrackSegment> segments = List.of();
+    private final Set<String> faultPoints = new HashSet<>();
 
     RouteView() {
       super(MainActivity.this);
@@ -2191,6 +2197,8 @@ public class MainActivity extends Activity {
 
     void updateOccupancy() {
       Arrays.fill(occupied, 0);
+      faultPoints.clear();
+      for (Rules.Event fault : activeFaults()) faultPoints.add(Rules.km(fault.crossing()));
       Rules.TravelState state = diagramState();
       segments = Rules.trackSegments(route(), state);
       for (Rules.Occupancy report : Rules.approachingCrossings(state)) {
@@ -2295,7 +2303,8 @@ public class MainActivity extends Activity {
         p.setStyle(Paint.Style.FILL);
         p.setColor(SURFACE);
         c.drawCircle(x, y, dp(5.5f), p);
-        p.setColor(station ? WARNING : lit[i] ? reportColor : 0xFF63728F);
+        p.setColor(station ? WARNING : faultPoints.contains(Rules.km(km)) ? RED
+            : lit[i] ? reportColor : 0xFF63728F);
         if (station) c.drawRoundRect(x - dp(4), y - dp(4), x + dp(4), y + dp(4), dp(2), dp(2), p);
         else c.drawCircle(x, y, dp(3.5f), p);
         p.setTypeface(
