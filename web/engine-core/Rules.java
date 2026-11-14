@@ -1,0 +1,1311 @@
+package vn.duongngang.monitor;
+
+import java.util.*;
+
+/** Domain rules independent of Android. All timestamps are epoch milliseconds. */
+public final class Rules {
+  public static final int POLL_SECONDS = 30;
+  private static final Set<Long> AXLE_EXEMPT_CHAINAGES =
+      Set.of(280500L, 307507L, 309056L, 320445L, 338900L, 343350L);
+  private static final java.util.regex.Pattern POINT =
+      java.util.regex.Pattern.compile(
+          "(?iu)^(?:km\\s*)?(\\d+)\\s*\\+\\s*(\\d{1,3})(?:\\s*\\(\\s*([^()]+?)\\s*\\))?$");
+  private static final java.util.regex.Pattern WHITESPACE = java.util.regex.Pattern.compile("\\s+");
+  private static final java.util.regex.Pattern FUSE_BLOWN = java.util.regex.Pattern.compile("cầu chì 50\\s*a bị đứt");
+  private static final java.util.regex.Pattern FUSE_RECOVERED = java.util.regex.Pattern.compile("cầu chì 50\\s*a khôi phục tốt");
+  private static final java.util.regex.Pattern DC_OVER = java.util.regex.Pattern.compile("nguồn dc\\s*>\\s*29\\s*v");
+  private static final java.util.regex.Pattern DC_RECOVERED = java.util.regex.Pattern.compile("nguồn 24\\s*v khôi phục tốt");
+  private static final java.util.regex.Pattern VOLTAGE_DEVICE =
+      java.util.regex.Pattern.compile("điện áp\\s+cảm biến\\s*(\\d+)");
+  private static final java.util.regex.Pattern NUMBERED_DEVICE =
+      java.util.regex.Pattern.compile(
+          "(cảm biến|cần chắn|chuông|đèn)(?:\\s+(?:điện|cảnh báo|tín hiệu|đỏ|số))*\\s*(\\d+)");
+  private static final java.util.regex.Pattern DEVICE_STATE =
+      java.util.regex.Pattern.compile("\\s+(?:hỏng|khôi phục|mất|bất thường|bị)\\b");
+  private static final java.util.regex.Pattern BARRIER_ACTIVITY =
+      java.util.regex.Pattern.compile(
+          "(?iu)^cần\\s+chắn(?:\\s+(?:số\\s+)?\\d+)?\\s+đã\\s+(hạ|nâng)$");
+
+  /** Fixture only: operational routes use the full account inventory and confirmed supplements. */
+  public static final Route DEMO_ROUTE =
+      new Route(
+          List.of(
+              "312+111",
+              "313+456",
+              "313+800",
+              "314+550",
+              "319+200 (Vi)",
+              "320+445",
+              "320+957",
+              "321+780",
+              "327+327",
+              "328+325",
+              "330+00 (YX)",
+              "332+350",
+              "334+830"));
+
+  /** Fifteen Vietnamese calendar dates, including today. */
+  public static long historyCutoff(long now) {
+    return java.time.Instant.ofEpochMilli(now).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+        .toLocalDate().minusDays(29).atStartOfDay(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+        .toInstant().toEpochMilli();
+  }
+
+  /** Display grouping only; never changes equipment faults or the train diagram. */
+  /** Empty selection follows the Vietnamese calendar, including month/year transitions. */
+  public static java.time.LocalDate monitoringDay(String selection, long now) {
+    var today = java.time.Instant.ofEpochMilli(now).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toLocalDate();
+    try {
+      var chosen = java.time.LocalDate.parse(selection);
+      return chosen.isAfter(today) || chosen.isBefore(today.minusDays(29)) ? today : chosen;
+    } catch (java.time.DateTimeException invalid) { return today; }
+  }
+
+  public record EventGroup(String crossing, int direction, boolean completed, List<Event> events) {}
+
+  public static List<EventGroup> crossingHistory(List<Event> input, String crossing) {
+    List<Event> ordered = new ArrayList<>();
+    Set<String> seen = new HashSet<>();
+    for (Event event : input)
+      if (km(event.crossing()).equals(km(crossing)) && seen.add(event.id())) ordered.add(event);
+    ordered.sort(Comparator.comparingLong(Event::at).thenComparingInt(Rules::reportPhase)
+        .thenComparing(Event::id));
+    List<EventGroup> groups = new ArrayList<>();
+    List<Event> current = new ArrayList<>();
+    int currentDirection = 0;
+    boolean completed = false, passedOnly = false;
+    for (Event event : ordered) {
+      int arrival = event.red() ? 0 : direction(event.text());
+      int passage = event.red() ? 0 : passedDirection(event.text());
+      boolean reset = !event.red() && evidenceReset(event);
+      // Explicit arrivals always begin a fresh train, even if the last one never restored.
+      // A passage without an arrival can start an incomplete visit, but never absorb a
+      // previous completed train or a visit travelling in the opposite direction.
+      boolean starts = arrival != 0
+          || passage != 0 && (currentDirection == 0 || completed || passedOnly
+              || currentDirection != passage);
+      boolean separateLooseCluster = currentDirection == 0 && !current.isEmpty()
+          && (event.at() - current.get(current.size() - 1).at() > 5 * 60000L
+              || event.at() - current.get(0).at() > 15 * 60000L);
+      if ((starts || separateLooseCluster) && !current.isEmpty()) {
+        groups.add(new EventGroup(km(crossing), currentDirection, completed, List.copyOf(current)));
+        current.clear();
+        completed = false;
+      }
+      if (starts) {
+        currentDirection = arrival != 0 ? arrival : passage;
+        passedOnly = arrival == 0;
+      } else if (completed && (!reset
+          || event.at() - current.get(current.size() - 1).at() > 5 * 60000L)) {
+        groups.add(new EventGroup(km(crossing), currentDirection, true, List.copyOf(current)));
+        current.clear();
+        currentDirection = 0;
+        completed = false;
+        passedOnly = false;
+      }
+      current.add(event);
+      if (reset && currentDirection != 0) completed = true;
+    }
+    if (!current.isEmpty())
+      groups.add(new EventGroup(km(crossing), currentDirection, completed, List.copyOf(current)));
+    Collections.reverse(groups);
+    return groups;
+  }
+
+  public static boolean isPoint(String raw) {
+    return raw != null && POINT.matcher(raw.trim()).matches();
+  }
+
+  public static String stationCode(String raw) {
+    if (raw == null) return "";
+    var match = POINT.matcher(raw.trim());
+    return match.matches() && match.group(3) != null ? match.group(3).trim() : "";
+  }
+
+  public static boolean isStation(String raw) {
+    return !stationCode(raw).isEmpty();
+  }
+
+  /** Compact display name only; preserve station keys in routes, reports and journey caches. */
+  public static String stationLabel(String raw) {
+    String code = stationCode(raw);
+    return code.equalsIgnoreCase("Nghi Long") && chainage(km(raw)) == 303350L ? "NL" : code;
+  }
+
+  private static long chainage(String raw) {
+    var match = POINT.matcher(raw);
+    if (!match.matches()) throw new IllegalArgumentException("Lý trình không hợp lệ: " + raw);
+    return Math.addExact(
+        Math.multiplyExact(Long.parseLong(match.group(1)), 1000), Integer.parseInt(match.group(2)));
+  }
+
+  /** Owner-confirmed new station absent from the website inventory; never invent report rows. */
+  public static Route accountRoute(String user, Route source) {
+    if (user == null || !user.trim().equalsIgnoreCase("Chosy") || source.points().isEmpty())
+      return source;
+    // Prefer the website's own point/name if it later publishes this location.
+    for (String point : source.points()) if (chainage(point) == 303350L) return source;
+    List<String> points = new ArrayList<>(source.points());
+    points.add("303+350 (Nghi Long)");
+    return new Route(points);
+  }
+
+  /** Immutable account-specific topology. A station breaks adjacency in both directions. */
+  public static final class Route {
+    private final List<String> points, crossings;
+
+    public Route(Collection<String> raw) {
+      Set<String> unique = new LinkedHashSet<>();
+      Map<Long, String> locations = new HashMap<>();
+      for (String value : raw) {
+        if (!isPoint(value)) throw new IllegalArgumentException("Lý trình không hợp lệ: " + value);
+        String point = km(value);
+        String existing = locations.putIfAbsent(chainage(point), point);
+        if (existing != null && !existing.equals(point))
+          throw new IllegalArgumentException("Danh sách điểm mâu thuẫn tại Km " + point);
+        unique.add(point);
+      }
+      List<String> ordered = new ArrayList<>(unique);
+      ordered.sort(Comparator.comparingLong(Rules::chainage));
+      points = Collections.unmodifiableList(ordered);
+      List<String> road = new ArrayList<>();
+      for (String point : points) if (!isStation(point)) road.add(point);
+      crossings = Collections.unmodifiableList(road);
+    }
+
+    public List<String> points() {
+      return points;
+    }
+
+    public List<String> crossings() {
+      return crossings;
+    }
+
+    public String first() {
+      return crossings.isEmpty() ? "" : crossings.get(0);
+    }
+
+    public String last() {
+      return crossings.isEmpty() ? "" : crossings.get(crossings.size() - 1);
+    }
+
+    public boolean validRange(String from, String to) {
+      return crossings.contains(km(from))
+          && crossings.contains(km(to))
+          && crossings.indexOf(km(from)) <= crossings.indexOf(km(to));
+    }
+
+    public boolean inRange(String point, String from, String to) {
+      if (!validRange(from, to)) return false;
+      int i = crossings.indexOf(km(point));
+      return i >= crossings.indexOf(km(from)) && i <= crossings.indexOf(km(to));
+    }
+
+    public List<String> routeSpan(String from, String to) {
+      if (!validRange(from, to)) return List.of();
+      return new ArrayList<>(points.subList(points.indexOf(km(from)), points.indexOf(km(to)) + 1));
+    }
+
+    /** Neighbor for drawing, including stations; null represents the edge of the account route. */
+    public String adjacent(String crossing, int step) {
+      if (step != 1 && step != -1 || !crossings.contains(km(crossing))) return null;
+      int neighbor = points.indexOf(km(crossing)) + step;
+      return neighbor < 0 || neighbor >= points.size() ? null : points.get(neighbor);
+    }
+
+    public String upstream(String crossing, int direction) {
+      String previous = adjacent(crossing, -direction);
+      return previous == null || isStation(previous) ? null : previous;
+    }
+  }
+
+  public record Event(
+      String id, long at, String crossing, String text, boolean red, List<String> counts) {
+    public Event {
+      red = knownFault(text) || red && !knownRecovery(text);
+    }
+  }
+
+  private static String normalizedReport(String text) {
+    String t = WHITESPACE.matcher(text.trim()).replaceAll(" ").toLowerCase(Locale.ROOT);
+    return t.endsWith(".") || t.endsWith("!") ? t.substring(0, t.length() - 1).trim() : t;
+  }
+
+  public static boolean knownFault(String text) {
+    String t = normalizedReport(text);
+    return t.startsWith("cầu chì") && FUSE_BLOWN.matcher(t).matches()
+        || t.startsWith("nguồn") && DC_OVER.matcher(t).matches();
+  }
+
+  private static boolean knownRecovery(String text) {
+    String t = normalizedReport(text);
+    return t.startsWith("cầu chì") && FUSE_RECOVERED.matcher(t).matches()
+        || t.startsWith("nguồn") && DC_RECOVERED.matcher(t).matches();
+  }
+
+  public static String km(String raw) {
+    if (raw == null) return "";
+    var match = POINT.matcher(raw.trim());
+    if (!match.matches()) return raw.replaceFirst("(?i)^Km\\s*", "").trim();
+    return match.group(1)
+        + "+"
+        + match.group(2)
+        + (match.group(3) == null ? "" : " (" + match.group(3).trim() + ")");
+  }
+
+  public static int direction(String text) {
+    String t = text.toLowerCase(Locale.ROOT).trim();
+    return t.equals("tàu lẻ") ? 1 : t.equals("tàu chẵn") ? -1 : 0;
+  }
+
+  public record Occupancy(String crossing, int direction, long at) {}
+
+  /**
+   * Per-crossing occupation from reports, not inferred GPS positions or unique train identities.
+   */
+  public static List<Occupancy> occupancies(Route route, List<Event> input) {
+    List<Event> ordered = new ArrayList<>(input);
+    ordered.sort(Comparator.comparingLong(Event::at).thenComparing(Event::id));
+    Map<String, Occupancy> occupied = new HashMap<>();
+    Set<String> seen = new HashSet<>();
+    for (Event e : ordered) {
+      String point = km(e.crossing());
+      if (!seen.add(e.id()) || !route.crossings().contains(point)) continue;
+      int direction = direction(e.text());
+      if (direction != 0) occupied.put(point, new Occupancy(point, direction, e.at()));
+      else if (e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")) occupied.remove(point);
+      // Tail clearing CB3/CB4 and raised barriers do not release the full monitored area.
+    }
+    List<Occupancy> result = new ArrayList<>();
+    for (String point : route.crossings())
+      if (occupied.containsKey(point)) result.add(occupied.get(point));
+    return result;
+  }
+
+  public static int passedDirection(String text) {
+    String t = text.toLowerCase(Locale.ROOT).trim().replaceAll("\\s+", " ");
+    if (t.equals("tàu lẻ đã qua đường ngang")) return 1;
+    if (t.equals("tàu chẵn đã qua đường ngang")) return -1;
+    return 0;
+  }
+
+  /** The operator's reset ends a self-trigger, not unrelated hardware faults. */
+  public static boolean isManualRecovery(String text) {
+    return WHITESPACE.matcher(text.trim()).replaceAll(" ").equalsIgnoreCase("Ấn nút Phục hồi");
+  }
+
+  /** Exact local operator commands; never interpret hardware recovery as an operator action. */
+  public static boolean endsTrain(String text) {
+    String normalized = WHITESPACE.matcher(text.trim()).replaceAll(" ").toLowerCase(Locale.ROOT);
+    return Set.of("ấn nút phục hồi", "ấn nút duy tu", "ấn nút cảnh báo", "khôi phục hệ thống")
+        .contains(normalized);
+  }
+
+  /** Ordered crossings in one station-bounded section, nearest first. */
+  private static List<String> upstreamSection(Route route, String point, int direction) {
+    List<String> result = new ArrayList<>();
+    String next = route.upstream(point, direction);
+    while (next != null) {
+      result.add(next);
+      next = route.upstream(next, direction);
+    }
+    return result;
+  }
+
+  private static int reportPhase(Event event) {
+    if (direction(event.text()) != 0) return 0;
+    if (event.red()) return 1;
+    if (barrierActivity(event) != 0) return 2;
+    if (passedDirection(event.text()) != 0) return 3;
+    return evidenceReset(event) ? 4 : 5;
+  }
+
+  private static final String MOTION_JOURNEY = "travel:motion:";
+
+  /** One source arrival, kept until both source release and downstream arrival are known. */
+  public record Journey(
+      String id,
+      String from,
+      String to,
+      int direction,
+      long at,
+      boolean passed,
+      boolean released,
+      boolean reached,
+      String successorId,
+      long lastAt,
+      boolean selfTriggered,
+      boolean stalled) {
+    public Journey(String id, String from, String to, int direction, long at, boolean passed,
+        boolean released, boolean reached, String successorId, long lastAt, boolean selfTriggered) {
+      this(id, from, to, direction, at, passed, released, reached, successorId, lastAt, selfTriggered, false);
+    }
+    public Journey(
+        String id,
+        String from,
+        String to,
+        int direction,
+        long at,
+        boolean passed,
+        boolean released,
+        boolean reached,
+        String successorId,
+        long lastAt) {
+      this(id, from, to, direction, at, passed, released, reached, successorId, lastAt, false);
+    }
+
+    public Journey(
+        String id,
+        String from,
+        String to,
+        int direction,
+        long at,
+        boolean passed,
+        boolean released,
+        boolean reached) {
+      this(id, from, to, direction, at, passed, released, reached, null, at);
+    }
+  }
+
+  public record TravelState(List<Journey> journeys) {
+    public TravelState {
+      journeys = List.copyOf(journeys);
+    }
+
+    public static TravelState empty() {
+      return new TravelState(List.of());
+    }
+  }
+
+  public record Between(String from, String to, int direction, long at) {}
+
+  /** Exactly one incoming or outgoing interval per unmatched journey, with nullable route edges. */
+  public record TrackSegment(String from, String to, int direction) {}
+
+  public static List<TrackSegment> trackSegments(Route route, TravelState state) {
+    Set<TrackSegment> segments = new LinkedHashSet<>();
+    for (Journey j : state.journeys()) {
+      // The downstream report has taken ownership of this train's one visible interval.
+      if (j.reached() || !route.crossings().contains(j.from())) continue;
+      if (!j.passed() && !j.released())
+        segments.add(
+            new TrackSegment(route.adjacent(j.from(), -j.direction()), j.from(), j.direction()));
+      // Crossing-to-crossing continuity survives source restoration. Station/route-exit
+      // intervals last only until the adjoining crossing restores; station logs are ignored.
+      else if (j.passed() && (!j.released() || j.to() != null))
+        segments.add(
+            new TrackSegment(j.from(), route.adjacent(j.from(), j.direction()), j.direction()));
+    }
+    return new ArrayList<>(segments);
+  }
+
+  public static List<Between> betweenCrossings(TravelState state) {
+    Map<String, Between> result = new LinkedHashMap<>();
+    for (Journey j : state.journeys())
+      if (j.passed() && !j.reached() && j.to() != null) {
+        String key = j.from() + "|" + j.to() + "|" + j.direction();
+        result.put(key, new Between(j.from(), j.to(), j.direction(), j.at()));
+      }
+    return new ArrayList<>(result.values());
+  }
+
+  public static List<Occupancy> approachingCrossings(TravelState state) {
+    List<Occupancy> result = new ArrayList<>();
+    for (Journey j : state.journeys())
+      if (!j.reached() && !j.passed() && !j.released())
+        result.add(new Occupancy(j.from(), j.direction(), j.at()));
+    return result;
+  }
+
+  private static Journey progress(
+      Journey j, boolean passed, boolean released, boolean reached, String successor, long at) {
+    return new Journey(
+        j.id(),
+        j.from(),
+        j.to(),
+        j.direction(),
+        j.at(),
+        passed,
+        released,
+        reached,
+        successor,
+        Math.max(j.lastAt(), at),
+        j.selfTriggered(), j.stalled());
+  }
+
+  private static Journey latestJourney(
+      Map<String, Journey> journeys, String point, int direction, boolean unreleasedOnly) {
+    Journey result = null;
+    for (Journey j : journeys.values())
+      if (j.from().equals(point)
+          && (direction == 0 || j.direction() == direction)
+          && (!unreleasedOnly || !j.released())
+          && (result == null || j.at() >= result.at())) result = j;
+    return result;
+  }
+
+  private static boolean claimed(Map<String, Journey> journeys, String id) {
+    for (Journey j : journeys.values()) if (id.equals(j.successorId())) return true;
+    return false;
+  }
+
+  private static boolean freshUpstream(
+      Map<String, Journey> journeys, String point, int direction, long after, long before) {
+    for (Journey j : journeys.values())
+      if (!j.reached()
+          && point.equals(j.to())
+          && j.direction() == direction
+          && j.at() > after
+          && j.at() <= before) return true;
+    return false;
+  }
+
+  /** An explicit arrival takes the newest source on its directed interval and retires older
+   * unmatched trails there immediately. Sources after this arrival remain following trains.
+   * Activity-only evidence retains single-source matching and cannot perform this cleanup.
+   */
+  private static void linkPredecessor(Route route, Map<String, Journey> journeys, Journey current) {
+    boolean actualTrain = !current.id().startsWith(MOTION_JOURNEY);
+    if (!actualTrain && claimed(journeys, current.id())) return;
+    Journey previous = null;
+    List<String> upstream = actualTrain ? upstreamSection(route, current.from(), current.direction())
+        : List.of();
+    for (Journey j : journeys.values())
+      if ((current.from().equals(j.to())
+              || actualTrain && upstream.contains(j.from()) && !j.id().startsWith(MOTION_JOURNEY))
+          && current.direction() == j.direction()
+          && !j.reached()
+          && j.at() <= current.at()
+          && (previous == null || (actualTrain
+              ? upstream.indexOf(j.from()) < upstream.indexOf(previous.from())
+                  || j.from().equals(previous.from())
+                      && (current.from().equals(j.to()) ? j.at() > previous.at() : j.at() < previous.at())
+              : j.at() < previous.at())))
+        previous = j;
+    if (previous == null) return;
+    for (Journey j : new ArrayList<>(journeys.values()))
+      if (previous.from().equals(j.from()) && current.direction() == j.direction()
+          && !j.reached() && (j.id().equals(previous.id())
+              || actualTrain && current.from().equals(previous.to()) && j.at() <= previous.at()))
+        journeys.put(j.id(),
+            progress(j, j.passed(), j.released(), true, current.id(), current.at()));
+  }
+
+  /** Barrier activity may locate an existing incoming train; it cannot create one on its own. */
+  private static Journey movementJourney(Route route, Map<String, Journey> journeys, Event event) {
+    String point = km(event.crossing());
+    if (latestJourney(journeys, point, 0, true) != null) return null;
+    Journey local = latestJourney(journeys, point, 0, false), incoming = null;
+    int direction = 0;
+    for (Journey j : journeys.values()) {
+      if (j.reached()
+          || j.selfTriggered()
+          || !point.equals(j.to())
+          || j.at() > event.at()
+          || local != null && j.at() <= local.at()
+          || !j.from().equals(route.upstream(point, j.direction()))) continue;
+      if (direction != 0 && direction != j.direction()) return null;
+      direction = j.direction();
+      if (incoming == null || j.at() < incoming.at()) incoming = j;
+    }
+    return incoming == null
+        ? null
+        : new Journey(
+            MOTION_JOURNEY + event.id(),
+            point,
+            route.upstream(point, -direction),
+            direction,
+            event.at(),
+            false,
+            false,
+            false);
+  }
+
+  /** Activity-only ownership must yield to the real approach, even after an activity reset. */
+  private static boolean promoteMovement(
+      Route route, Map<String, Journey> journeys, Event event, int direction) {
+    String point = km(event.crossing());
+    Journey motion = latestJourney(journeys, point, direction, false);
+    if (motion == null
+        || !motion.id().startsWith(MOTION_JOURNEY)
+        || motion.at() > event.at()
+        || (motion.reached() || motion.passed() && !motion.released())
+            && event.at() > motion.lastAt()
+        || freshUpstream(journeys, point, direction, motion.at(), event.at())) return false;
+    boolean afterActivityReset = motion.released() && event.at() > motion.lastAt();
+    journeys.remove(motion.id());
+    Journey current =
+        new Journey(
+            event.id(),
+            point,
+            motion.to(),
+            direction,
+            event.at(),
+            motion.passed() && !afterActivityReset,
+            motion.released() && !afterActivityReset,
+            motion.reached(),
+            motion.successorId(),
+            Math.max(event.at(), motion.lastAt()),
+            motion.selfTriggered(), motion.stalled());
+    journeys.put(current.id(), current);
+    for (Journey j : new ArrayList<>(journeys.values()))
+      if (motion.id().equals(j.successorId()))
+        journeys.put(
+            j.id(), progress(j, j.passed(), j.released(), j.reached(), current.id(), event.at()));
+    // A tentative activity match may have selected the old trail. The explicit report
+    // must still take ownership of the newest eligible real source.
+    linkPredecessor(route, journeys, current);
+    linkEarlierDownstream(journeys, current);
+    return true;
+  }
+
+  /**
+   * Confirmed traversal also reconciles delayed reports after a downstream crossing has
+   * taken ownership. Sources newer than the current arrival remain following trains.
+   */
+  private static void reconcileTraversal(Map<String, Journey> journeys, Journey current, long at) {
+    if (current.selfTriggered()) return;
+    Journey evidence = null;
+    for (Journey j : journeys.values())
+      if (current.from().equals(j.to())
+          && j.direction() == current.direction()
+          && !j.selfTriggered()
+          && j.at() <= current.at()
+          && j.lastAt() <= at
+          && (!j.reached() || current.id().equals(j.successorId()))
+          && (evidence == null || j.at() > evidence.at())) evidence = j;
+    if (evidence == null) return;
+    for (Journey j : new ArrayList<>(journeys.values()))
+      if (!j.reached()
+          && current.from().equals(j.to())
+          && j.direction() == current.direction()
+          && j.at() <= evidence.at())
+        journeys.put(j.id(), progress(j, j.passed(), true, true, current.id(), at));
+  }
+
+  /** Neighboring approach sensors can report in the reverse order while both zones overlap. */
+  private static void linkEarlierDownstream(Map<String, Journey> journeys, Journey current) {
+    if (current.to() == null || current.reached()) return;
+    Journey downstream = null;
+    for (Journey j : journeys.values())
+      if (current.to().equals(j.from())
+          && current.direction() == j.direction()
+          && !j.passed()
+          && !j.released()
+          && !j.reached()
+          && j.at() <= current.at()
+          // Only reconcile nearby detection timestamps; do not merge a later train into
+          // an old unfinished visit. This does not expire an existing pending interval.
+          && current.at() - j.at() <= 120000L
+          && !claimed(journeys, j.id())
+          && (downstream == null || j.at() > downstream.at())) downstream = j;
+    if (downstream != null)
+      journeys.put(
+          current.id(),
+          progress(
+              current, current.passed(), current.released(), true, downstream.id(), current.at()));
+  }
+
+  /** New directional evidence at a crossing supersedes older opposite intervals touching it. */
+  private static void retireContradictions(
+      Route route, Map<String, Journey> journeys, String point, int direction, long at) {
+    for (Journey j : new ArrayList<>(journeys.values())) {
+      if (j.reached() || j.direction() == direction || j.at() > at) continue;
+      String neighbor = route.adjacent(j.from(), j.passed() ? j.direction() : -j.direction());
+      if (point.equals(j.from()) || point.equals(neighbor))
+        journeys.put(j.id(), progress(j, j.passed(), true, true, null, at));
+    }
+  }
+
+  /** Keep pending trains and bounded completion records, so late passages cannot resurrect them. */
+  private static TravelState compactJourneys(Map<String, Journey> journeys) {
+    Map<String, Journey> latestClosed = new HashMap<>();
+    Set<String> live = new HashSet<>();
+    for (Journey j : journeys.values()) {
+      if (!j.reached()) live.add(j.id());
+      else {
+        String key = j.from() + "|" + j.direction();
+        Journey previous = latestClosed.get(key);
+        if (previous == null || j.at() >= previous.at()) latestClosed.put(key, j);
+      }
+    }
+    List<Journey> result = new ArrayList<>();
+    for (Journey j : journeys.values())
+      if (!j.reached()
+          || latestClosed.get(j.from() + "|" + j.direction()) == j
+          || (j.successorId() != null && live.contains(j.successorId()))) result.add(j);
+    return new TravelState(result);
+  }
+
+  /** Event-based continuity with explicit successor links and completion records, not GPS. */
+  public static TravelState travelState(Route route, TravelState initial, List<Event> input) {
+    List<Event> ordered = new ArrayList<>(input);
+    ordered.sort(
+        Comparator.comparingLong(Event::at)
+            .thenComparingInt(Rules::reportPhase)
+            .thenComparingLong(
+                e ->
+                    isPoint(e.crossing())
+                        ? chainage(km(e.crossing())) * (direction(e.text()) == -1 ? -1 : 1)
+                        : 0)
+            .thenComparing(Event::id));
+    Map<String, Journey> journeys = new LinkedHashMap<>();
+    for (Journey j : initial.journeys())
+      if ((j.direction() == 1 || j.direction() == -1)
+          && route.crossings().contains(j.from())
+          && Objects.equals(j.to(), route.upstream(j.from(), -j.direction())))
+        journeys.put(j.id(), j);
+    Set<String> seen = new HashSet<>(journeys.keySet());
+    for (Event e : ordered) {
+      String point = km(e.crossing());
+      if (!seen.add(e.id()) || !route.crossings().contains(point)) continue;
+      if (isSelfTrigger(e)) {
+        Journey j = journeys.get(e.id().substring(5));
+        if (j != null && j.from().equals(point))
+          journeys.put(
+              j.id(),
+              new Journey(
+                  j.id(),
+                  j.from(),
+                  j.to(),
+                  j.direction(),
+                  j.at(),
+                  j.passed(),
+                  j.released(),
+                  j.reached(),
+                  j.successorId(),
+                  j.lastAt(),
+                  true, j.stalled()));
+        continue;
+      }
+      if (e.red()) {
+        // Remember an interrupted train across checkpoint/restart; never clear the original fault.
+        String lower = e.text().toLowerCase(Locale.ROOT);
+        if (lower.contains("tàu")) {
+          Journey affected = null;
+          for (Journey j : journeys.values())
+            if (j.from().equals(point) && !j.reached() && j.at() <= e.at()
+                && (affected == null || j.at() > affected.at())) affected = j;
+          if (affected != null)
+            journeys.put(affected.id(), new Journey(affected.id(), affected.from(), affected.to(),
+                affected.direction(), affected.at(), affected.passed(), affected.released(),
+                affected.reached(), affected.successorId(), e.at(), affected.selfTriggered(), true));
+        }
+        continue;
+      }
+      int d = direction(e.text()), passed = passedDirection(e.text());
+      Journey local = latestJourney(journeys, point, 0, false);
+      // A known interrupted visit can coexist with a following normal train at this point.
+      // End that interrupted visit, never erase the newer independent arrival instead.
+      if (endsTrain(e.text())) {
+        Journey interrupted = null;
+        for (Journey j : journeys.values())
+          if (j.from().equals(point) && !j.reached() && j.at() <= e.at()
+              && (j.stalled() || j.selfTriggered())
+              && (interrupted == null || j.at() > interrupted.at())) interrupted = j;
+        if (interrupted != null) local = interrupted;
+      }
+      if (endsTrain(e.text()) && (!e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+          || local != null && (!local.passed() || local.selfTriggered() || local.stalled()))) {
+        if (local != null && !local.reached() && local.at() <= e.at())
+          journeys.put(local.id(), progress(local, local.passed(), true, true, local.successorId(), e.at()));
+      } else if (barrierActivity(e) != 0) {
+        Journey movement = movementJourney(route, journeys, e);
+        if (movement != null) {
+          journeys.put(movement.id(), movement);
+          linkPredecessor(route, journeys, movement);
+          linkEarlierDownstream(journeys, movement);
+        }
+      } else if (d != 0) {
+        retireContradictions(route, journeys, point, d, e.at());
+        if (promoteMovement(route, journeys, e, d)) continue;
+        for (Journey j : new ArrayList<>(journeys.values()))
+          if (j.from().equals(point) && !j.released()) {
+            if (j.reached() || !j.passed() || j.direction() != d)
+              journeys.put(j.id(), progress(j, j.passed(), true, true, j.successorId(), e.at()));
+            else journeys.put(j.id(), progress(j, true, true, false, null, e.at()));
+          }
+        Journey current =
+            new Journey(e.id(), point, route.upstream(point, -d), d, e.at(), false, false, false);
+        journeys.put(current.id(), current);
+        linkPredecessor(route, journeys, current);
+        linkEarlierDownstream(journeys, current);
+      } else if (passed != 0 || e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")) {
+        Journey current = latestJourney(journeys, point, passed, passed == 0);
+        if (current != null && current.at() > e.at()) continue;
+        if (passed != 0
+            && current != null
+            && (current.released() || current.passed() || current.reached())
+            && freshUpstream(journeys, point, passed, current.at(), e.at())) current = null;
+        if (current == null && passed != 0) {
+          Journey latest = latestJourney(journeys, point, 0, false);
+          if (latest != null
+              && latest.direction() != passed
+              && !freshUpstream(journeys, point, passed, latest.at(), e.at())) continue;
+          current =
+              new Journey(
+                  e.id(),
+                  point,
+                  route.upstream(point, -passed),
+                  passed,
+                  e.at(),
+                  true,
+                  false,
+                  false);
+          journeys.put(current.id(), current);
+        }
+        if (current == null) continue;
+        if (!current.released()) {
+          if (!current.reached()) {
+            if (passed != 0) retireContradictions(route, journeys, point, passed, e.at());
+            linkPredecessor(route, journeys, current);
+            linkEarlierDownstream(journeys, current);
+          }
+          // The next crossing may already own the visible interval before this passage.
+          // That must not suppress reconciliation of the older incoming trail.
+          reconcileTraversal(journeys, current, e.at());
+          current = journeys.get(current.id());
+        }
+        boolean released = current.released() || passed == 0;
+        boolean closed = current.reached() || (released && current.to() == null);
+        journeys.put(
+            current.id(), progress(current, true, released, closed, current.successorId(), e.at()));
+      }
+      if (journeys.size() > route.crossings().size() * 4 + 16) {
+        List<Journey> retained = compactJourneys(journeys).journeys();
+        journeys.clear();
+        for (Journey j : retained) journeys.put(j.id(), j);
+      }
+    }
+    return compactJourneys(journeys);
+  }
+
+  /** Owner-specified exclusions from the app's six-sensor axle comparison, across accounts. */
+  public static boolean isAxleExempt(String crossing) {
+    return isPoint(crossing) && AXLE_EXEMPT_CHAINAGES.contains(chainage(km(crossing)));
+  }
+
+  public static String axleNote(Event event) {
+    return !isAxleExempt(event.crossing())
+            && event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+        ? axleNote(event.counts())
+        : "";
+  }
+
+  public static String axleNote(List<String> raw) {
+    AxleComparison comparison = compareAxles(raw);
+    if (comparison == null) return "";
+    if (comparison.standard() == null) return "cảm biến đếm trục không đồng nhất, lỗi";
+    List<String> notes = new ArrayList<>();
+    for (int i = 0; i < 6; i++) {
+      int delta = comparison.counts().get(i) - comparison.standard();
+      if (Math.abs(delta) >= 3) notes.add("CB" + (i + 1) + " " + axleDifference(delta));
+    }
+    return String.join(" · ", notes);
+  }
+
+  public record AxleComparison(List<Integer> counts, Integer standard) {}
+
+  /** null means invalid/voltage data; a null standard means a tied comparison. */
+  public static AxleComparison compareAxles(List<String> raw) {
+    if (raw.size() != 6) return null;
+    List<Integer> values = new ArrayList<>();
+    Map<Integer, Integer> frequencies = new HashMap<>();
+    for (String s : raw) {
+      if (!s.trim().matches("\\d+")) return null;
+      try {
+        int n = Integer.parseInt(s.trim());
+        values.add(n);
+        frequencies.merge(n, 1, Integer::sum);
+      } catch (NumberFormatException e) {
+        return null;
+      }
+    }
+    int max = Collections.max(frequencies.values());
+    List<Integer> modes = new ArrayList<>();
+    frequencies.forEach(
+        (n, c) -> {
+          if (c == max) modes.add(n);
+        });
+    return new AxleComparison(
+        List.copyOf(values), modes.size() == 1 && max >= 2 ? modes.get(0) : null);
+  }
+
+  public static String axleDifference(int delta) {
+    return (delta > 0 ? "thừa " : "thiếu ") + Math.abs(delta) + " trục";
+  }
+
+  public record AxleError(
+      Event source,
+      int sensor,
+      int standard,
+      int observed,
+      int delta,
+      int dailyCount,
+      long missing,
+      long extra) {}
+
+  /** Count distinct restore measurements per crossing, sensor and Vietnamese calendar day. */
+  public static List<AxleError> axleErrors(Route route, List<Event> input) {
+    List<Event> ordered = new ArrayList<>(input);
+    ordered.sort(Comparator.comparingLong(Event::at).thenComparing(Event::id));
+    Set<String> seen = new HashSet<>();
+    Map<String, long[]> totals = new HashMap<>();
+    List<AxleError> out = new ArrayList<>();
+    for (Event e : ordered) {
+      if (e.red()
+          || isAxleExempt(e.crossing())
+          || !e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+          || !route.crossings().contains(km(e.crossing()))
+          || !seen.add(e.id())) continue;
+      AxleComparison c = compareAxles(e.counts());
+      if (c == null || c.standard() == null) continue;
+      long day = faultBaseline(0, e.at());
+      for (int i = 0; i < 6; i++) {
+        int delta = c.counts().get(i) - c.standard();
+        if (Math.abs(delta) < 3) continue;
+        String key = day + "|" + km(e.crossing()) + "|" + i;
+        long[] count = totals.computeIfAbsent(key, k -> new long[3]);
+        if (Math.abs(delta) >= 3) count[0]++;
+        if (delta < 0) count[1] -= delta;
+        else count[2] += delta;
+        out.add(
+            new AxleError(
+                e,
+                i + 1,
+                c.standard(),
+                c.counts().get(i),
+                delta,
+                (int) count[0],
+                count[1],
+                count[2]));
+      }
+    }
+    return out;
+  }
+
+  public static boolean isAxleFault(Event event) {
+    String id = event.id();
+    return id.length() >= 7
+        && id.startsWith("axle:")
+        && id.charAt(5) >= '1'
+        && id.charAt(5) <= '6'
+        && id.charAt(6) == ':';
+  }
+
+  public static boolean isGenerated(Event event) {
+    return isSelfTrigger(event) || isAxleFault(event);
+  }
+
+  public static boolean isExcludedAxleFault(Event event) {
+    return isAxleFault(event) && isAxleExempt(event.crossing());
+  }
+
+  public static boolean isLargeAxleFault(Event event) {
+    if (!isAxleFault(event)) return false;
+    var comparison = compareAxles(event.counts());
+    return comparison != null
+        && comparison.standard() != null
+        && Math.abs(comparison.counts().get(event.id().charAt(5) - '1') - comparison.standard())
+            >= 10;
+  }
+
+  /** Sixth error and each single deviation of at least ten axles are new alerts, not reminders. */
+  public static List<Event> axleAlerts(Route route, List<Event> input) {
+    List<Event> alerts = new ArrayList<>();
+    for (AxleError e : axleErrors(route, input)) {
+      boolean large = Math.abs(e.delta()) >= 10;
+      if (!large && (Math.abs(e.delta()) < 3 || e.dailyCount() != 6)) continue;
+      String text =
+          "CB"
+              + e.sensor()
+              + (large
+                  ? " đếm " + axleDifference(e.delta()) + " trong 1 lần"
+                  : " đếm sai 6 lần trong ngày · Lần thứ 6 " + axleDifference(e.delta()))
+              + " · Chuẩn "
+              + e.standard()
+              + ", đếm "
+              + e.observed();
+      if (large && e.dailyCount() >= 6) text += " · Sai " + e.dailyCount() + " lần trong ngày";
+      alerts.add(
+          new Event(
+              "axle:" + e.sensor() + ":" + e.source().id(),
+              e.source().at(),
+              km(e.source().crossing()),
+              text,
+              true,
+              e.source().counts()));
+    }
+    return alerts;
+  }
+
+  /** Missing upstream evidence is meaningful only with complete coverage of the whole window. */
+  public static boolean suspect(
+      Route route,
+      Event current,
+      List<Event> history,
+      long coverageStart,
+      long travelWindow,
+      boolean complete) {
+    int d = direction(current.text());
+    String previous = route.upstream(current.crossing(), d);
+    if (d == 0 || previous == null || !complete || coverageStart > current.at() - travelWindow)
+      return false;
+    List<Event> window = new ArrayList<>();
+    for (Event e : history) if (e.at() >= current.at() - travelWindow) window.add(e);
+    window.add(current);
+    return suspectedSelfTriggers(route, window, coverageStart).stream()
+        .anyMatch(e -> e.id().equals(current.id()));
+  }
+
+  public static boolean selfTriggerEnabled(int intervalSeconds) {
+    return intervalSeconds == 30;
+  }
+
+  public static boolean isSelfTrigger(Event event) {
+    return event.id().startsWith("self:");
+  }
+
+  private static String eventFaultKey(Event event) {
+    return isSelfTrigger(event)
+        ? "@self"
+        : isAxleFault(event)
+            ? (isLargeAxleFault(event)
+                ? "@axleSingle:" + event.id()
+                : "@axleDaily:" + event.id().charAt(5))
+            : faultKey(event.text());
+  }
+
+  private static int barrierActivity(Event event) {
+    if (event.red() || isGenerated(event)) return 0;
+    var match = BARRIER_ACTIVITY.matcher(event.text().trim());
+    return !match.matches() ? 0 : match.group(1).equalsIgnoreCase("hạ") ? 1 : -1;
+  }
+
+  private static boolean evidenceReset(Event event) {
+    return endsTrain(event.text());
+  }
+
+  /** One operating visit, irrespective of how many numbered barriers report movement. */
+  private static final class EvidenceVisit {
+    final long startedAt, previousStart, previousActivityStart;
+    final int previousArrivalDirection;
+    final String point;
+    final EvidenceVisit previousVisit;
+    EvidenceVisit supportedBy;
+    final List<Event> signs = new ArrayList<>();
+    Event arrival;
+    int direction;
+    long passedAt = Long.MIN_VALUE, endExclusive = Long.MAX_VALUE;
+
+    EvidenceVisit(String point, long at, EvidenceVisit previousTrain, EvidenceVisit previousActivity) {
+      this.point = point;
+      previousVisit = previousTrain;
+      startedAt = at;
+      // Only a directional train report defines the preceding train boundary. Unnamed
+      // barrier/button/reset operations cannot make a completed incoming train obsolete.
+      previousStart = previousTrain == null ? Long.MIN_VALUE
+          : previousTrain.arrival == null ? previousTrain.passedAt : previousTrain.arrival.at();
+      previousActivityStart = previousActivity == null ? Long.MIN_VALUE : previousActivity.startedAt;
+      previousArrivalDirection =
+          previousTrain == null || previousTrain.arrival == null ? 0 : previousTrain.direction;
+    }
+
+    boolean supports(EvidenceVisit target) {
+      if (direction != 0 && direction != target.direction) return false;
+      // Explicit arrival tokens keep the existing one-to-one continuity for trains in transit.
+      // Fallback activity must be from a new visit, not a late raise from an older train.
+      EvidenceVisit precedingSource =
+          target.previousVisit == null ? null : target.previousVisit.supportedBy;
+      boolean queuedTrain =
+          arrival != null
+              && target.previousArrivalDirection == target.direction
+              && precedingSource != null
+              && arrival.at()
+                  > (precedingSource.arrival == null
+                      ? precedingSource.startedAt : precedingSource.arrival.at());
+      long evidenceStart = arrival != null ? arrival.at()
+          : passedAt != Long.MIN_VALUE ? passedAt : startedAt;
+      // A barrier-only source remains fallback evidence under the existing cautious rule;
+      // it is not promoted to an additional directional train. Explicit arrival/passage
+      // evidence is compared with real trains only, never with an unnamed local operation.
+      long boundary = arrival == null && passedAt == Long.MIN_VALUE
+          ? target.previousActivityStart : target.previousStart;
+      if (!queuedTrain && evidenceStart <= boundary) return false;
+      for (Event sign : signs) if (sign.at() < target.endExclusive) return true;
+      return false;
+    }
+  }
+
+  /** Match whole upstream visits, including late same-visit evidence, once per downstream train. */
+  public static List<Event> suspectedSelfTriggers(
+      Route route, List<Event> input, long coverageStart) {
+    List<Event> ordered = new ArrayList<>(input);
+    ordered.sort(
+        Comparator.comparingLong(Event::at)
+            .thenComparingInt(e -> evidenceReset(e) ? 4 : reportPhase(e))
+            .thenComparing(Event::id));
+    Map<String, EvidenceVisit> open = new HashMap<>(), previous = new HashMap<>();
+    Map<String, EvidenceVisit> previousTrains = new HashMap<>();
+    Map<String, List<EvidenceVisit>> evidence = new HashMap<>();
+    List<EvidenceVisit> arrivals = new ArrayList<>();
+    Set<String> seen = new HashSet<>();
+    Set<String> crossings = new HashSet<>(route.crossings());
+    for (Event event : ordered) {
+      String point = km(event.crossing());
+      if (event.at() < coverageStart
+          || event.red()
+          || isGenerated(event)
+          || !crossings.contains(point)
+          || !seen.add(event.id())) continue;
+      EvidenceVisit visit = open.get(point);
+      if (evidenceReset(event)) {
+        if (visit != null)
+          visit.endExclusive = event.at() == Long.MAX_VALUE ? Long.MAX_VALUE : event.at() + 1;
+        open.remove(point);
+        continue;
+      }
+      int d = direction(event.text()),
+          passed = passedDirection(event.text()),
+          barrier = barrierActivity(event);
+      if (d == 0 && passed == 0 && barrier == 0) continue;
+      boolean split =
+          visit != null
+              && (d != 0
+                      && (visit.arrival != null
+                          || visit.passedAt != Long.MIN_VALUE
+                          || visit.direction != 0 && visit.direction != d)
+                  || passed != 0 && visit.direction != 0 && visit.direction != passed);
+      if (split) {
+        visit.endExclusive = event.at();
+        visit = null;
+      }
+      if (visit == null) {
+        EvidenceVisit old = previous.get(point);
+        visit = new EvidenceVisit(point, event.at(), previousTrains.get(point), old);
+        previous.put(point, visit);
+        open.put(point, visit);
+        evidence.computeIfAbsent(point, k -> new ArrayList<>()).add(visit);
+      }
+      visit.signs.add(event);
+      if (d != 0) {
+        visit.arrival = event;
+        visit.direction = d;
+        arrivals.add(visit);
+        previousTrains.put(point, visit);
+      } else if (passed != 0) {
+        visit.direction = passed;
+        if (visit.arrival == null && visit.passedAt == Long.MIN_VALUE) arrivals.add(visit);
+        visit.passedAt = event.at();
+        previousTrains.put(point, visit);
+      }
+    }
+    Set<EvidenceVisit> used = new HashSet<>();
+    Set<String> corroborated = new HashSet<>();
+    List<Event> suspects = new ArrayList<>();
+    for (EvidenceVisit target : arrivals) {
+      List<String> section = upstreamSection(route, target.point, target.direction);
+      if (section.isEmpty()) continue;
+      long targetAt = target.arrival == null ? target.passedAt : target.arrival.at();
+      EvidenceVisit match = null;
+      for (String upstream : section) {
+        for (EvidenceVisit candidate : evidence.getOrDefault(upstream, List.of())) {
+          boolean distant = !upstream.equals(section.get(0));
+          long sourceAt = candidate.arrival == null ? candidate.passedAt : candidate.arrival.at();
+          if (!used.contains(candidate) && candidate.supports(target)
+              && (!distant || candidate.direction == target.direction
+                  && sourceAt != Long.MIN_VALUE && sourceAt <= targetAt)) {
+            match = candidate;
+            break;
+          }
+        }
+        if (match != null) break;
+      }
+      if (match == null && target.arrival != null) suspects.add(target.arrival);
+      else if (match != null) {
+        target.supportedBy = match;
+        used.add(match);
+        if (match.direction == target.direction && match.arrival != null
+            && match.arrival.at() <= targetAt) corroborated.add(match.arrival.id());
+      }
+    }
+    suspects.removeIf(e -> corroborated.contains(e.id()));
+    return suspects;
+  }
+
+  /** Wait for another successful poll so late upstream uploads can disprove an early suspicion. */
+  public static List<Event> confirmedSelfTriggers(
+      List<Event> candidates, Map<String, Long> firstSeen, long now, long baseline, long delay) {
+    Set<String> current = new HashSet<>();
+    List<Event> confirmed = new ArrayList<>();
+    for (Event event : candidates) {
+      if (event.at() < baseline) continue;
+      current.add(event.id());
+      long first = firstSeen.computeIfAbsent(event.id(), k -> now);
+      if (now - first >= delay)
+        confirmed.add(
+            new Event(
+                "self:" + event.id(),
+                event.at(),
+                event.crossing(),
+                "Nghi tự kích",
+                true,
+                List.of()));
+    }
+    firstSeen.keySet().retainAll(current);
+    return confirmed;
+  }
+
+  /** Device identity takes precedence over measurement words such as voltage. */
+  public static String deviceGroup(Event event) {
+    String t = event.text().toLowerCase(Locale.ROOT);
+    if (isAxleFault(event) || t.contains("cảm biến") || t.matches(".*\\bcb[1-6]\\b.*")) return "Cảm biến";
+    if (t.contains("chuông")) return "Chuông";
+    if (t.contains("đèn")) return "Đèn";
+    if (t.contains("cần chắn")) return "Cần chắn";
+    if (t.contains("kết nối")) return "Kết nối";
+    if (t.contains("điện áp") || t.contains("220vac") || t.contains("nguồn") || t.contains("cầu chì")) return "Điện áp";
+    return "";
+  }
+
+  public static boolean diagramEnabled(int seconds) { return seconds == 30; }
+
+  /** Derive the same daily axle alerts on a fresh install and on a warm cache. */
+  public static List<Event> dailyRecords(Route route, List<Event> raw) {
+    List<Event> records = new ArrayList<>();
+    for (Event e : raw) if (!isAxleFault(e)) records.add(e);
+    records.addAll(axleAlerts(route, records));
+    records.sort(Comparator.comparingLong(Event::at).reversed().thenComparing(Event::id));
+    return records;
+  }
+
+  /** Full historical evidence can be replayed without creating live notifications. */
+  public static List<Event> historicalSelfTriggers(Route route, List<Event> records,
+      long coverage, long from, long to, int interval) {
+    if (!selfTriggerEnabled(interval)) return List.of();
+    List<Event> original = new ArrayList<>(), inferred = new ArrayList<>();
+    for (Event e : records) if (!isGenerated(e)) original.add(e);
+    for (Event e : suspectedSelfTriggers(route, original, coverage))
+      if (e.at() >= from && e.at() + 10000L < to)
+        inferred.add(new Event("self:" + e.id(), e.at(), e.crossing(), "Nghi tự kích", true, List.of()));
+    return inferred;
+  }
+
+  /** Generic system restoration must never clear unrelated device faults. */
+  public static String faultKey(String text) {
+    String t = normalizedReport(text);
+    if (FUSE_BLOWN.matcher(t).matches() || FUSE_RECOVERED.matcher(t).matches()) return "cầu chì 50a";
+    if (DC_OVER.matcher(t).matches() || DC_RECOVERED.matcher(t).matches())
+      return "nguồn dc > 29v";
+    if (t.contains("220vac")) return "nguồn 220VAC";
+    if (t.contains("kết nối giám sát")) return "kết nối giám sát";
+    var voltage = VOLTAGE_DEVICE.matcher(t);
+    if (voltage.find()) return "điện áp cảm biến " + voltage.group(1);
+    var m = NUMBERED_DEVICE.matcher(t);
+    if (m.find()) return m.group(1) + " " + m.group(2);
+    for (String family : List.of("chuông", "đèn")) {
+      int start = t.indexOf(family);
+      if (start >= 0) {
+        String device = DEVICE_STATE.split(t.substring(start), 2)[0].trim();
+        return device.isEmpty() ? family : device;
+      }
+    }
+    return t;
+  }
+
+  public static long faultBaseline(long previous, long now) {
+    long midnight =
+        java.time.Instant.ofEpochMilli(now)
+            .atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+            .toLocalDate()
+            .atStartOfDay(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+            .toInstant()
+            .toEpochMilli();
+    return Math.max(previous, midnight);
+  }
+
+  public static boolean needsNewBaseline(long last, long now, boolean restarted) {
+    if (last <= 0 || now <= last) return false;
+    java.time.ZoneId zone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+    return now - last >= 24L * 60 * 60 * 1000
+        || (restarted
+            && !java.time.Instant.ofEpochMilli(last)
+                .atZone(zone)
+                .toLocalDate()
+                .equals(java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate()));
+  }
+
+  public record Incident(Event fault, Event recovery) {}
+
+  private static boolean isFaultRelevant(Event event) {
+    return event.red()
+        || event.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")
+        || event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+        || endsTrain(event.text());
+  }
+
+  /** Pair only explicit restoration messages with earlier faults of that device and crossing. */
+  public static List<Incident> incidentHistory(List<Event> input) {
+    List<Event> ordered = new ArrayList<>();
+    for (var event : input) if (isFaultRelevant(event)) ordered.add(event);
+    ordered.sort(Comparator.comparingLong(Event::at).thenComparingInt(Rules::reportPhase));
+    List<Incident> result = new ArrayList<>();
+    Map<String, List<Integer>> open = new HashMap<>();
+    for (Event event : ordered) {
+      if (isExcludedAxleFault(event)) continue;
+      String key = km(event.crossing()) + "|" + eventFaultKey(event);
+      if (event.red()) {
+        open.computeIfAbsent(key, k -> new ArrayList<>()).add(result.size());
+        result.add(new Incident(event, null));
+      } else if (event.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")
+          || event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+          || endsTrain(event.text())) {
+        List<String> matches = new ArrayList<>();
+        if (event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+            || endsTrain(event.text())) matches.add(km(event.crossing()) + "|@self");
+        else matches.add(key);
+        String lower = event.text().toLowerCase(Locale.ROOT);
+        if (lower.contains("cần chắn") && faultKey(event.text()).equals(lower)) {
+          String prefix = km(event.crossing()) + "|cần chắn ";
+          for (String candidate : open.keySet())
+            if (candidate.startsWith(prefix)) matches.add(candidate);
+        }
+        for (String match : matches) {
+          List<Integer> indices = open.remove(match);
+          if (indices != null)
+            for (int index : indices)
+              result.set(index, new Incident(result.get(index).fault(), event));
+        }
+      }
+    }
+    result.sort(Comparator.comparingLong((Incident i) -> i.fault().at()).reversed());
+    return result;
+  }
+
+  public static List<Event> activeFaults(List<Event> input) {
+    List<Event> sorted = new ArrayList<>();
+    for (var event : input) if (isFaultRelevant(event)) sorted.add(event);
+    sorted.sort(Comparator.comparingLong(Event::at).thenComparingInt(Rules::reportPhase));
+    Map<String, Event> faults = new LinkedHashMap<>();
+    for (Event e : sorted) {
+      if (isExcludedAxleFault(e)) continue;
+      String k = km(e.crossing()) + "|" + eventFaultKey(e);
+      if (e.red()) faults.put(k, e);
+      else if (e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+          || endsTrain(e.text())) {
+        faults.remove(km(e.crossing()) + "|@self");
+      } else if (e.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")) {
+        faults.remove(k);
+        // The actual web has a collective "Cần chắn khôi phục tốt" event.
+        if (e.text().toLowerCase(Locale.ROOT).contains("cần chắn")
+            && faultKey(e.text()).equals(e.text().toLowerCase(Locale.ROOT))) {
+          String prefix = km(e.crossing()) + "|cần chắn ";
+          faults.keySet().removeIf(key -> key.startsWith(prefix));
+        }
+      }
+    }
+    var result = new ArrayList<>(faults.values());
+    result.sort(Comparator.comparingLong(Event::at).reversed());
+    return result;
+  }
+}

@@ -6,7 +6,7 @@ import java.util.*;
 import java.util.stream.*;
 import org.json.*;
 
-/** Headless adapter; compiles the SAME rule/parser sources as Android, without Android stubs. */
+/** Headless adapter; uses a web rule variant; Android originals remain in reference, without Android stubs. */
 public final class Engine {
   static Object json(Object o) throws Exception {
     if (o == null) return JSONObject.NULL;
@@ -52,8 +52,8 @@ public final class Engine {
     raw.removeIf(e->discard.contains(e.id()));
     var eligible=historical ? List.<Rules.Event>of() : candidates.stream().filter(e->last>0&&!reset&&(fresh.contains(e.id())||pending.containsKey(e.id()))).toList();
     if (last==0||reset) pending.clear();
-    // Poll cadence is independent of the original 30-second inference delay.
-    var confirmed=in.optBoolean("maintenance") ? List.<Rules.Event>of() : Rules.confirmedSelfTriggers(eligible,pending,now,0,30000);
+    // Only a successful source read may confirm after ten seconds.
+    var confirmed=in.optBoolean("maintenance") ? List.<Rules.Event>of() : Rules.confirmedSelfTriggers(eligible,pending,now,0,10000);
     var existing=raw.stream().map(Rules.Event::id).collect(Collectors.toSet());
     for(var e:confirmed) if(existing.add(e.id())) raw.add(e);
     var daily=Rules.dailyRecords(route,between(raw,dayStart,now+1));
@@ -81,7 +81,7 @@ public final class Engine {
     var groups=Rules.crossingHistory(daily,in.optString("crossing"));
     var announcements=new HashMap<String,String>();for(var e:faults)announcements.put(e.id(),AlertOptions.announcement(e));
     var out=new JSONObject();
-    out.put("route",json(route.points())).put("points",json(pointInfo)).put("faults",json(faults)).put("incidents",json(Rules.incidentHistory(daily)))
+    out.put("webRulesVersion",2).put("route",json(route.points())).put("points",json(pointInfo)).put("faults",json(faults)).put("incidents",json(Rules.incidentHistory(daily)))
       .put("segments",json(Rules.trackSegments(route,current))).put("occupancies",json(Rules.occupancies(route,raw)))
       .put("trains",json(between(raw,dayStart,now+1).stream().filter(e->Rules.direction(e.text())!=0).sorted(Comparator.comparingLong(Rules.Event::at).reversed()).toList()))
       .put("devices",json(devices)).put("groups",json(groups)).put("axles",json(Rules.axleErrors(route,between(raw,dayStart,now+1))))

@@ -253,7 +253,7 @@ class App:
             except PublicError as error:
                 state=json.loads(self.monitor(mid)['state']);state.update(loading=False,connectionLost=error.kind=='network' or previous.get('connectionLost',False),status=str(error),lastAttempt=loading['lastAttempt'])
                 with self.db() as db:
-                    db.execute('UPDATE monitors SET state=?,next_due=? WHERE id=?',(encode(state),time.time()+(120 if error.kind=='network' else POLL_SECONDS),mid))
+                    db.execute('UPDATE monitors SET state=?,next_due=? WHERE id=?',(encode(state),time.time()+(50 if error.kind=='network' else POLL_SECONDS),mid))
                     if error.kind=='auth':
                         for s in db.execute('SELECT id,options FROM sessions WHERE monitor=?',(mid,)).fetchall():
                             options=json.loads(s['options']);options['running']=False;db.execute('UPDATE sessions SET options=? WHERE id=?',(encode(options),s['id']))
@@ -295,7 +295,7 @@ class App:
         except Exception:
             with self.db() as db:
                 state=json.loads(self.monitor(mid)['state']);state.update(loading=False,status='Chưa hoàn tất cập nhật. Dữ liệu cũ được giữ.')
-                db.execute('UPDATE monitors SET state=?,next_due=? WHERE id=?',(encode(state),time.time()+120,mid))
+                db.execute('UPDATE monitors SET state=?,next_due=? WHERE id=?',(encode(state),time.time()+50,mid))
         finally:
             with self.db() as db:db.execute('UPDATE monitors SET lease_owner=?,lease_until=0 WHERE id=? AND lease_owner=?',('',mid,self.owner))
             with self.active_lock:self.active.discard(mid)
@@ -336,6 +336,15 @@ class App:
         options=json.loads(session['options'])
         if not session['monitor']:return {'configured':False,'options':options,'seq':0}
         m=self.monitor(session['monitor']);creds=self.open(m['credentials']);state=json.loads(m['state'])
+        if state.get('webRulesVersion')!=2:
+            # Upgrade cached derived totals before serving them; raw/checkpoints remain intact.
+            with self.lock(m['id']):
+                state=json.loads(self.monitor(m['id'])['state'])
+                if state.get('webRulesVersion')!=2:
+                    rows=self.event_rows(m['id'])
+                    derived=self.analyze(m['id'],rows,state,state.get('route',[]),creds['user'],maintenance=True)
+                    state.update(derived)
+                    self.update_analysis(m['id'],state,state,rows)
         selected=(query.get('day') or [options.get('monitorDate') or today().isoformat()])[0]
         day=self.valid_day(selected)
         historical=day!=today()

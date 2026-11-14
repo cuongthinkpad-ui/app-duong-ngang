@@ -19,7 +19,7 @@ Mật khẩu phải percent-encode ký tự đặc biệt. Không in chuỗi k�
 ## 2. Build từ thư mục ZIP đã giải nén
 
 ```sh
-gcloud builds submit --tag REGION-docker.pkg.dev/PROJECT/REPOSITORY/duong-ngang-web:1.1.0 .
+gcloud builds submit --tag REGION-docker.pkg.dev/PROJECT/REPOSITORY/duong-ngang-web:1.2.0 .
 ```
 
 Thay các tên PROJECT/REGION/REPOSITORY bằng tài nguyên thật. Dockerfile tự biên dịch đúng Java core bằng Java 21. Không deploy thư mục `dist/` riêng.
@@ -29,7 +29,7 @@ Thay các tên PROJECT/REGION/REPOSITORY bằng tài nguyên thật. Dockerfile 
 Lần đầu triển khai riêng tư, đặt PUBLIC_ORIGIN tạm `https://pending.invalid`, sau đó lấy URL thật và cập nhật trước khi cấp truy cập công khai. Điều này tránh đoán URL Cloud Run. VAPID_SUBJECT phải là email quản trị thật dạng `mailto:...`.
 
 ```sh
-gcloud run deploy SERVICE --image REGION-docker.pkg.dev/PROJECT/REPOSITORY/duong-ngang-web:1.1.0 --region REGION --service-account RUNTIME_SERVICE_ACCOUNT --no-allow-unauthenticated --min-instances 1 --max-instances 1 --no-cpu-throttling --timeout 300 --concurrency 40 --cpu 2 --memory 2Gi --add-cloudsql-instances PROJECT:REGION:INSTANCE --set-secrets APP_KEY=rail-app-key:1,VAPID_PRIVATE_KEY=rail-vapid-key:1,DATABASE_URL=rail-database-url:1 --set-env-vars PUBLIC_ORIGIN=https://pending.invalid,VAPID_SUBJECT=mailto:ADMIN_EMAIL,WEBSITE_HOSTS=visitec.vn
+gcloud run deploy SERVICE --image REGION-docker.pkg.dev/PROJECT/REPOSITORY/duong-ngang-web:1.2.0 --region REGION --service-account RUNTIME_SERVICE_ACCOUNT --no-allow-unauthenticated --min-instances 1 --max-instances 1 --no-cpu-throttling --timeout 300 --concurrency 40 --cpu 2 --memory 2Gi --add-cloudsql-instances PROJECT:REGION:INSTANCE --set-secrets APP_KEY=rail-app-key:1,VAPID_PRIVATE_KEY=rail-vapid-key:1,DATABASE_URL=rail-database-url:1 --set-env-vars PUBLIC_ORIGIN=https://pending.invalid,VAPID_SUBJECT=mailto:ADMIN_EMAIL,WEBSITE_HOSTS=visitec.vn
 ```
 
 Lấy `status.url` bằng `gcloud run services describe SERVICE --region REGION --format='value(status.url)'`. Cập nhật biến bằng `gcloud run services update SERVICE --region REGION --update-env-vars PUBLIC_ORIGIN=ACTUAL_HTTPS_ORIGIN`. Sau khi kiểm tra cấu hình và `/health`, cấp invoker public theo chính sách dự án. Không thay các secret phiên bản gốc khi chỉ cập nhật code.

@@ -43,12 +43,31 @@ class Backend(unittest.TestCase):
         self.assertEqual(len(state['faults']),1);self.assertEqual(state['alerts'],[]);self.assertEqual(len(state['route']),5)
         stored=self.app.monitor(mid)['credentials'];self.assertNotIn('local-test-password',stored);self.assertEqual(self.app.open(stored)['password'],'local-test-password')
         other,_=self.app.session();self.assertFalse(self.app.snapshot(other,{})['configured']);self.assertNotIn('password',encode(state));self.assertNotIn('checkpoint',state)
-    def test_retry_120_preserves_cache_and_recovers(self):
+    def test_retry_50_preserves_cache_and_recovers(self):
         Website.rows=[event('old')];mid=self.config();initial=self.state();Website.down=True
         start=time.time();self.app.poll(mid);m=self.app.monitor(mid);s=self.state()
         self.assertTrue(s['connectionLost']);self.assertEqual(s['lastSuccess'],initial['lastSuccess']);self.assertEqual(len(s['faults']),1)
-        self.assertGreaterEqual(m['next_due'],start+120);self.assertLess(m['next_due'],time.time()+121)
+        self.assertGreaterEqual(m['next_due'],start+50);self.assertLess(m['next_due'],time.time()+51)
         self.app.retry(mid);self.assertLessEqual(self.app.monitor(mid)['next_due'],time.time());Website.down=False;self.app.poll(mid);self.assertFalse(self.state()['connectionLost']);self.assertGreater(self.app.monitor(mid)['next_due'],time.time()+8);self.assertLessEqual(self.app.monitor(mid)['next_due'],time.time()+10)
+    def test_retry_delay_from_error_end_and_manual_serialization(self):
+        from unittest.mock import patch
+        mid=self.config();real=self.app.engine;entered=threading.Event();release=threading.Event();calls=[]
+        def fail(request):
+            if request['op']=='fetch':
+                calls.append(time.monotonic());entered.set();release.wait(5)
+                raise PublicError('network fixture',503,'network')
+            return real(request)
+        self.app.engine=fail
+        worker=threading.Thread(target=self.app.poll,args=(mid,));worker.start();self.assertTrue(entered.wait(5))
+        self.app.retry(mid);self.assertEqual(len(calls),1)
+        second=threading.Thread(target=self.app.poll,args=(mid,));second.start()
+        time.sleep(.1);self.assertEqual(len(calls),1,'a concurrent poll must wait on the account lock')
+        ended=time.time();release.set();worker.join(10);second.join(10)
+        self.assertFalse(worker.is_alive());self.assertFalse(second.is_alive());self.assertEqual(len(calls),2)
+        self.assertGreaterEqual(self.app.monitor(mid)['next_due'],ended+50)
+        self.assertLessEqual(self.app.monitor(mid)['next_due'],time.time()+50)
+        self.app.retry(mid);self.assertLessEqual(self.app.monitor(mid)['next_due'],time.time())
+
     def test_only_new_alerts_confirmation_keeps_faults(self):
         Website.rows=[event('old',at=now_ms()-10000)];mid=self.config();self.app.poll(mid);self.assertEqual(self.state()['seq'],0)
         Website.rows.append(event('new','Đèn 1 hỏng',at=now_ms()-1000));self.app.poll(mid);s=self.state();self.assertGreater(s['seq'],0)
@@ -126,17 +145,26 @@ class Backend(unittest.TestCase):
         result=self.app.engine(dict(op='analyze',now=now_ms(),route=['100+000','101+000','102+000'],events=rows,previous={}))
         self.assertEqual(len(result['trains']),125);self.assertNotIn('yesterday',[e['id'] for e in result['trains']])
 
-    def test_ten_second_poll_keeps_thirty_second_self_trigger_delay(self):
+    def test_ten_second_poll_confirms_only_after_ten_seconds(self):
         now=now_ms();arrival=event('missing-source','Tàu lẻ',at=now-1000,red=False)
         request=dict(op='analyze',now=now,user='fixture',route=['100+000','101+000','102+000'],events=[arrival],previous={'lastSuccess':now-10000},added=[arrival['id']])
         result=self.app.engine(request)
         self.assertIn(arrival['id'],result['pending'])
-        for seconds in (10,20,29,30):
+        for seconds in (1,9,10):
             request.update(now=now+seconds*1000,previous=dict(result,lastSuccess=now),added=[])
             result=self.app.engine(request)
-            self.assertEqual(any(e['id']=='self:missing-source' for e in result['derived']),seconds==30)
+            self.assertEqual(any(e['id']=='self:missing-source' for e in result['derived']),seconds==10)
         request.update(now=now+40000,maintenance=True)
         self.assertEqual(self.app.engine(request)['derived'],[],'offline maintenance is not a successful source read')
+
+    def test_upgrade_cached_small_axles_preserves_raw_and_history(self):
+        mid=self.config();row=dict(event('small','Khôi phục hệ thống',red=False),counts=['42','40','40','40','40','40'])
+        self.app.save_rows(mid,[row]);state=json.loads(self.app.monitor(mid)['state']);state.pop('webRulesVersion',None)
+        state['axles']=[dict(source=row,sensor=1,delta=2,dailyCount=0,missing=0,extra=2)]
+        with self.app.db() as db:db.execute('UPDATE monitors SET state=? WHERE id=?',(encode(state),mid))
+        self.assertEqual(self.state()['axles'],[])
+        self.assertEqual(next(e for e in self.app.event_rows(mid) if e['id']=='small')['counts'],row['counts'])
+        self.assertEqual(json.loads(self.app.monitor(mid)['state'])['webRulesVersion'],2)
 
     def test_snapshot_with_axle_statistics_and_scope(self):
         mid=self.config();state=json.loads(self.app.monitor(mid)['state'])

@@ -1,27 +1,30 @@
-# Kiểm chứng gói web 1.1.0 — 13/11/2026
+# Kiểm chứng web 1.2.0 — 14/11/2026
 
-Kết quả của phiên hiện tại; không kế thừa tuyên bố hoàn tất từ ZIP 1.0.0. Chỉ web thay đổi, không Android/APK. Rules.java, WebSource.java, AlertOptions.java so nguyên byte với commit Android 0.27.3 `ee1affe5ea024590ce356e0f1e23aafbf17df669`: khớp.
+Kết quả chạy mới trong phiên này, không nhận kết quả 1.1.0 làm bằng chứng thay đổi mới. Nguồn Android/APK trong checkout không sửa. Core web ở engine-core là bản riêng: bỏ notes/errors |delta|<3 và đổi điều kiện historical self từ 30 xuống 10 giây; adapter live xác nhận sau ≥10 giây trên lần đọc nguồn thành công, maintenance không xác nhận.
 
-| Kiểm tra thực thi | Kết quả |
+| Kiểm tra | Kết quả |
 |---|---|
-| Core Java gốc | 772 ca nghiệp vụ đạt |
-| Parser và HTTP reader fixture | 16 + 39 ca đạt |
-| AlertOptions gốc | 17 ca đạt |
-| Backend SQLite + Java/HTTP thật cục bộ | 14 bài đạt |
-| Scheduler/suy luận mới | Nhịp thành công 10 giây; retry mạng 120 giây; pending ở giây 10/20/29, xác nhận giây 30; maintenance offline không xác nhận suy luận |
-| Dữ liệu web | AxleError lọc scope qua source; history backfill/checkpoint, không replay lỗi cũ, account isolation, CSRF, chặn static private files; endpoint audio/stream trả 404 |
-| Âm foreground | Test hủy generation cũ không dừng batch mới; recovery loại cảnh báo hết hiệu lực |
-| Chromium với server HTTP và parser thật | 320/375/390/430 px không tràn trang; thứ tự summary→kết nối→sơ đồ; retry, confirm, sáu nhóm, ba bộ lọc đường ngang, settings/mode/reload không lỗi JS |
-| Build | Java compile, npm run build, JS syntax đạt |
-| ZIP độc lập | Giải nén ngoài checkout, build core và chạy lại 772/16/39/17 + 14 backend + tests âm + npm build đạt; không cần Android SDK |
-| Máy chủ local | /health 200 ok:true; /api/session khởi tạo được; worker chạy không cần browser trong test |
+| Core Android gốc, compile riêng build/reference | 772 ca đạt |
+| Parser / HTTP reader fixture / AlertOptions gốc | 16 / 39 / 17 đạt |
+| Core web ghi chú CB | 8 kiểm tra đạt, ±1/±2 và CB lớn cùng bản tin |
+| Backend + yêu cầu web mới | 22 bài đạt (16 backend, 6 quy tắc mới riêng) |
+| Tự kích | 9.999 giây chưa báo; 10 giây + lần analyze sau đọc thành công đủ điều kiện; offline ở 10/50 giây không báo; bằng chứng muộn bác bỏ đúng self |
+| Retry | 50 giây từ sau lỗi; giữ cache; retry tay bỏ chờ; không phát lại lỗi cũ; worker chạy không browser |
+| Trục | ±1/±2 không records dẫn xuất/totals/faults; raw/số gốc giữ; nhiều CB độc lập; 3/6 lần/9/10, source mới, duplicate, ngày/điểm, 6 ngoại lệ; nâng cache cũ và history |
+| Chromium HTTP/Java thật cục bộ | 320/375/390/430 px không tràn; chấm đỏ, ga vàng, đoạn xanh; cập nhật màu khi không đổi route/segments; N sự cố/Tốt/chưa đủ; retry/confirm/groups/settings/reload không JS exception |
+| Âm foreground | Hai test hủy batch/recovery đạt; không phải kiểm chứng đã nghe trên iPhone |
+| Build | javac, node syntax và npm run build đạt |
 
-Ảnh bốn tab/chi tiết và mất kết nối trong `screenshots/` được tạo lại từ fixture của phiên này. Không phải dữ liệu vận hành. Luồng MP3 đã xóa cả backend/UI/dependency Docker; hai WAV hữu hạn giữ cho cảnh báo foreground.
+Máy dùng Temurin JDK 21.0.9+10 tải từ Adoptium và xác minh SHA-256, Python 3.12, Node 24, Chromium hệ thống. JAR jsoup/json xác minh SHA-256 theo build script; dependencies Python pin theo lockfile.
 
-## Ranh giới bàn giao
+## Phần nghiệm thu còn thiếu
 
-**Chưa thử trong phiên này:** tài khoản/website vận hành thật, Safari/WebKit, iPhone vật lý, Apple Push thật, PostgreSQL production, Docker image mới và Google Cloud triển khai thật. Không có URL HTTPS sản phẩm đã nghiệm thu. Những kết quả Docker/PostgreSQL/media được ghi trong biên bản cũ không được dùng để xác nhận bản 1.1.0.
+Website/tài khoản vận hành thật, Safari/WebKit, Android/iPhone vật lý, Apple Push thực, giọng khi khóa máy, PostgreSQL production, backup/restore production, build Docker image mới và deploy HTTPS chưa thử. Không có URL sản phẩm đã nghiệm thu. Push mock chỉ kiểm outbox/chống trùng, không chứng minh nhà cung cấp giao được tới iPhone. Retry tests dùng clock/delay cục bộ, không phải phép đo mạng vận hành 50 giây trên thiết bị thật.
 
-Theo yêu cầu chủ sở hữu, AI Studio tích hợp thông báo, chạy nền iPhone và cấu hình máy chủ theo `INTEGRATION.md`, rồi thực hiện nghiệm thu thực tế ở đặc tả gốc và `ACCEPTANCE.md`. Gói mã nguồn build được không đồng nghĩa mọi ID nghiệm thu đã đạt. Core tests chứng minh bộ quy tắc gốc; backend/browser tests chứng minh những đường đi được liệt kê, không tự phủ toàn bộ native instrumentation hay mọi tổ hợp vận hành.
+AI Studio tiếp tục ma trận SRC/TRN/FLT/SELF/AXLE/ALM/DB/UI/BG/IOS của đặc tả, áp dụng yêu cầu mới LATEST_REQUIREMENTS_1.2.0.md. Các ID chưa có kiểm thử cụ thể không được tự đánh dấu đạt chỉ từ tổng số core tests. Hai thay đổi giao diện APK riêng vẫn chưa thực hiện.
 
-Không sửa ngưỡng nghiệp vụ: Nghi tự kích 30 giây, retry mạng 120 giây từ kết thúc lỗi, stale 60 giây, full refresh 15 phút, retention 30 ngày. Chỉ lịch đọc nguồn đổi 30→10 giây. Bản web trước dùng stale 90 giây; bản này sửa về 60 giây theo đặc tả Android. Bổ sung nối UI bị thiếu: Đếm trục lỗi, ba filter, Áp dụng phạm vi, Ngày/phạm vi đứng trước tài khoản; sửa lọc AxleError và không xác nhận self từ maintenance/cache. Không thay core.
+## Gói độc lập và môi trường
+
+Giải nén ngoài checkout vào /tmp, tạo venv mới từ lockfile, build Java, chạy lại 772/16/39/17 core gốc + 8 web axle-note + 22 backend/quy tắc + 2 alarm tests + npm build + Chromium bốn chiều rộng: đạt. Không cần Android SDK hoặc nguồn nằm ngoài ZIP. Máy chủ local chạy worker, /health trả 200 ok:true và /api/session tạo phiên riêng được. Script cài môi trường chạy lại thành công, dùng lại dependencies hợp lệ.
+
+`git diff ee1affe5 -- app tests` và diff so với base web xác nhận không sửa Android/test gốc/APK. WebSource.java và AlertOptions.java của engine-core giữ nguyên. ZIP có manifest SHA-256 từng file và revision nguồn; danh sách xuất whitelist loại DB/runtime/key/keystore/capture xác thực. Đây là xác nhận mã nguồn/cục bộ, không phải xác nhận production/iPhone.

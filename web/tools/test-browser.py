@@ -33,6 +33,26 @@ try:
    refresh();assert page.locator('#retry').is_visible();page.locator('#retry').click();page.wait_for_timeout(500);assert app.monitor(mid)['next_due']<=time.time();page.screenshot(path=str(out/(name+'-connection-lost.png')))
    app.announce(mid,before,before['faults']);page.locator('#confirm').click();page.wait_for_timeout(500);assert len(json.loads(app.monitor(mid)['state'])['faults'])==2
    session=list(context.cookies())[0]['value'];s,_=app.session(session);assert json.loads(s['options'])['running'];assert json.loads(s['options'])['confirmedThrough']>0
+   # Requirements 1.2: marker changes even with unchanged route/train segments.
+   assert page.locator('[data-point="100+000"] circle').get_attribute('fill')=='#ff5b6e'
+   assert page.locator('[data-point="102+000 (Vị)"] rect').nth(1).get_attribute('fill')=='#fbbf24'
+   assert page.locator('#route path[stroke="#35d3a5"]').count()>0
+   retained=json.loads(app.monitor(mid)['state'])
+   def replace_state(value):
+    with app.db() as db:db.execute('UPDATE monitors SET state=? WHERE id=?',(encode(value),mid))
+    refresh()
+   replace_state(dict(retained,faults=[]))
+   assert page.locator('[data-point="100+000"] circle').get_attribute('fill')!='#ff5b6e'
+   replace_state(retained)
+   assert page.locator('[data-point="100+000"] circle').get_attribute('fill')=='#ff5b6e'
+   page.locator('.navigation [data-go=crossings]').click();page.wait_for_timeout(800)
+   assert '1 sự cố' in page.locator('#crossings-list [data-crossing="101+000"]').inner_text()
+   assert 'Tốt' in page.locator('#crossings-list [data-crossing="280+500"]').inner_text()
+   with app.db() as db:db.execute('DELETE FROM days WHERE monitor=?',(mid,))
+   refresh()
+   assert 'Tốt' not in page.locator('#crossings-list [data-crossing="280+500"]').inner_text()
+   with app.db() as db:db.execute('INSERT INTO days VALUES(?,?)',(mid,__import__('server').today().isoformat()))
+   refresh()
    page.locator('.navigation [data-go=crossings]').click();page.locator('#crossing-filter').select_option('fault');assert page.locator('#crossings-list [data-crossing]').count()==2;page.locator('#crossing-filter').select_option('clear');assert page.locator('#crossings-list [data-crossing]').count()==1;page.locator('#crossing-filter').select_option('all');page.screenshot(path=str(out/(name+'-crossings.png')));page.locator('#crossings-list [data-crossing="101+000"]').click();page.locator('#device-groups .device').first.wait_for();page.wait_for_timeout(1200)
    assert page.locator('#device-groups').inner_text().count('Cảm biến')>=1
    assert 'Điện áp cảm biến 7 < 5V' in page.locator('#device-groups').inner_text();page.screenshot(path=str(out/(name+'-detail.png')))
