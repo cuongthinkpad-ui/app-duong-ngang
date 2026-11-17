@@ -35,6 +35,7 @@ public class RulesTest {
 
   public static void main(String[] args) {
     sectionContinuity026();
+    powerFaults027();
     var historyRoute = new Rules.Route(List.of("312+111", "313+800", "314+550"));
     List<Rules.Event> historyRaw = new ArrayList<>();
     for (int i = 0; i < 6; i++) historyRaw.add(axle(100000L + i * 60000L, "313+800", 3, 3));
@@ -2232,6 +2233,38 @@ public class RulesTest {
         .equals(List.of(dest)),"chain never crosses station boundary");
     check(!Rules.endsTrain("Cần chắn khôi phục tốt") && Rules.endsTrain("  Ấn nút   DUY TU  "),
         "termination matches exact normalized commands only");
+  }
+
+  static void powerFaults027() {
+    for (String text : List.of("Cầu chì 50A bị đứt", "  CẦU CHÌ 50 a  BỊ ĐỨT ", "Cầu chì 50A bị đứt.")) {
+      var fuse = event(1000,"100+000",text,false);
+      var recovery = event(2000,"100+000"," Cầu chì 50A khôi phục tốt ",false);
+      check(fuse.red() && fuse.text().equals(text), "uncolored fuse becomes a fault without renaming raw report");
+      check(Rules.activeFaults(List.of(fuse)).equals(List.of(fuse)), "uncolored fuse is active");
+      check(Rules.activeFaults(List.of(fuse,recovery)).isEmpty(), "exact fifty-ampere recovery closes fuse");
+      check(Rules.incidentHistory(List.of(fuse,recovery)).get(0).recovery().equals(recovery), "fuse recovery linked in archive");
+      check(Rules.deviceGroup(fuse).equals("Điện áp"), "fuse appears under power group");
+      check(Rules.activeFaults(List.of(fuse,event(2000,"101+000",recovery.text(),false))).equals(List.of(fuse)),
+          "another crossing cannot clear fuse");
+      check(Rules.activeFaults(List.of(fuse,event(2000,"100+000","Cầu chì 30A khôi phục tốt",false))).equals(List.of(fuse)),
+          "another fuse rating cannot clear fifty-ampere fault");
+    }
+    for (String text : List.of("nguồn DC > 29v", "Nguồn DC>29V", "  NGUỒN DC  > 29 V ")) {
+      var over = event(1000,"100+000",text,true);
+      var recovery = event(2000,"100+000"," Nguồn 24V khôi phục tốt ",false);
+      var mains = event(1000,"100+000","Mất nguồn xoay chiều 220VAC",true);
+      var sensor = event(1000,"100+000","Điện áp cảm biến 1 < 5V",true);
+      check(Rules.activeFaults(List.of(over,recovery)).isEmpty(), "twenty-four-volt recovery clears DC overvoltage spelling variant");
+      check(Rules.incidentHistory(List.of(over,recovery)).get(0).recovery().equals(recovery), "DC recovery linked in history");
+      check(Rules.activeFaults(List.of(over,mains,sensor,recovery)).size()==2, "DC recovery preserves mains and sensor faults");
+      check(Rules.activeFaults(List.of(over,event(2000,"101+000",recovery.text(),false))).equals(List.of(over)),
+          "DC recovery applies only at same crossing");
+    }
+    check(!Rules.knownFault("Cầu chì 30A bị đứt") && !Rules.knownFault("Kiểm tra cầu chì 50A bị đứt"),
+        "semantic uncolored override is scoped to exact confirmed fault text");
+    check(!event(1,"100+000","Cầu chì 50A khôi phục tốt",true).red()
+        && !event(1,"100+000","Nguồn 24V khôi phục tốt",true).red(),
+        "known recovery messages remain recoveries even with erroneous red styling");
   }
 
 }

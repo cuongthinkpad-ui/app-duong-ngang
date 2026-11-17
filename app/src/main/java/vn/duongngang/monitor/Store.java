@@ -24,6 +24,31 @@ public final class Store {
       prefs.edit().putInt("interval", Rules.POLL_SECONDS).apply();
   }
 
+  public String alertMode() {
+    return AlertOptions.mode(prefs.getString("alertMode", ""), prefs.getBoolean("sound", true));
+  }
+
+  public void setAlertMode(String mode) {
+    String selected = AlertOptions.mode(mode, !AlertOptions.SILENT.equals(mode));
+    var edit = prefs.edit().putString("alertMode", selected)
+        .putBoolean("sound", !AlertOptions.SILENT.equals(selected))
+        .putString("voiceStatus", AlertOptions.SILENT.equals(selected) ? "Đã tắt âm thanh cảnh báo"
+            : AlertOptions.BELL.equals(selected) ? "Chế độ chỉ chuông" : "Giọng đọc sử dụng tiếng Việt của điện thoại");
+    if (!AlertOptions.SILENT.equals(selected)) edit.putString("audibleMode", selected);
+    else if (!AlertOptions.SILENT.equals(alertMode())) edit.putString("audibleMode", alertMode());
+    edit.apply();
+  }
+
+  public boolean faultRulesReady() { return prefs.getInt("faultRulesVersion", 0) == 1; }
+
+  public void prepareFaultRules(String expected, long now) {
+    synchronized (Store.class) {
+      if (!account().equals(expected) || faultRulesReady()) return;
+      long baseline = Rules.faultBaseline(prefs.getLong("baselineFrom", 0), now);
+      updateActiveFaults(expected, baseline, now, baseline, List.of());
+    }
+  }
+
   private javax.crypto.SecretKey key() throws Exception {
     KeyStore ks = KeyStore.getInstance("AndroidKeyStore");
     ks.load(null);
@@ -135,6 +160,7 @@ public final class Store {
     synchronized (Store.class) {
       if (!account().equals(expected)) throw new IllegalStateException("Tài khoản đã thay đổi");
       long cutoff = Rules.historyCutoff(now);
+      prepareFaultRules(expected, now);
       if (!historyCleanupDue(now)) return 0;
       prepareSelfEvidence(expected, now);
       updateTravelState(now);
@@ -237,7 +263,8 @@ public final class Store {
       input.addAll(axleAlerts);
       // A cached self-trigger may predate the newest delta page. Include its reset even
       // after upgrading from a version that did not yet recognize the manual button.
-      long from = replayFrom;
+      boolean remapFaults = !faultRulesReady();
+      long from = remapFaults ? Math.min(replayFrom, baseline) : replayFrom;
       for (var fault : input) if (Rules.isSelfTrigger(fault)) from = Math.min(from, fault.at());
       List<Rules.Event> recent = events(from, now + 1);
       for (var e : recent) if (!Rules.isAxleFault(e) && e.at() >= baseline) input.add(e);
@@ -261,6 +288,8 @@ public final class Store {
           .putString("activeFaults", list.toString())
           .putString("occupiedPoints", points.toString())
           .putInt("axleVersion", AXLE_VERSION)
+          .putInt("faultRulesVersion", 1)
+          .putLong("dataRevision", prefs.getLong("dataRevision", 0) + (remapFaults ? 1 : 0))
           .apply();
       updateTravelState(now);
       return active;
@@ -588,6 +617,7 @@ public final class Store {
             .remove("selfFrom")
             .remove("pendingSelf")
             .remove("selfEvidenceVersion")
+            .remove("faultRulesVersion")
             .remove("activeFaults")
             .remove("occupiedPoints")
             .remove("travelState")
@@ -712,9 +742,12 @@ public final class Store {
     try (var db = db()) {
       try (var cursor =
           db.rawQuery(
-              "SELECT * FROM events WHERE at>=? AND red=0 AND text LIKE ? ORDER BY at DESC",
+              "SELECT * FROM events WHERE at>=? AND text LIKE ? ORDER BY at DESC",
               new String[] {"" + to, "%khôi phục tốt%"})) {
-        appendRows(cursor, out);
+        List<Rules.Event> later = new ArrayList<>();
+        appendRows(cursor, later);
+        // Legacy rows may retain erroneous website styling; classify the known recovery first.
+        for (var event : later) if (!event.red()) out.add(event);
       }
       for (String point : inferredPoints)
         try (var cursor =

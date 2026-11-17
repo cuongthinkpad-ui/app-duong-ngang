@@ -8,7 +8,7 @@ import java.util.List;
 /** No test dependencies. Uses a separate device-protected sandbox, never the app's normal data. */
 public final class RouteStoreChecks extends Instrumentation {
   private int checks;
-  private boolean uiMode, previewMode, timingMode, telemetryMode, historyMode;
+  private boolean uiMode, previewMode, timingMode, telemetryMode, historyMode, voiceMode, voiceMissingMode;
 
   private void check(boolean result, String message) {
     checks++;
@@ -18,6 +18,8 @@ public final class RouteStoreChecks extends Instrumentation {
   @Override
   public void onCreate(Bundle arguments) {
     super.onCreate(arguments);
+    voiceMissingMode = arguments != null && "voice-missing".equals(arguments.getString("mode"));
+    voiceMode = arguments != null && "voice".equals(arguments.getString("mode"));
     historyMode = arguments != null && "history".equals(arguments.getString("mode"));
     previewMode = arguments != null && "preview".equals(arguments.getString("mode"));
     uiMode = arguments != null && "ui".equals(arguments.getString("mode"));
@@ -28,6 +30,26 @@ public final class RouteStoreChecks extends Instrumentation {
 
   @Override
   public void onStart() {
+    if (voiceMissingMode) {
+      Bundle result = new Bundle();
+      try {
+        result.putString("stream", new VoiceChecks(this).runUnavailable() + " unavailable-voice checks passed\n");
+        finish(-1,result);
+      } catch (Throwable failure) {
+        result.putString("stream", "FAILED: " + failure + "\n"); finish(0,result);
+      }
+      return;
+    }
+    if (voiceMode) {
+      Bundle result = new Bundle();
+      try {
+        result.putString("stream", new VoiceChecks(this).run() + " Vietnamese voice checks passed\n");
+        finish(-1, result);
+      } catch (Throwable failure) {
+        result.putString("stream", "FAILED: " + failure + "\n"); finish(0, result);
+      }
+      return;
+    }
     if (historyMode) {
       Bundle result = new Bundle();
       try {
@@ -1335,6 +1357,46 @@ public final class RouteStoreChecks extends Instrumentation {
         check(upgraded.prefs.getInt("interval", 0) == 30,
             "legacy polling setting migrates to thirty seconds: " + legacy);
       }
+      store.credentials("https://rail.example.test/", "power-rules-upgrade", "test-only");
+      long powerNow = System.currentTimeMillis(), powerDay = Rules.faultBaseline(0, powerNow);
+      var powerRoute = new Rules.Route(List.of("100+000", "101+000"));
+      var fuse = new Rules.Event("power-fuse", powerDay + 1000, "100+000", "Cầu chì 50A bị đứt", false, List.of());
+      var dc = new Rules.Event("power-dc", powerDay + 2000, "100+000", "nguồn DC > 29v", true, List.of());
+      var dcRecovery = new Rules.Event("power-dc-recovery", powerDay + 3000, "100+000", " Nguồn 24V khôi phục tốt ", false, List.of());
+      var mains = new Rules.Event("power-mains", powerDay + 1000, "100+000", "Mất nguồn xoay chiều 220VAC", true, List.of());
+      store.saveForAccount(store.account(), new WebSource.DayData(List.of(fuse,dc,dcRecovery,mains), powerRoute));
+      try (var oldDb = context.openOrCreateDatabase("events.db", 0, null)) {
+        oldDb.execSQL("UPDATE events SET red=0 WHERE id='power-fuse'");
+      }
+      var stale = new org.json.JSONArray().put(new org.json.JSONArray().put(dc.id()).put(dc.at())
+          .put(dc.crossing()).put(dc.text()).put(new org.json.JSONArray()));
+      store.prefs.edit().putString("activeFaults", stale.toString()).remove("faultRulesVersion").commit();
+      store.prepareFaultRules(store.account(), powerNow);
+      check(store.faultRulesReady() && store.activeFaults().stream().anyMatch(e -> e.id().equals(fuse.id()) && e.red()),
+          "offline upgrade reconstructs previously uncolored fuse in current cache");
+      check(store.activeFaults().stream().noneMatch(e -> e.id().equals(dc.id()))
+              && store.activeFaults().stream().anyMatch(e -> e.id().equals(mains.id())),
+          "offline upgrade replays existing DC recovery without clearing mains");
+      check(store.events(powerDay, powerNow).stream().anyMatch(e -> e.id().equals(fuse.id()) && e.text().equals("Cầu chì 50A bị đứt")),
+          "cached original fault spelling and ID remain intact");
+      var fuseRecovery = new Rules.Event("power-fuse-recovery", powerNow - 10, "100+000", "Cầu chì 50A khôi phục tốt", false, List.of());
+      store.saveForAccount(store.account(), new WebSource.DayData(List.of(fuseRecovery), powerRoute));
+      store.updateActiveFaults(store.account(), fuseRecovery.at(), powerNow, powerDay, List.of());
+      check(store.activeFaults().stream().noneMatch(e -> e.id().equals(fuse.id()))
+          && store.incidentEvents(powerDay,powerNow).stream().anyMatch(e -> e.id().equals(fuseRecovery.id())),
+          "later fuse recovery closes correct persisted alert and stays in history");
+      try (var oldDb = context.openOrCreateDatabase("events.db", 0, null)) {
+        oldDb.execSQL("UPDATE events SET red=1 WHERE id='power-fuse-recovery'");
+      }
+      check(Rules.incidentHistory(store.incidentEvents(powerDay,powerDay+2000)).stream()
+          .anyMatch(i -> i.fault().id().equals(fuse.id()) && i.recovery()!=null
+              && i.recovery().id().equals(fuseRecovery.id())),
+          "historical interval links later known recovery even when legacy stored styling was red");
+      long revision = store.prefs.getLong("dataRevision",0);
+      store.prepareFaultRules(store.account(),powerNow);
+      check(store.prefs.getLong("dataRevision",0)==revision, "power migration is idempotent");
+      store.credentials("https://rail.example.test/", "power-rules-new-account", "test-only");
+      check(!store.faultRulesReady(), "power migration marker is scoped to account");
       result.putString("stream", checks + " account storage checks passed\n");
 
     } catch (Throwable failure) {

@@ -1017,7 +1017,7 @@ final class UiRefreshChecks {
         navigate("settings");
         String settingsVisible = labels((View) field(activity, "content"));
         check(!settingsVisible.contains("Thử chuông báo lỗi")
-                && settingsVisible.contains("Chuông và rung sự cố"),
+                && settingsVisible.contains("Giọng nói") && settingsVisible.contains("Chỉ chuông"),
             "settings removes trial playback and retains actual incident sound toggle");
       });
       ui(() -> navigate("crossingHistory"));

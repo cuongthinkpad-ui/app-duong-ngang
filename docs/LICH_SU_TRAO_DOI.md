@@ -248,3 +248,13 @@ Chủ dự án giao bốn mục đã duyệt và yêu cầu không hỏi lại: 
 Làm rõ trong cùng phiên: chủ dự án xác nhận nguyên tắc “khi xóa dấu tàu bị treo thì không xóa nhầm dấu của tàu khác đang chạy trên sơ đồ”. Đây không phải một chức năng lưu tàu riêng hay giả định có hai lượt thật cách nhau hai phút; các giờ trong ví dụ chỉ minh họa trình tự. Bản tin báo tàu và đã qua trong cùng lượt không tạo thêm tàu. Đã bổ sung hồi quy chọn đúng lượt có lỗi/tự kích khi cùng điểm có lượt khác và giữ bản tin lỗi gốc.
 
 Hoàn tất 0.26: 737 quy tắc, 12 parser, 39 HTTP fixture, 193 lưu trữ và 24 giao diện lịch sử/âm/rung đạt trên bản cuối; build/lint 0 lỗi, 15 cảnh báo. Ca dịch vụ `--nontrain-only` đạt theo chu kỳ thật 30 giây. Cài đè 0.25 → 0.26 ký gốc giữ tệp private/cài đặt và chuyển chu kỳ cũ về 30 giây. 69 ca UI cập nhật đạt trước bước bổ sung chọn đúng lượt lỗi, chi tiết phạm vi tại UI_REVIEW_0.26.md. Chưa thử Xiaomi/website thật trong phiên này. APK và checksum ở downloads/.
+
+## 0.27 — giọng đọc và lỗi nguồn
+
+Sau bản 0.26, chủ dự án yêu cầu thêm bản đọc cảnh báo: hai hồi chuông rồi đọc sáu lần, có rung; sau đó bổ sung ba lựa chọn giọng nói/chỉ chuông/im lặng. Chủ dự án yêu cầu nhận `Cầu chì 50A bị đứt` dù không đỏ, khôi phục bằng `Cầu chì 50A khôi phục tốt`; ghép `nguồn DC > 29v` với `Nguồn 24V khôi phục tốt`. Chữ hiển thị giữ nguyên dữ liệu gốc.
+
+Đã triển khai, kiểm thử TTS tiếng Việt thật, kiểm thử cache cũ/khôi phục và cài đè ký gốc. Chủ dự án còn yêu cầu xác nhận tên từ dữ liệu/web thật; môi trường trả `Domain forbidden`. Đã lưu miền vào draft và đã nhận đủ thông tin truy cập riêng; chưa xác minh đăng nhập hoặc báo cáo vì chính sách mạng chưa áp dụng. Đưa 0.27 lên nhánh kiểm thử riêng, giữ main 0.26; kết quả và phần còn chờ tại UI_REVIEW_0.27.md. Không ghi thông tin truy cập hay bản tin xác thực vào Git.
+
+## Bàn giao phiên sang Google AI Studio
+
+Chủ dự án yêu cầu lưu phiên làm việc lên GitHub để thử tiếp tục bằng Google AI Studio. Đã bổ sung tài liệu TIEP_TUC_0.27_AI_STUDIO.md gồm nhánh/commit, yêu cầu đã chốt, phần còn chờ, phạm vi kiểm thử, giới hạn Android native và prompt tiếp tục. Cập nhật liên kết bàn giao mới nhất; không chuyển thông tin truy cập, khóa ký, dữ liệu xác thực hoặc cấu hình riêng lên Git.

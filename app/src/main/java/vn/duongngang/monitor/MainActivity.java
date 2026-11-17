@@ -34,7 +34,7 @@ public class MainActivity extends Activity {
       WARNING = 0xFFFBBF24;
   private Store store;
   private LinearLayout screen, content;
-  private TextView status, routeNote, summaryTitle, summaryDetail, summaryTime;
+  private TextView status, routeNote, summaryTitle, summaryDetail, summaryTime, voiceState;
   private LinearLayout summaryCard;
   private SummaryRing summaryRing;
   private ImageView headerMark;
@@ -132,6 +132,8 @@ public class MainActivity extends Activity {
           if (followToday) selected = LocalDate.now(WebSource.ZONE);
           if (historyFollowToday) historyDay = LocalDate.now(WebSource.ZONE);
           prepareLocalData();
+          if (page.equals("settings") && voiceState != null)
+            voiceState.setText(store.prefs.getString("voiceStatus", "Giọng đọc sử dụng tiếng Việt của điện thoại"));
           String state =
               store.prefs.getString("status", "")
                   + store.prefs.getLong("lastSuccess", 0)
@@ -176,13 +178,15 @@ public class MainActivity extends Activity {
     String capturedAccount = capturedStore.account();
     long now = System.currentTimeMillis();
     if (capturedStore.travelReady() && capturedStore.axleReady()
-        && capturedStore.selfEvidenceReady() && !capturedStore.historyCleanupDue(now)) return;
+        && capturedStore.selfEvidenceReady() && capturedStore.faultRulesReady()
+        && !capturedStore.historyCleanupDue(now)) return;
     preparingLocalData = true;
     io.execute(() -> {
       boolean prepared = false;
       try {
         synchronized (Store.class) {
           if (!capturedStore.account().equals(capturedAccount)) return;
+          capturedStore.prepareFaultRules(capturedAccount, now);
           capturedStore.prepareSelfEvidence(capturedAccount, now);
           capturedStore.prepareTravelState(capturedAccount, now);
           if (!capturedStore.axleReady())
@@ -957,11 +961,15 @@ public class MainActivity extends Activity {
   }
 
   private void setAlarmSound(boolean enabled) {
-    store.prefs.edit().putBoolean("sound", enabled).apply();
-    if (!enabled) {
+    setAlertMode(enabled ? store.prefs.getString("audibleMode", AlertOptions.VOICE) : AlertOptions.SILENT);
+  }
+
+  private void setAlertMode(String mode) {
+    store.setAlertMode(mode);
+    if (store.prefs.getBoolean("running", false))
+      startService(new Intent(this, MonitorService.class).setAction("MUTE_ALARM"));
+    if (AlertOptions.SILENT.equals(store.alertMode())) {
       NotificationManager manager = getSystemService(NotificationManager.class);
-      if (store.prefs.getBoolean("running", false))
-        startService(new Intent(this, MonitorService.class).setAction("MUTE_ALARM"));
       for (var notification : manager.getActiveNotifications())
         if (notification.getId() != 1) manager.cancel(notification.getId());
     }
@@ -1081,10 +1089,10 @@ public class MainActivity extends Activity {
     mute.setGravity(Gravity.CENTER);
     mute.setBackground(shape(FAULT_TINT, 10, 0));
     mute.addView(icon(sound ? "bell" : "mute", RED, 17));
-    TextView muteText = text(sound ? "Tắt chuông" : "Bật chuông", 10, RED, true);
+    TextView muteText = text(sound ? "Tắt âm thanh" : "Bật âm thanh", 10, RED, true);
     muteText.setPadding(dp(5), 0, 0, 0);
     mute.addView(muteText);
-    mute.setContentDescription(sound ? "Tắt chuông tất cả sự cố" : "Bật chuông sự cố");
+    mute.setContentDescription(sound ? "Tắt chuông, giọng đọc và rung" : "Bật âm thanh cảnh báo");
     touch(
         mute,
         () -> {
@@ -1619,15 +1627,36 @@ public class MainActivity extends Activity {
     gap(options, 10);
     options.addView(text("Cố định 30 giây", 12, INK, true));
     divider(options);
-    Switch sound =
-        toggle(
-            "Chuông và rung sự cố",
-            "Tắt để dừng cả chuông và rung",
-            store.prefs.getBoolean("sound", true),
-            options);
-    sound.setOnCheckedChangeListener((b, on) -> setAlarmSound(on));
+    options.addView(text("CÁCH CẢNH BÁO", 10, MUTED, true));
+    RadioGroup alertModes = new RadioGroup(this);
+    String[] modeValues = {AlertOptions.VOICE, AlertOptions.BELL, AlertOptions.SILENT};
+    String[] modeLabels = {"Giọng nói · 2 hồi chuông, đọc 6 lần, có rung",
+        "Chỉ chuông · 6 hồi chuông, có rung", "Im lặng · chỉ hiện thông báo"};
+    for (int i = 0; i < modeValues.length; i++) {
+      RadioButton choice = new RadioButton(this);
+      choice.setId(View.generateViewId());
+      choice.setText(modeLabels[i]); choice.setTextColor(INK); choice.setTextSize(12);
+      choice.setButtonTintList(android.content.res.ColorStateList.valueOf(BLUE));
+      choice.setPadding(0, dp(6), 0, dp(6));
+      choice.setTag(modeValues[i]);
+      alertModes.addView(choice);
+      if (store.alertMode().equals(modeValues[i])) alertModes.check(choice.getId());
+    }
+    alertModes.setOnCheckedChangeListener((group, id) -> {
+      View selectedMode = group.findViewById(id);
+      if (selectedMode != null) setAlertMode((String) selectedMode.getTag());
+    });
+    options.addView(alertModes);
     gap(options, 7);
-    options.addView(text("Âm lượng chuông dùng mức Báo thức của điện thoại", 10, MUTED, false));
+    options.addView(text("Âm thanh dùng mức Báo thức của điện thoại", 10, MUTED, false));
+    voiceState = text(store.prefs.getString("voiceStatus", "Giọng đọc sử dụng tiếng Việt của điện thoại"), 10, MUTED, false);
+    options.addView(voiceState);
+    options.addView(action("Cài đặt giọng đọc", "link", false, () -> {
+      try { startActivity(new Intent("com.android.settings.TTS_SETTINGS")); }
+      catch (android.content.ActivityNotFoundException missing) {
+        Toast.makeText(this, "Mở Cài đặt điện thoại → Chuyển văn bản thành giọng nói", Toast.LENGTH_LONG).show();
+      }
+    }));
     gap(options, 10);
     options.addView(
         action(
@@ -1678,7 +1707,6 @@ public class MainActivity extends Activity {
                     .prefs
                     .edit()
                     .putInt("interval", Rules.POLL_SECONDS)
-                    .putBoolean("sound", sound.isChecked())
                     .putBoolean("demoUi", false)
                     .apply();
                 demo = false;

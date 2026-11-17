@@ -4,7 +4,7 @@
 Preserves/restores the emulator app's data and proxy. Never contacts the company web,
 never prints credentials. Build/install the debug APK and start an emulator first.
 """
-import json, os, pathlib, re, subprocess, sys, tempfile, threading, time
+import json, os, pathlib, re, subprocess, sys, tempfile, threading, time, html, hashlib
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -148,11 +148,21 @@ class Fixture(BaseHTTPRequestHandler):
             if current.get('nontrain_next'):
                 tn2 = datetime.fromtimestamp(current['nontrain_next'], timezone.utc).replace(tzinfo=None)+timedelta(hours=7)
                 rows += [('101+000', 'Tàu lẻ', tn2, False)]
+        if selected == now.date() and current.get('audio_stage'):
+            ta = datetime.fromtimestamp(current['audio_at'], timezone.utc).replace(tzinfo=None)+timedelta(hours=7)
+            rows += [('101+000','Cầu chì 50A bị đứt',ta,False), ('101+000','nguồn DC > 29v',ta,True)]
+            if current['audio_stage'] >= 2:
+                rows += [('101+000','Cầu chì 50A khôi phục tốt',ta+timedelta(seconds=2),False),
+                         ('101+000','Nguồn 24V khôi phục tốt',ta+timedelta(seconds=3),False),
+                         ('101+000','Chuông 1 hỏng',datetime.fromtimestamp(current['bell_at'],timezone.utc).replace(tzinfo=None)+timedelta(hours=7),True)]
+            if current['audio_stage'] >= 3:
+                ts=datetime.fromtimestamp(current['silent_at'],timezone.utc).replace(tzinfo=None)+timedelta(hours=7)
+                rows += [('101+000','Chuông 1 khôi phục tốt',ts,False),('101+000','Đèn 1 hỏng',ts,True)]
         table = "<table id='FixtureGdata'>"
         for entry in reversed(rows):
             point, text, at, red = entry[:4]
             counts = entry[4] if len(entry) > 4 else []
-            table += f"<tr><td>Km {point}</td><td><font color={'red' if red else 'blue'}>{text}</font></td><td>{selected:%d/%m}</td><td>{at:%H:%M:%S}</td>" + ''.join(f'<td>{n}</td>' for n in counts) + '</tr>'
+            table += f"<tr><td>Km {point}</td><td><font color={'red' if red else 'blue'}>{html.escape(text)}</font></td><td>{selected:%d/%m}</td><td>{at:%H:%M:%S}</td>" + ''.join(f'<td>{n}</td>' for n in counts) + '</tr>'
         body = (f"<form method='post' action='/'><h1>BÁO CÁO ĐƯỜNG NGANG CBTĐ</h1><input name='date' value='{selected:%d/%m/%Y}'>"
                 + point_options + table + '</table></form>').encode()
         self.send_response(200)
@@ -185,6 +195,10 @@ def run_diagram_checks():
 def main():
     assert adb('shell', 'getprop', 'ro.kernel.qemu').strip() == '1', 'Emulator required; physical phones are refused'
     assert adb('get-serialno').strip().startswith('emulator-'), 'Use a dedicated emulator'
+    target_apk = pathlib.Path(__file__).resolve().parent.parent/'app/build/outputs/apk/debug/app-debug.apk'
+    installed_apk = adb('shell','pm','path',PKG).strip().removeprefix('package:')
+    installed_hash = adb('shell','sha256sum',installed_apk).split()[0]
+    assert hashlib.sha256(target_apk.read_bytes()).hexdigest()==installed_hash, 'Install the current built APK before service checks'
     previous = metadata()
     previous_running = previous.get('running') == 'true'
     old_proxy = adb('shell', 'settings', 'get', 'global', 'http_proxy').strip()
@@ -224,6 +238,46 @@ def main():
             assert int(empty.get('lastAlarm', '0')) == 0, 'Empty snapshot must not sound'
             assert not faults(empty), 'Exempt axle reports must not create faults'
             print('PASS: six qualifying errors and one large deviation at all six exempt points remain silent', flush=True)
+            if '--audio-modes-only' in sys.argv:
+                phase.update(audio_stage=1,audio_at=int(time.time())-1)
+                voiced=wait_for(lambda s: any(row[3]=='Cầu chì 50A bị đứt' for row in faults(s))
+                    and any(row[3]=='nguồn DC > 29v' for row in faults(s))
+                    and int(s.get('lastAlarm','0'))>0 and s.get('voiceStatus','').startswith('Đang đọc'),
+                    'voice mode reads real service alerts, including uncolored fifty-ampere fuse')
+                def select_mode(mode, day=''):
+                    stop_service()
+                    state=ET.fromstring(preferences_xml())
+                    for key in ['alertMode','sound','running','monitorDate','historyReadDay','historyReadAt']:
+                        for child in list(state):
+                            if child.get('name')==key: state.remove(child)
+                    ET.SubElement(state,'string',name='alertMode').text=mode
+                    ET.SubElement(state,'boolean',name='sound',value='false' if mode=='silent' else 'true')
+                    ET.SubElement(state,'boolean',name='running',value='true')
+                    ET.SubElement(state,'string',name='monitorDate').text=day
+                    file=folder/'audio-mode.xml';file.write_bytes(ET.tostring(state,encoding='utf-8'))
+                    install(file,'shared_prefs/monitor.xml')
+                    adb('shell','am','start','-n',PKG+'/.MainActivity')
+                phase.update(audio_stage=2,bell_at=int(time.time())-1)
+                select_mode('bell')
+                bell=wait_for(lambda s: any(row[3]=='Chuông 1 hỏng' for row in faults(s))
+                    and int(s.get('lastAlarm','0'))>int(voiced['lastAlarm'])
+                    and s.get('voiceStatus')=='Chế độ chỉ chuông',
+                    'bell-only mode plays while fuse and DC recoveries are processed')
+                assert all(row[3] not in ('Cầu chì 50A bị đứt','nguồn DC > 29v') for row in faults(bell))
+                print('PASS: exact fuse and DC/24V recovery names close only corresponding power alerts',flush=True)
+                phase.update(audio_stage=3,silent_at=int(time.time())-1)
+                select_mode('silent')
+                silent=wait_for(lambda s: any(row[3]=='Đèn 1 hỏng' for row in faults(s))
+                    and s.get('voiceStatus')=='Đã tắt âm thanh cảnh báo', 'silent mode retains visual fault and notification')
+                assert silent.get('lastAlarm')==bell.get('lastAlarm'),'Silent mode must not start an audible batch'
+                assert 'channel=faults_silent' in adb('shell','dumpsys','notification','--noredact')
+                yesterday=(datetime.now(timezone.utc)+timedelta(hours=7)).date()-timedelta(days=1)
+                select_mode('voice',yesterday.isoformat())
+                history=wait_for(lambda s:s.get('historyReadDay')==yesterday.isoformat(),
+                    'historical read completes with voice enabled but no audible alert')
+                assert history.get('lastAlarm')==bell.get('lastAlarm'),'History must not start speech or chimes'
+                print('5 audio-mode service checks passed',flush=True)
+                return
             if '--nontrain-only' in sys.argv:
                 operator_start = int(time.time())+1
                 phase.update(nontrain=True, nontrain_at=operator_start)
