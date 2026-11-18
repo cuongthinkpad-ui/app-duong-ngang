@@ -95,8 +95,7 @@ public class MainActivity extends Activity {
             long to = day.plusDays(1).atStartOfDay(WebSource.ZONE).toInstant().toEpochMilli();
             if (day.equals(LocalDate.now(WebSource.ZONE))) to = System.currentTimeMillis() + 1;
             var events = Rules.dailyRecords(store.route(), store.events(from, to));
-            var incidents = day.equals(LocalDate.now(WebSource.ZONE))
-                ? store.incidentEvents(from, to) : events;
+            var incidents = store.incidentEvents(events, to, day.equals(LocalDate.now(WebSource.ZONE)));
             var travel = day.equals(store.monitoringDay()) && store.historicalMonitoring()
                 ? store.events(Rules.historyCutoff(System.currentTimeMillis()), to) : List.<Rules.Event>of();
             var state = Rules.diagramEnabled(Rules.POLL_SECONDS)
@@ -582,7 +581,7 @@ public class MainActivity extends Activity {
     if (viewFaults != null) return viewFaults;
     if (demo) return viewFaults = Rules.activeFaults(samples());
     if (historicalView()) {
-      var records = new ArrayList<>(allToday());
+      var records = new ArrayList<>(dayData(viewDay()).incidents());
       if (!Rules.selfTriggerEnabled(Rules.POLL_SECONDS)) records.removeIf(Rules::isSelfTrigger);
       return viewFaults = Rules.activeFaults(records);
     }
@@ -1994,10 +1993,10 @@ public class MainActivity extends Activity {
     gap(summary, 7);
     summary.addView(text("Thông tin ghi nhận gần nhất", 10, MUTED, false));
     divider(summary);
-    String[] labels = {"Chuông", "Đèn", "Cần chắn", "Cảm biến", "Kết nối", "Điện áp"};
+    String[] labels = {"Chuông", "Đèn", "Cần chắn", "Cảm biến", "Kết nối", "Điện áp", "PLC"};
     String[] values = new String[labels.length];
     for (int i = 0; i < labels.length; i++) values[i] = deviceReading(faults, labels[i]);
-    String[] icons = {"bell", "alert", "rail", "overview", "link", "voltage"};
+    String[] icons = {"bell", "alert", "rail", "overview", "link", "voltage", "overview"};
     for (int i = 0; i < labels.length; i++) {
       final String value = values[i];
       boolean redReading = faults.stream().anyMatch(e -> value.contains(e.text()));

@@ -22,6 +22,8 @@ public final class Rules {
           "(cảm biến|cần chắn|chuông|đèn)(?:\\s+(?:điện|cảnh báo|tín hiệu|đỏ|số))*\\s*(\\d+)");
   private static final java.util.regex.Pattern DEVICE_STATE =
       java.util.regex.Pattern.compile("\\s+(?:hỏng|khôi phục|mất|bất thường|bị)\\b");
+  private static final java.util.regex.Pattern BARRIER_STATE =
+      java.util.regex.Pattern.compile("cần chắn (?:số )?(1|2) (mất trạng thái|đã hạ|đã nâng)");
   private static final java.util.regex.Pattern BARRIER_ACTIVITY =
       java.util.regex.Pattern.compile(
           "(?iu)^cần\\s+chắn(?:\\s+(?:số\\s+)?\\d+)?\\s+đã\\s+(hạ|nâng)$");
@@ -233,7 +235,9 @@ public final class Rules {
 
   public static boolean knownFault(String text) {
     String t = normalizedReport(text);
-    return t.startsWith("cầu chì") && FUSE_BLOWN.matcher(t).matches()
+    return t.equals("plc hỏng") || (t.startsWith("cần chắn ")
+        && BARRIER_STATE.matcher(t).matches() && t.endsWith(" mất trạng thái"))
+        || t.startsWith("cầu chì") && FUSE_BLOWN.matcher(t).matches()
         || t.startsWith("nguồn") && DC_OVER.matcher(t).matches();
   }
 
@@ -1163,6 +1167,7 @@ public final class Rules {
     if (t.contains("chuông")) return "Chuông";
     if (t.contains("đèn")) return "Đèn";
     if (t.contains("cần chắn")) return "Cần chắn";
+    if (faultKey(t).equals("plc")) return "PLC";
     if (t.contains("kết nối")) return "Kết nối";
     if (t.contains("điện áp") || t.contains("220vac") || t.contains("nguồn") || t.contains("cầu chì")) return "Điện áp";
     return "";
@@ -1194,6 +1199,9 @@ public final class Rules {
   /** Generic system restoration must never clear unrelated device faults. */
   public static String faultKey(String text) {
     String t = normalizedReport(text);
+    if (t.equals("plc hỏng") || t.equals("plc khôi phục tốt")) return "plc";
+    var barrier = BARRIER_STATE.matcher(t);
+    if (barrier.matches()) return "cần chắn " + barrier.group(1) + " mất trạng thái";
     if (FUSE_BLOWN.matcher(t).matches() || FUSE_RECOVERED.matcher(t).matches()) return "cầu chì 50a";
     if (DC_OVER.matcher(t).matches() || DC_RECOVERED.matcher(t).matches())
       return "nguồn dc > 29v";
@@ -1237,45 +1245,60 @@ public final class Rules {
 
   public record Incident(Event fault, Event recovery) {}
 
-  private static boolean isFaultRelevant(Event event) {
-    return event.red()
-        || event.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")
-        || event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
-        || endsTrain(event.text());
+  static boolean isEquipmentRecovery(String text) {
+    String t = normalizedReport(text);
+    var barrier = BARRIER_STATE.matcher(t);
+    return t.equals("plc khôi phục tốt") || barrier.matches() && barrier.group(2).startsWith("đã ");
   }
 
-  /** Pair only explicit restoration messages with earlier faults of that device and crossing. */
+  private static boolean isRecovery(Event event) {
+    return isEquipmentRecovery(event.text()) || !event.red()
+        && (normalizedReport(event.text()).contains("khôi phục tốt")
+            || event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
+            || endsTrain(event.text()));
+  }
+
+  private static final Comparator<Event> FAULT_ORDER = Comparator.comparingLong(Event::at)
+      // These restorations require a strictly earlier fault, even at one-second precision.
+      .thenComparingInt(e -> isEquipmentRecovery(e.text()) ? -1 : reportPhase(e));
+
+  private static List<String> recoveryKeys(Event event, Set<String> open) {
+    String prefix = km(event.crossing()) + "|";
+    if (event.text().trim().equalsIgnoreCase("Khôi phục hệ thống") || endsTrain(event.text()))
+      return List.of(prefix + "@self");
+    String text = normalizedReport(event.text());
+    String key = eventFaultKey(event);
+    if (text.contains("cần chắn") && key.equals(text)) {
+      List<String> matches = new ArrayList<>();
+      matches.add(prefix + key);
+      for (String candidate : open)
+        if (candidate.startsWith(prefix + "cần chắn ")) matches.add(candidate);
+      return matches;
+    }
+    if (key.matches("cần chắn [12]") && text.contains("khôi phục tốt"))
+      return List.of(prefix + key, prefix + key + " mất trạng thái");
+    return List.of(prefix + key);
+  }
+
+  /** Pair restoration messages with faults of that device and crossing. */
   public static List<Incident> incidentHistory(List<Event> input) {
-    List<Event> ordered = new ArrayList<>();
-    for (var event : input) if (isFaultRelevant(event)) ordered.add(event);
-    ordered.sort(Comparator.comparingLong(Event::at).thenComparingInt(Rules::reportPhase));
     List<Incident> result = new ArrayList<>();
     Map<String, List<Integer>> open = new HashMap<>();
+    List<Event> ordered = new ArrayList<>(input);
+    ordered.sort(FAULT_ORDER);
     for (Event event : ordered) {
       if (isExcludedAxleFault(event)) continue;
-      String key = km(event.crossing()) + "|" + eventFaultKey(event);
-      if (event.red()) {
-        open.computeIfAbsent(key, k -> new ArrayList<>()).add(result.size());
-        result.add(new Incident(event, null));
-      } else if (event.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")
-          || event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
-          || endsTrain(event.text())) {
-        List<String> matches = new ArrayList<>();
-        if (event.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
-            || endsTrain(event.text())) matches.add(km(event.crossing()) + "|@self");
-        else matches.add(key);
-        String lower = event.text().toLowerCase(Locale.ROOT);
-        if (lower.contains("cần chắn") && faultKey(event.text()).equals(lower)) {
-          String prefix = km(event.crossing()) + "|cần chắn ";
-          for (String candidate : open.keySet())
-            if (candidate.startsWith(prefix)) matches.add(candidate);
-        }
-        for (String match : matches) {
-          List<Integer> indices = open.remove(match);
+      if (isRecovery(event)) {
+        for (String key : recoveryKeys(event, open.keySet())) {
+          List<Integer> indices = open.remove(key);
           if (indices != null)
             for (int index : indices)
               result.set(index, new Incident(result.get(index).fault(), event));
         }
+      } else if (event.red()) {
+        String key = km(event.crossing()) + "|" + eventFaultKey(event);
+        open.computeIfAbsent(key, k -> new ArrayList<>()).add(result.size());
+        result.add(new Incident(event, null));
       }
     }
     result.sort(Comparator.comparingLong((Incident i) -> i.fault().at()).reversed());
@@ -1283,25 +1306,16 @@ public final class Rules {
   }
 
   public static List<Event> activeFaults(List<Event> input) {
-    List<Event> sorted = new ArrayList<>();
-    for (var event : input) if (isFaultRelevant(event)) sorted.add(event);
-    sorted.sort(Comparator.comparingLong(Event::at).thenComparingInt(Rules::reportPhase));
+    List<Event> ordered = new ArrayList<>();
+    for (var event : input)
+      if (!isExcludedAxleFault(event) && (event.red() || isRecovery(event))) ordered.add(event);
+    ordered.sort(FAULT_ORDER);
     Map<String, Event> faults = new LinkedHashMap<>();
-    for (Event e : sorted) {
-      if (isExcludedAxleFault(e)) continue;
-      String k = km(e.crossing()) + "|" + eventFaultKey(e);
-      if (e.red()) faults.put(k, e);
-      else if (e.text().trim().equalsIgnoreCase("Khôi phục hệ thống")
-          || endsTrain(e.text())) {
-        faults.remove(km(e.crossing()) + "|@self");
-      } else if (e.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt")) {
-        faults.remove(k);
-        // The actual web has a collective "Cần chắn khôi phục tốt" event.
-        if (e.text().toLowerCase(Locale.ROOT).contains("cần chắn")
-            && faultKey(e.text()).equals(e.text().toLowerCase(Locale.ROOT))) {
-          String prefix = km(e.crossing()) + "|cần chắn ";
-          faults.keySet().removeIf(key -> key.startsWith(prefix));
-        }
+    for (Event event : ordered) {
+      if (isRecovery(event)) {
+        for (String key : recoveryKeys(event, faults.keySet())) faults.remove(key);
+      } else {
+        faults.put(km(event.crossing()) + "|" + eventFaultKey(event), event);
       }
     }
     var result = new ArrayList<>(faults.values());

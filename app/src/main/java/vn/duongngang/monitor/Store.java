@@ -11,6 +11,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import org.json.*;
 
 public final class Store {
+  private static final int FAULT_RULES_VERSION = 2;
   private static final int TRAVEL_VERSION = 6;
   private static final int AXLE_VERSION = 3;
   private static final int SELF_EVIDENCE_VERSION = 5;
@@ -39,13 +40,13 @@ public final class Store {
     edit.apply();
   }
 
-  public boolean faultRulesReady() { return prefs.getInt("faultRulesVersion", 0) == 1; }
+  public boolean faultRulesReady() { return prefs.getInt("faultRulesVersion", 0) == FAULT_RULES_VERSION; }
 
   public void prepareFaultRules(String expected, long now) {
     synchronized (Store.class) {
       if (!account().equals(expected) || faultRulesReady()) return;
       long baseline = Rules.faultBaseline(prefs.getLong("baselineFrom", 0), now);
-      updateActiveFaults(expected, baseline, now, baseline, List.of());
+      updateActiveFaults(expected, now + 1, now, baseline, List.of(), false);
     }
   }
 
@@ -253,6 +254,12 @@ public final class Store {
    */
   public List<Rules.Event> updateActiveFaults(
       String expected, long replayFrom, long now, long baseline, List<String> disproved) {
+    return updateActiveFaults(expected, replayFrom, now, baseline, disproved, true);
+  }
+
+  private List<Rules.Event> updateActiveFaults(
+      String expected, long replayFrom, long now, long baseline, List<String> disproved,
+      boolean updateOccupation) {
     synchronized (Store.class) {
       if (!account().equals(expected)) throw new IllegalStateException("Tài khoản đã thay đổi");
       if (!axleReady()) discardExcludedAxleAlerts();
@@ -264,10 +271,12 @@ public final class Store {
       // A cached self-trigger may predate the newest delta page. Include its reset even
       // after upgrading from a version that did not yet recognize the manual button.
       boolean remapFaults = !faultRulesReady();
-      long from = remapFaults ? Math.min(replayFrom, baseline) : replayFrom;
+      long from = replayFrom;
       for (var fault : input) if (Rules.isSelfTrigger(fault)) from = Math.min(from, fault.at());
       List<Rules.Event> recent = events(from, now + 1);
-      for (var e : recent) if (!Rules.isAxleFault(e) && e.at() >= baseline) input.add(e);
+      List<Rules.Event> faultReports =
+          remapFaults && baseline < from ? events(baseline, now + 1) : recent;
+      for (var e : faultReports) if (!Rules.isAxleFault(e) && e.at() >= baseline) input.add(e);
       List<Rules.Event> active = Rules.activeFaults(input);
       JSONArray list = new JSONArray();
       for (var e : active)
@@ -278,20 +287,21 @@ public final class Store {
                 .put(e.crossing())
                 .put(e.text())
                 .put(new JSONArray(e.counts())));
-      List<Rules.Event> occupied = occupationEvents();
-      occupied.addAll(recent);
-      JSONArray points = new JSONArray();
-      for (var point : Rules.occupancies(route(), occupied))
-        points.put(new JSONArray().put(point.crossing()).put(point.direction()).put(point.at()));
-      prefs
-          .edit()
-          .putString("activeFaults", list.toString())
-          .putString("occupiedPoints", points.toString())
+      var edit = prefs.edit().putString("activeFaults", list.toString());
+      if (updateOccupation) {
+        List<Rules.Event> occupied = occupationEvents();
+        occupied.addAll(recent);
+        JSONArray points = new JSONArray();
+        for (var point : Rules.occupancies(route(), occupied))
+          points.put(new JSONArray().put(point.crossing()).put(point.direction()).put(point.at()));
+        edit.putString("occupiedPoints", points.toString());
+      }
+      edit
           .putInt("axleVersion", AXLE_VERSION)
-          .putInt("faultRulesVersion", 1)
+          .putInt("faultRulesVersion", FAULT_RULES_VERSION)
           .putLong("dataRevision", prefs.getLong("dataRevision", 0) + (remapFaults ? 1 : 0))
           .apply();
-      updateTravelState(now);
+      if (updateOccupation) updateTravelState(now);
       return active;
     }
   }
@@ -738,20 +748,31 @@ public final class Store {
    * trigger.
    */
   public synchronized List<Rules.Event> incidentEvents(long from, long to) {
-    List<Rules.Event> out = events(from, to);
-    out.removeIf(Rules::isAxleFault);
-    out.addAll(Rules.axleAlerts(route(), out));
+    return incidentEvents(Rules.dailyRecords(route(), events(from, to)), to, true);
+  }
+
+  synchronized List<Rules.Event> incidentEvents(
+      List<Rules.Event> dayRecords, long to, boolean includeOtherLaterRecoveries) {
+    List<Rules.Event> out = new ArrayList<>(dayRecords);
+
     Set<String> inferredPoints = new HashSet<>();
-    for (var event : out) if (Rules.isSelfTrigger(event)) inferredPoints.add(event.crossing());
+    for (var event : out) if (includeOtherLaterRecoveries && Rules.isSelfTrigger(event)) inferredPoints.add(event.crossing());
     try (var db = db()) {
       try (var cursor =
           db.rawQuery(
-              "SELECT * FROM events WHERE at>=? AND text LIKE ? ORDER BY at DESC",
-              new String[] {"" + to, "%khôi phục tốt%"})) {
+              "SELECT * FROM events WHERE at>=? AND"
+                  + " (text LIKE ? OR lower(trim(text)) LIKE ?)"
+                  + (includeOtherLaterRecoveries ? " OR (at>=? AND text LIKE ?)" : ""),
+              includeOtherLaterRecoveries
+                  ? new String[] {"" + to, "%ch_n%", "%plc%", "" + to, "%khôi phục tốt%"}
+                  : new String[] {"" + to, "%ch_n%", "%plc%"})) {
         List<Rules.Event> later = new ArrayList<>();
         appendRows(cursor, later);
         // Legacy rows may retain erroneous website styling; classify the known recovery first.
-        for (var event : later) if (!event.red()) out.add(event);
+        for (var event : later)
+          if (Rules.isEquipmentRecovery(event.text()) || includeOtherLaterRecoveries
+              && !event.red() && event.text().toLowerCase(Locale.ROOT).contains("khôi phục tốt"))
+            out.add(event);
       }
       for (String point : inferredPoints)
         try (var cursor =

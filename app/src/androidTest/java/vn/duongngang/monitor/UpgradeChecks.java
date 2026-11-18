@@ -5,7 +5,7 @@ import android.content.Context;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-/** Synthetic data on a dedicated emulator; run seed on 0.27, then verify after install -r. */
+/** Synthetic data on a dedicated emulator; run seed on 0.27.4, then verify after install -r. */
 final class UpgradeChecks {
   static String run(Instrumentation runner, boolean seed) throws Exception {
     if (!android.os.Build.HARDWARE.contains("ranchu"))
@@ -14,7 +14,7 @@ final class UpgradeChecks {
     Store store = new Store(context);
     long version = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).getLongVersionCode();
     if (seed) {
-      if (version != 27 && version != 30) throw new AssertionError("Seed must run against original 0.27 or 0.27.3 APK");
+      if (version != 31) throw new AssertionError("Seed must run against original 0.27.4 APK");
       String user = store.prefs.getString("user", "");
       if (!user.isEmpty() && !user.equals("upgrade-fixture"))
         throw new IllegalStateException("Refusing to replace existing account");
@@ -30,7 +30,7 @@ final class UpgradeChecks {
       }
       return "Upgrade fixture seeded on versionCode " + version + "\n";
     }
-    if (version != 31) throw new AssertionError("Verify must run against 0.27.4 APK");
+    if (version != 32) throw new AssertionError("Verify must run against 0.27.5 APK");
     if (!store.password().equals("synthetic-upgrade-password")) throw new AssertionError("Encrypted password or Android Keystore lost");
     if (!store.prefs.getString("user", "").equals("upgrade-fixture")
         || !store.prefs.getString("url", "").equals("http://127.0.0.1:9/")) throw new AssertionError("Account lost");
@@ -48,6 +48,6 @@ final class UpgradeChecks {
       if (size < 0 || !new String(bytes, 0, size, StandardCharsets.UTF_8).equals("preserve-private-data"))
         throw new AssertionError("Private file lost");
     }
-    return "6 install-over data checks passed (0.27.3 to 0.27.4)\n";
+    return "6 install-over data checks passed (0.27.4 to 0.27.5)\n";
   }
 }

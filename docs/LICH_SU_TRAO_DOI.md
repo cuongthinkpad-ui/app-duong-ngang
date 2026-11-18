@@ -1,5 +1,9 @@
 # Nhật ký trao đổi và các quyết định của chủ dự án
 
+## Bổ sung — 0.27.5
+
+Chủ dự án duyệt ghép bản tin cần 1/2 đã hạ hoặc đã nâng với lỗi mất trạng thái trước đó của chính cần tại cùng điểm, kể cả qua lượt tàu sau. Một bản tin PLC khôi phục tốt khép tất cả ghi nhận PLC hỏng trước đó tại cùng điểm. Giữ từng bản tin gốc, bằng chứng, lỗi khác và dữ liệu tài khoản. Bản Android 0.27.5 tiếp tục từ APK 0.27.4 đã có chấm đỏ. Xem [nguyên nhân và kiểm chứng](UI_REVIEW_0.27.5.md).
+
 ## Bổ sung — 0.27.4
 
 Chủ dự án đã duyệt hai sửa đổi hiển thị trên Android chính: chấm đường ngang đỏ khi còn sự cố chưa khôi phục và trở về màu sơ đồ khi hết lỗi; danh sách thay giờ bên phải bằng Tốt khi đã tải đủ dữ liệu và không lỗi, hoặc N sự cố màu đỏ theo lỗi còn tồn tại. Ga giữ nguyên, đoạn tàu/mũi tên xanh. Không sửa nghiệp vụ, âm thanh hay lịch đọc Android.

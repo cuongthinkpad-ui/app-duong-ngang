@@ -1,4 +1,6 @@
-# Đường Ngang — cập nhật 0.27.4
+# Đường Ngang — cập nhật 0.27.5
+
+**[Tải APK 0.27.5](DuongNgang-0.27.5.apk)** — ký khóa gốc, versionCode 32. Cài đè trực tiếp và giữ ứng dụng hiện có trên máy. [Checksum](SHA256SUMS) · [Biên bản kiểm thử](../docs/UI_REVIEW_0.27.5.md).
 
 **[Tải APK 0.27.4](DuongNgang-0.27.4.apk)** — ký khóa gốc, versionCode 31; cài đè, **không gỡ app cũ**. Chấm đường ngang đỏ khi còn lỗi chưa khôi phục; danh sách ghi **N sự cố** màu đỏ hoặc **Tốt** sau khi tải đủ dữ liệu. Giữ toàn bộ nghiệp vụ, âm thanh và nhịp đọc của 0.27.3. [Kiểm chứng và bàn giao](../docs/UI_REVIEW_0.27.4.md).
 

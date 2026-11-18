@@ -1,4 +1,6 @@
-> Bàn giao mới nhất: [0.27.4 — hiển thị sự cố trên chấm và danh sách](UI_REVIEW_0.27.4.md), nhánh làm việc `codex/android-0.27.3-ui`, nền Android 0.27.3 tại `ee1affe` trên `codex/0.27-notification-stop`. Chỉ sửa hiển thị theo yêu cầu đã duyệt; giữ lịch đọc 30 giây/thử lại 120 giây và âm thanh của 0.27.3. Main vẫn là 0.26; nhánh iPhone/web không phải nguồn cho bản này.
+> Bàn giao mới nhất cho [0.27.5 — khôi phục lỗi cần chắn và PLC](UI_REVIEW_0.27.5.md) nằm trên nhánh `codex/android-0.27.5-recovery` từ Android 0.27.4 tại `1f0ef05`. Cache lỗi phiên bản 2 dựng lại từ dữ liệu cục bộ. Tài liệu liên kết APK ký gốc, checksum và kết quả kiểm thử.
+
+> Bàn giao trước: [0.27.4 — hiển thị sự cố trên chấm và danh sách](UI_REVIEW_0.27.4.md), nhánh làm việc `codex/android-0.27.3-ui`, nền Android 0.27.3 tại `ee1affe` trên `codex/0.27-notification-stop`. Chỉ sửa hiển thị theo yêu cầu đã duyệt; giữ lịch đọc 30 giây/thử lại 120 giây và âm thanh của 0.27.3. Main vẫn là 0.26; nhánh iPhone/web không phải nguồn cho bản này.
 
 > Bàn giao trước: [0.27.3 — tự kết nối lại](UI_REVIEW_0.27.3.md), nhánh `codex/0.27-notification-stop`, tiếp tục từ `527fc3d`. Lỗi kết nối tự thử lại sau 2 phút ở nền. Ô nhỏ **giữa CÓ SỰ CỐ và sơ đồ** luôn hiện trạng thái/tiến trình tải; chỉ khi mất kết nối mới hiện nút đỏ **Kết nối lại** và dòng **Mất kết nối**. Thu gọn phần trên để dành chỗ, không thêm mục phía dưới. Kết nối thành công trở lại đọc 30 giây; giữ XÁC NHẬN, dữ liệu và không đọc lại lỗi cũ. Main vẫn giữ 0.26.
 

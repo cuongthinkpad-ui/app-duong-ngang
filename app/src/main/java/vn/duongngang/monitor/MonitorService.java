@@ -30,6 +30,11 @@ public class MonitorService extends Service {
 
   private void resetDailyFaults() {
     store.resetDailyFaults(System.currentTimeMillis());
+    retainOpenAlerts();
+    sendBroadcast(new Intent(UPDATE).setPackage(getPackageName()));
+  }
+
+  private void retainOpenAlerts() {
     Set<Integer> open = new HashSet<>();
     for (var fault : store.activeFaults()) open.add(notificationId(fault));
     var manager = getSystemService(NotificationManager.class);
@@ -41,7 +46,6 @@ public class MonitorService extends Service {
     ringingFaults.retainAll(current);
     if (voice != null) voice.retain(current);
     if (ringingFaults.isEmpty()) stopAlerts();
-    sendBroadcast(new Intent(UPDATE).setPackage(getPackageName()));
   }
 
   private void scheduleDailyReset() {
@@ -232,7 +236,11 @@ public class MonitorService extends Service {
       WebSource pollSource;
       synchronized (Store.class) {
         if (!store.account().equals(account) || Thread.currentThread().isInterrupted()) return;
-        store.maintainHistory(account, System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+        boolean remapFaults = !store.faultRulesReady();
+        store.prepareFaultRules(account, now);
+        if (remapFaults) retainOpenAlerts();
+        store.maintainHistory(account, now);
         if (source == null || !sourceAccount.equals(account)) {
           source =
               new WebSource(

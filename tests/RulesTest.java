@@ -36,6 +36,7 @@ public class RulesTest {
   public static void main(String[] args) {
     sectionContinuity026();
     powerFaults027();
+    equipmentRecovery0275();
     var historyRoute = new Rules.Route(List.of("312+111", "313+800", "314+550"));
     List<Rules.Event> historyRaw = new ArrayList<>();
     for (int i = 0; i < 6; i++) historyRaw.add(axle(100000L + i * 60000L, "313+800", 3, 3));
@@ -2265,6 +2266,52 @@ public class RulesTest {
     check(!event(1,"100+000","Cầu chì 50A khôi phục tốt",true).red()
         && !event(1,"100+000","Nguồn 24V khôi phục tốt",true).red(),
         "known recovery messages remain recoveries even with erroneous red styling");
+  }
+
+  static void equipmentRecovery0275() {
+    String crossing = "332+350", other = "321+780";
+    var one = event(201620, crossing, "Cần chắn 1 mất trạng thái", true);
+    var two = event(201620, crossing, "Cần chắn 2 mất trạng thái", true);
+    var down = event(201625, crossing, "Cần chắn 1 đã hạ", false);
+    var up = event(201630, crossing, "Cần chắn 2 đã nâng", false);
+    var early = event(201619, crossing, "Cần chắn 1 đã nâng", false);
+    var tied = event(one.at(), crossing, "Cần chắn 1 đã hạ", false);
+    var elsewhere = event(201626, other, "Cần chắn 2 đã hạ", false);
+    var otherBarrierFault = event(201621, crossing, "Cần chắn 1 hỏng", true);
+    var trainFault = event(201622, crossing, "Tàu không qua đường ngang", true);
+    var again = event(201640, crossing, one.text(), true);
+    check(Rules.activeFaults(List.of(early, one, tied)).equals(List.of(one)),
+        "earlier and same-second actions do not recover a barrier fault");
+    check(Rules.activeFaults(List.of(two, one, down, elsewhere, otherBarrierFault, trainFault))
+        .equals(List.of(trainFault, otherBarrierFault, two)),
+        "numbered lowering recovers only matching lost state at the same point");
+    check(Rules.activeFaults(List.of(again, up, down, two, one)).equals(List.of(again)),
+        "either direction of motion is enough and a subsequent fault reopens");
+    var barriers = Rules.incidentHistory(List.of(again, two, down, one, up, elsewhere));
+    check(barriers.contains(new Rules.Incident(one, down))
+        && barriers.contains(new Rules.Incident(two, up))
+        && barriers.contains(new Rules.Incident(again, null)),
+        "history retains fault records and exact evidence across independent barrier cycles");
+
+    var plc1 = event(85238, other, "PLC hỏng", true);
+    var plc2 = event(85951, other, "PLC hỏng", false);
+    var plcRecovery = event(90009, other, "PLC khôi phục tốt", true);
+    var plcElsewhere = event(85950, crossing, plc1.text(), true);
+    var mains = event(85952, other, "Mất nguồn xoay chiều 220VAC", true);
+    var plcAgain = event(90100, other, plc1.text(), true);
+    check(Rules.activeFaults(List.of(plcRecovery, plc2, plc1)).isEmpty(),
+        "one PLC recovery closes repeated faults, regardless of source styling or order");
+    var plcRecords = List.of(plcRecovery, plc1, plc2, plcElsewhere, mains, plcAgain);
+    check(Rules.activeFaults(plcRecords).equals(List.of(plcAgain, mains, plcElsewhere)),
+        "PLC reopen is effective and recovery never crosses locations or device types");
+    var plcHistory = Rules.incidentHistory(plcRecords);
+    check(plcHistory.size() == 5 && plcHistory.contains(new Rules.Incident(plc1, plcRecovery))
+        && plcHistory.contains(new Rules.Incident(plc2, plcRecovery))
+        && plcHistory.contains(new Rules.Incident(plcAgain, null)),
+        "both original PLC faults link to the same recovery and reopen stays in history");
+    var tiedPlc = event(plcRecovery.at(), other, plc1.text(), true);
+    check(Rules.incidentHistory(List.of(plc1, tiedPlc, plcRecovery))
+        .contains(new Rules.Incident(tiedPlc, null)), "PLC recovery requires a strictly earlier fault");
   }
 
 }

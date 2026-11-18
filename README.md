@@ -1,4 +1,6 @@
-# Đường Ngang — Android 0.27.4
+# Đường Ngang — Android 0.27.5
+
+**[Bàn giao và kiểm chứng 0.27.5](docs/UI_REVIEW_0.27.5.md)** — khôi phục lỗi mất trạng thái theo đúng số cần và khép toàn bộ ghi nhận PLC hỏng trước bản tin PLC khôi phục tốt tại cùng đường ngang. [Tải APK ký gốc](downloads/DuongNgang-0.27.5.apk).
 
 **[Bàn giao và kiểm chứng 0.27.4](docs/UI_REVIEW_0.27.4.md)** — chấm đường ngang đỏ khi còn sự cố chưa khôi phục; hết lỗi trở về màu sơ đồ. Danh sách thay giờ bên phải bằng **N sự cố** màu đỏ hoặc **Tốt** khi đã tải đủ dữ liệu. Giữ ga, đoạn tàu, nghiệp vụ, âm thanh và lịch đọc của Android 0.27.3. [Tải APK ký gốc](downloads/DuongNgang-0.27.4.apk).
 

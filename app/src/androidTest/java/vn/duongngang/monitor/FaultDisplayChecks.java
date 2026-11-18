@@ -102,8 +102,9 @@ final class FaultDisplayChecks {
       List<Rules.Event> events = new ArrayList<>(List.of(
           new Rules.Event("arrival", at, "312+111", "Tàu lẻ", false, List.of()),
           new Rules.Event("passage", at + 1000, "312+111", "Tàu lẻ đã qua đường ngang", false, List.of()),
-          new Rules.Event("bell", at + 2000, "312+111", "Chuông 1 hỏng", true, List.of()),
-          new Rules.Event("light", at + 3000, "312+111", "Đèn đỏ 1 hỏng", true, List.of()),
+          new Rules.Event("barrier", at + 2000, "312+111", "Cần chắn 1 mất trạng thái", true, List.of()),
+          new Rules.Event("plc", at + 3000, "312+111", "PLC hỏng", true, List.of()),
+          new Rules.Event("plc-repeat", at + 3500, "312+111", "PLC hỏng", true, List.of()),
           new Rules.Event("station", at + 4000, "319+200 (Vi)", "Chuông 1 hỏng", true, List.of())));
       fixture.saveHistoricalDay(fixture.account(), day, new WebSource.DayData(events, route));
       ui(() -> call("refreshContent")); await("2 sự cố");
@@ -115,7 +116,7 @@ final class FaultDisplayChecks {
       });
       // Exercise refresh while keeping the same diagram View instance.
       Object[] original = {null}; ui(() -> original[0] = get("routeView"));
-      events.add(new Rules.Event("bell-recovered", at + 5000, "312+111", "Chuông 1 khôi phục tốt", false, List.of()));
+      events.add(new Rules.Event("barrier-recovered", at + 5000, "312+111", "Cần chắn 1 đã hạ", false, List.of()));
       fixture.saveHistoricalDay(fixture.account(), day, new WebSource.DayData(events, route));
       ui(() -> call("refreshContent"));
       long until = System.currentTimeMillis() + 30000;
@@ -132,7 +133,7 @@ final class FaultDisplayChecks {
         b.recycle(); set("page", "crossings"); call("render");
         check(find(entry("312+111"), "1 sự cố") != null, "list count decrements after partial recovery");
       });
-      events.add(new Rules.Event("light-recovered", at + 6000, "312+111", "Đèn đỏ 1 khôi phục tốt", false, List.of()));
+      events.add(new Rules.Event("plc-recovered", at + 6000, "312+111", "PLC khôi phục tốt", false, List.of()));
       fixture.saveHistoricalDay(fixture.account(), day, new WebSource.DayData(events, route));
       ui(() -> call("refreshContent"));
       until = System.currentTimeMillis() + 30000;
