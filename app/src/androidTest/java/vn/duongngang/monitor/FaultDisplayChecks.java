@@ -77,8 +77,18 @@ final class FaultDisplayChecks {
       check(b.getPixel(dp(385), dp(50)) == color("WARNING"), "station remains amber even with fault data");
       check(b.getPixel(dp(115), dp(50)) == color("GREEN"), "train segment stays green");
       int green = 0;
-      for (int y = dp(3); y < dp(40); y++) for (int x = dp(50); x < dp(180); x++)
-        if (b.getPixel(x, y) == color("GREEN")) green++;
+      int trainColor = color("GREEN");
+      // The 9dp glyphs can be fully antialiased on a low-density emulator.
+      // Sample the label lane above the track halo and allow partially covered pixels.
+      for (int y = dp(24); y < dp(44); y++) {
+        for (int x = dp(50); x < dp(180); x++) {
+          int pixel = b.getPixel(x, y);
+          int colorDistance = Math.abs(Color.red(pixel) - Color.red(trainColor))
+              + Math.abs(Color.green(pixel) - Color.green(trainColor))
+              + Math.abs(Color.blue(pixel) - Color.blue(trainColor));
+          if (colorDistance <= 70) green++;
+        }
+      }
       check(green > 0, "direction arrow and train label remain green");
     } finally { b.recycle(); }
   }
