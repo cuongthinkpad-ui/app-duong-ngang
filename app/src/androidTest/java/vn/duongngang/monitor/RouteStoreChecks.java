@@ -32,6 +32,26 @@ public final class RouteStoreChecks extends Instrumentation {
 
   @Override
   public void onStart() {
+    if (upgradeMode.equals("equipment-recovery")) {
+      if (!android.os.Build.HARDWARE.contains("ranchu"))
+        throw new IllegalStateException("Dedicated emulator only");
+      Context context = getTargetContext().createDeviceProtectedStorageContext();
+      Store store = new Store(context);
+      Bundle result = new Bundle();
+      int code = -1;
+      try {
+        checkEquipmentRecovery(context, store);
+        result.putString("stream", checks + " equipment recovery storage checks passed\n");
+      } catch (Throwable failure) {
+        result.putString("stream", "FAILED: " + failure + "\n");
+        code = 0;
+      } finally {
+        store.prefs.edit().clear().commit();
+        context.deleteDatabase("events.db");
+      }
+      finish(code, result);
+      return;
+    }
     if (upgradeMode.equals("fault-display")) {
       Bundle result = new Bundle();
       try {
@@ -1419,36 +1439,7 @@ public final class RouteStoreChecks extends Instrumentation {
       check(store.prefs.getLong("dataRevision",0)==revision, "power migration is idempotent");
       store.credentials("https://rail.example.test/", "power-rules-new-account", "test-only");
       check(!store.faultRulesReady(), "power migration marker is scoped to account");
-      var previousPlc = new Rules.Event("older-plc", powerDay - 2000, "101+000", "PLC hỏng", true, List.of());
-      var repeatedPlc = new Rules.Event("repeated-plc", powerDay - 1000, "101+000", "PLC hỏng", true, List.of());
-      long equipmentNow = Math.max(powerNow, powerDay + 10000);
-      var plcRecovered = new Rules.Event("plc-restored", powerDay + 3000, "101+000", "PLC khôi phục tốt", false, List.of());
-      var barrier = new Rules.Event("lost-barrier", powerDay + 1000, "101+000", "Cần chắn 1 mất trạng thái", true, List.of());
-      var lower = new Rules.Event("lowered-barrier", powerDay + 2000, "101+000", "Cần chắn 1 đã hạ", false, List.of());
-      store.saveForAccount(store.account(),
-          new WebSource.DayData(List.of(previousPlc, repeatedPlc, plcRecovered, barrier, lower), powerRoute));
-      var staleBarrier = new org.json.JSONArray().put(new org.json.JSONArray().put(barrier.id())
-          .put(barrier.at()).put(barrier.crossing()).put(barrier.text()).put(new org.json.JSONArray()));
-      store.prefs.edit().putString("activeFaults", staleBarrier.toString())
-          .putInt("faultRulesVersion", 1).putLong("lastAlarm", 1234L).commit();
-      var restarted = new Store(context);
-      restarted.prepareFaultRules(restarted.account(), equipmentNow);
-      check(restarted.faultRulesReady() && restarted.activeFaults().isEmpty()
-          && new Store(context).activeFaults().isEmpty(), "legacy active cache is corrected and stays corrected on restart");
-      check(restarted.prefs.getLong("lastAlarm", 0) == 1234L
-          && restarted.events(powerDay - 2000, equipmentNow + 1).size() == 5,
-          "equipment migration preserves alarm marker and all raw records");
-      var previousDay = restarted.events(powerDay - 86400000L, powerDay);
-      var equipmentHistory = Rules.incidentHistory(restarted.incidentEvents(previousDay, powerDay, false));
-      check(equipmentHistory.size() == 2 && equipmentHistory.stream()
-          .allMatch(i -> plcRecovered.equals(i.recovery())), "historical slice links both PLC faults across midnight");
-      var sameDay = restarted.events(powerDay, powerDay + 1500);
-      check(Rules.incidentHistory(restarted.incidentEvents(sameDay, powerDay + 1500, false))
-          .contains(new Rules.Incident(barrier, lower)), "historical slice retains raw barrier evidence beyond its boundary");
-      var newPlc = new Rules.Event("new-plc", powerDay + 4000, "101+000", "PLC hỏng", true, List.of());
-      restarted.saveForAccount(restarted.account(), new WebSource.DayData(List.of(newPlc), powerRoute));
-      restarted.updateActiveFaults(restarted.account(), newPlc.at(), equipmentNow, powerDay, List.of());
-      check(new Store(context).activeFaults().equals(List.of(newPlc)), "PLC fault after recovery persists on delta replay");
+      checkEquipmentRecovery(context, store);
 
       result.putString("stream", checks + " account storage checks passed\n");
 
@@ -1461,4 +1452,41 @@ public final class RouteStoreChecks extends Instrumentation {
     }
     finish(code, result);
   }
+
+  private void checkEquipmentRecovery(Context context, Store store) throws Exception {
+    long powerNow = System.currentTimeMillis(), powerDay = Rules.faultBaseline(0, powerNow);
+    long equipmentNow = Math.max(powerNow, powerDay + 10000);
+    var powerRoute = new Rules.Route(List.of("100+000", "101+000"));
+    store.credentials("https://rail.example.test/", "equipment-recovery", "test-only");
+    var previousPlc = new Rules.Event("older-plc", powerDay - 2000, "101+000", "PLC hỏng", true, List.of());
+    var repeatedPlc = new Rules.Event("repeated-plc", powerDay - 1000, "101+000", "PLC hỏng", true, List.of());
+    var plcRecovered = new Rules.Event("plc-restored", powerDay + 3000, "101+000", "PLC khôi phục tốt", false, List.of());
+    var barrier = new Rules.Event("lost-barrier", powerDay + 1000, "101+000", "Cần chắn 1 mất trạng thái", true, List.of());
+    var lower = new Rules.Event("lowered-barrier", powerDay + 2000, "101+000", "Cần chắn 1 đã hạ", false, List.of());
+    store.saveForAccount(store.account(),
+        new WebSource.DayData(List.of(previousPlc, repeatedPlc, plcRecovered, barrier, lower), powerRoute));
+    var staleBarrier = new org.json.JSONArray().put(new org.json.JSONArray().put(barrier.id())
+        .put(barrier.at()).put(barrier.crossing()).put(barrier.text()).put(new org.json.JSONArray()));
+    store.prefs.edit().putString("activeFaults", staleBarrier.toString())
+        .putInt("faultRulesVersion", 1).putLong("lastAlarm", 1234L).commit();
+    var restarted = new Store(context);
+    restarted.prepareFaultRules(restarted.account(), equipmentNow);
+    check(restarted.faultRulesReady() && restarted.activeFaults().isEmpty()
+        && new Store(context).activeFaults().isEmpty(), "legacy active cache is corrected and stays corrected on restart");
+    check(restarted.prefs.getLong("lastAlarm", 0) == 1234L
+        && restarted.events(powerDay - 2000, equipmentNow + 1).size() == 5,
+        "equipment migration preserves alarm marker and all raw records");
+    var previousDay = restarted.events(powerDay - 86400000L, powerDay);
+    var equipmentHistory = Rules.incidentHistory(restarted.incidentEvents(previousDay, powerDay, false));
+    check(equipmentHistory.size() == 2 && equipmentHistory.stream()
+        .allMatch(i -> plcRecovered.equals(i.recovery())), "historical slice links both PLC faults across midnight");
+    var sameDay = restarted.events(powerDay, powerDay + 1500);
+    check(Rules.incidentHistory(restarted.incidentEvents(sameDay, powerDay + 1500, false))
+        .contains(new Rules.Incident(barrier, lower)), "historical slice retains raw barrier evidence beyond its boundary");
+    var newPlc = new Rules.Event("new-plc", powerDay + 4000, "101+000", "PLC hỏng", true, List.of());
+    restarted.saveForAccount(restarted.account(), new WebSource.DayData(List.of(newPlc), powerRoute));
+    restarted.updateActiveFaults(restarted.account(), newPlc.at(), equipmentNow, powerDay, List.of());
+    check(new Store(context).activeFaults().equals(List.of(newPlc)), "PLC fault after recovery persists on delta replay");
+  }
+
 }

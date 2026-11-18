@@ -20,6 +20,8 @@ Nền Android 0.27.4 tại `1f0ef05d432bdf3e0afdeacea35604ca796e527b`, nhánh `c
 - 780 ca nghiệp vụ đạt, gồm 8 ca mới cho thấy hai cần hoạt động độc lập, khôi phục đúng điểm/số cần/loại lỗi, thời gian bằng hoặc trước lỗi không khôi phục, và lỗi mới xuất hiện sau khôi phục. Hai lỗi PLC cùng liên kết với một bản tin phục hồi.
 - 16 ca parser và 39 ca đọc qua HTTP fixture có xác thực đạt.
 - Build APK ứng dụng, APK kiểm thử và lint thành công. Lint báo 0 lỗi, 14 cảnh báo.
+- Cài đè bằng ADB từ APK gốc 0.27.4 lên APK 0.27.5 trên giả lập AOSP Android 10/API 29. Sáu nhóm kiểm tra giữ dữ liệu đạt gồm mật khẩu mã hóa bằng Android Keystore, URL/ID, cấu hình âm thanh, phạm vi/chu kỳ, bản tin SQLite và tệp riêng.
+- Bộ lưu trữ đầy đủ chạm giới hạn thời gian trên giả lập chạy bằng phần mềm. Runner có chế độ `equipment-recovery` để chạy riêng năm ca hồi quy cache và lịch sử của bản này.
 - Chưa thử trên điện thoại thật/Xiaomi, HyperOS hoặc website Visitec trong phiên này.
 
 ## APK
