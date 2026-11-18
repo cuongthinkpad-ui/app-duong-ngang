@@ -1,3 +1,5 @@
+> [bào giao END1](b%C3%A0o%20giao%20END1.md) tổng hợp mốc Android 0.27.5 và cách tiếp tục trên tài khoản khác.
+
 > Bàn giao mới nhất cho [0.27.5 — khôi phục lỗi cần chắn và PLC](UI_REVIEW_0.27.5.md) nằm trên nhánh `codex/android-0.27.5-recovery` từ Android 0.27.4 tại `1f0ef05`. Cache lỗi phiên bản 2 dựng lại từ dữ liệu cục bộ. Tài liệu liên kết APK ký gốc, checksum và kết quả kiểm thử.
 
 > Bàn giao trước: [0.27.4 — hiển thị sự cố trên chấm và danh sách](UI_REVIEW_0.27.4.md), nhánh làm việc `codex/android-0.27.3-ui`, nền Android 0.27.3 tại `ee1affe` trên `codex/0.27-notification-stop`. Chỉ sửa hiển thị theo yêu cầu đã duyệt; giữ lịch đọc 30 giây/thử lại 120 giây và âm thanh của 0.27.3. Main vẫn là 0.26; nhánh iPhone/web không phải nguồn cho bản này.
