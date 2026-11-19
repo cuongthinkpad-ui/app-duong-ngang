@@ -1,4 +1,6 @@
-# Đường Ngang — cập nhật 0.27.5
+# Đường Ngang — cập nhật 0.27.6
+
+**[Tải APK 0.27.6](DuongNgang-0.27.6.apk)** · versionCode 33, dùng khóa ký gốc. Nút tải bản mới qua Drive nằm ở cuối Cài đặt. [Biên bản](../docs/UI_REVIEW_0.27.6.md)
 
 **[Tải APK 0.27.5](DuongNgang-0.27.5.apk)** — ký khóa gốc, versionCode 32. Cài đè trực tiếp và giữ ứng dụng hiện có trên máy. [Checksum](SHA256SUMS) · [Biên bản kiểm thử](../docs/UI_REVIEW_0.27.5.md).
 

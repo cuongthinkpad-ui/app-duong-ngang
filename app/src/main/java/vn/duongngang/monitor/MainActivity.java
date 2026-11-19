@@ -6,6 +6,7 @@ import android.content.*;
 import android.content.res.ColorStateList;
 import android.graphics.*;
 import android.graphics.drawable.*;
+import android.net.Uri;
 import android.os.*;
 import android.text.InputType;
 import android.view.*;
@@ -65,6 +66,10 @@ public class MainActivity extends Activity {
   private boolean historyFollowToday = true, preparingLocalData;
   private final long demoClock = System.currentTimeMillis();
   private final ExecutorService io = Executors.newSingleThreadExecutor();
+  private static final int ALLOW_UPDATE_INSTALL = 1301;
+  private final ExecutorService updateIo = Executors.newSingleThreadExecutor();
+  private Uri pendingUpdate;
+  private boolean downloadingUpdate;
   private final ExecutorService dataIo = Executors.newSingleThreadExecutor();
   private record DayView(String revision, List<Rules.Event> events,
       List<Rules.Event> incidents, List<Rules.Event> travelEvents, Rules.TravelState travel) {}
@@ -160,6 +165,8 @@ public class MainActivity extends Activity {
   @Override
   public void onCreate(Bundle state) {
     super.onCreate(state);
+    if (state != null && state.getString("pendingUpdate") != null)
+      pendingUpdate = Uri.parse(state.getString("pendingUpdate"));
     store = new Store(this);
     selected = historyDay = store.monitoringDay();
     followToday = historyFollowToday = !store.historicalMonitoring();
@@ -236,6 +243,7 @@ public class MainActivity extends Activity {
     stopEffects();
     io.shutdownNow();
     dataIo.shutdownNow();
+    updateIo.shutdownNow();
     super.onDestroy();
   }
 
@@ -1813,6 +1821,88 @@ public class MainActivity extends Activity {
               store.prefs.edit().putString("status", "Đã dừng theo dõi").apply();
               Toast.makeText(this, "Đã dừng theo dõi", Toast.LENGTH_SHORT).show();
             }));
+    gap(content, 10);
+    content.addView(action("Tải bản mới nhất", "link", false, () -> {
+      if (pendingUpdate != null) installUpdate(pendingUpdate);
+      else downloadUpdate();
+    }));
+  }
+
+  private void downloadUpdate() {
+    if (downloadingUpdate) return;
+    downloadingUpdate = true;
+    Toast.makeText(this, "Đang tải bản cập nhật…", Toast.LENGTH_SHORT).show();
+    updateIo.execute(() -> {
+      try {
+        Uri apk = AppUpdate.download(this);
+        runOnUiThread(() -> {
+          downloadingUpdate = false;
+          if (isFinishing() || isDestroyed()) return;
+          if (apk == null) {
+            Toast.makeText(this, "Drive chưa có phiên bản mới hơn.", Toast.LENGTH_LONG).show();
+          } else if (uiVisible) {
+            installUpdate(apk);
+          } else {
+            pendingUpdate = apk;
+          }
+        });
+      } catch (java.io.IOException | android.content.pm.PackageManager.NameNotFoundException
+          | IllegalArgumentException failure) {
+        runOnUiThread(() -> {
+          downloadingUpdate = false;
+          if (isFinishing() || isDestroyed() || !uiVisible) return;
+          var dialog = new AlertDialog.Builder(this)
+              .setTitle("Chưa thể cập nhật")
+              .setMessage(failure.getMessage())
+              .setNegativeButton("Đóng", null);
+          if (!(failure instanceof AppUpdate.InvalidApk)) {
+            dialog.setPositiveButton("Mở Google Drive", (prompt, which) -> {
+                try {
+                  startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(AppUpdate.SHARE_URL)));
+                } catch (ActivityNotFoundException missing) {
+                  Toast.makeText(this, "Thiết bị chưa có ứng dụng mở liên kết.", Toast.LENGTH_LONG).show();
+                }
+              });
+          }
+          dialog.show();
+        });
+      }
+    });
+  }
+
+  private void installUpdate(Uri apk) {
+    try {
+      if (!getPackageManager().canRequestPackageInstalls()) {
+        pendingUpdate = apk;
+        startActivityForResult(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+            Uri.parse("package:" + getPackageName())), ALLOW_UPDATE_INSTALL);
+        return;
+      }
+      pendingUpdate = null;
+      startActivity(new Intent(Intent.ACTION_VIEW)
+          .setDataAndType(apk, AppUpdate.APK_TYPE)
+          .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION));
+    } catch (ActivityNotFoundException | SecurityException unavailable) {
+      pendingUpdate = null;
+      Toast.makeText(this, "Thiết bị chưa cho phép mở trình cài đặt APK.", Toast.LENGTH_LONG).show();
+    }
+  }
+
+  @Override protected void onActivityResult(int request, int result, Intent data) {
+    super.onActivityResult(request, result, data);
+    if (request != ALLOW_UPDATE_INSTALL || pendingUpdate == null) return;
+    Uri apk = pendingUpdate;
+    pendingUpdate = null;
+    if (getPackageManager().canRequestPackageInstalls()) {
+      installUpdate(apk);
+    } else {
+      Toast.makeText(this, "Cần cho phép cài ứng dụng từ nguồn này để cập nhật.", Toast.LENGTH_LONG).show();
+    }
+  }
+
+  @Override protected void onSaveInstanceState(Bundle state) {
+    super.onSaveInstanceState(state);
+    if (pendingUpdate != null) state.putString("pendingUpdate", pendingUpdate.toString());
   }
 
   private void openCrossing(String km) {
