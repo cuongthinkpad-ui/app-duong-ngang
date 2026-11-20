@@ -235,7 +235,8 @@ public final class Rules {
 
   public static boolean knownFault(String text) {
     String t = normalizedReport(text);
-    return t.equals("plc hỏng") || (t.startsWith("cần chắn ")
+    return t.equals("plc hỏng") || t.equals("cần chắn hoạt động sai trình tự")
+        || (t.startsWith("cần chắn ")
         && BARRIER_STATE.matcher(t).matches() && t.endsWith(" mất trạng thái"))
         || t.startsWith("cầu chì") && FUSE_BLOWN.matcher(t).matches()
         || t.startsWith("nguồn") && DC_OVER.matcher(t).matches();

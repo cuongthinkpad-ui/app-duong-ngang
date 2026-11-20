@@ -37,6 +37,7 @@ public class RulesTest {
     sectionContinuity026();
     powerFaults027();
     equipmentRecovery0275();
+    barrierSequenceFault();
     var historyRoute = new Rules.Route(List.of("312+111", "313+800", "314+550"));
     List<Rules.Event> historyRaw = new ArrayList<>();
     for (int i = 0; i < 6; i++) historyRaw.add(axle(100000L + i * 60000L, "313+800", 3, 3));
@@ -2266,6 +2267,22 @@ public class RulesTest {
     check(!event(1,"100+000","Cầu chì 50A khôi phục tốt",true).red()
         && !event(1,"100+000","Nguồn 24V khôi phục tốt",true).red(),
         "known recovery messages remain recoveries even with erroneous red styling");
+  }
+
+  static void barrierSequenceFault() {
+    var fault = event(1000, "332+350", "Cần chắn hoạt động sai trình tự", false);
+    var motion = event(2000, "332+350", "Cần chắn 1 đã hạ", false);
+    var systemRecovery = event(3000, "332+350", "Khôi phục hệ thống", false);
+    check(fault.red() && Rules.deviceGroup(fault).equals("Cần chắn"),
+        "classify the report by its text even without red website styling");
+    check(Rules.activeFaults(List.of(fault, motion, systemRecovery)).equals(List.of(fault)),
+        "normal numbered motion and system reset do not clear the sequencing fault");
+    check(Rules.incidentHistory(List.of(fault, motion)).equals(List.of(new Rules.Incident(fault, null))),
+        "sequencing fault is visible in incident history with the original text");
+    var collectiveRecovery = event(4000, "332+350", "Cần chắn khôi phục tốt", false);
+    check(Rules.activeFaults(List.of(fault, collectiveRecovery)).isEmpty(),
+        "existing collective barrier recovery closes the sequencing fault");
+    check(!motion.red(), "normal motion is not classified as a fault");
   }
 
   static void equipmentRecovery0275() {

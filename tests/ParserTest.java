@@ -23,6 +23,12 @@ public class ParserTest {
     String css = html.replace("<font color='red'>", "<font style='color: rgb(255, 0, 0);'>");
     if (!WebSource.parse(Jsoup.parse(css), LocalDate.of(2026, 10, 22)).get(0).red())
       throw new AssertionError("CSS red");
+    String sequenceFault = "Cần chắn hoạt động sai trình tự";
+    String green = html.replace("color='red'", "color='green'")
+        .replace("Điện áp cảm biến 6 &lt; 5V", sequenceFault);
+    var sequence = WebSource.parse(Jsoup.parse(green), LocalDate.of(2026, 10, 22)).get(0);
+    if (!sequence.red() || !sequence.text().equals(sequenceFault))
+      throw new AssertionError("green sequencing report must be a fault and retain original text");
     String inventory =
         "<select><option>-- Tất cả --</option><option value='9'>Km 311+400</option>"
             + "<option value='1'>Km 275+290</option><option>Km 279+000 (CS)</option>"
@@ -93,6 +99,6 @@ public class ParserTest {
       var e = WebSource.parse(Jsoup.parse(html.replace("Điện áp cảm biến 6 &lt; 5V", restore)), LocalDate.of(2026,10,22)).get(0);
       if (e.red() || !e.text().equals(restore)) throw new AssertionError("exact power recovery survives styling");
     }
-    System.out.println("16 parser scenarios passed");
+    System.out.println("17 parser scenarios passed");
   }
 }

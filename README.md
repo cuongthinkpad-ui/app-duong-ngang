@@ -1,4 +1,6 @@
-# Đường Ngang — Android 0.27.6
+# Đường Ngang — Android 0.27.7
+
+**0.27.7** đưa bản tin **Cần chắn hoạt động sai trình tự** vào cảnh báo lỗi, kể cả khi nguồn hiển thị màu xanh. [Bàn giao 0.27.7](docs/UI_REVIEW_0.27.7.md) · [Tải APK ký gốc](downloads/DuongNgang-0.27.7.apk)
 
 Cuộn xuống cuối Cài đặt để dùng nút **Tải bản mới nhất**. [Bàn giao 0.27.6](docs/UI_REVIEW_0.27.6.md) · [Tải APK ký gốc](downloads/DuongNgang-0.27.6.apk)
 

@@ -1,3 +1,5 @@
+> [Android 0.27.7](UI_REVIEW_0.27.7.md) nhận diện bản tin cần chắn sai trình tự màu xanh là lỗi. Bản này kế thừa nút tải cập nhật Google Drive của [0.27.6](UI_REVIEW_0.27.6.md).
+
 > [bào giao END1](b%C3%A0o%20giao%20END1.md) tổng hợp mốc Android 0.27.5 và cách tiếp tục trên tài khoản khác.
 
 > Bàn giao mới nhất cho [0.27.5 — khôi phục lỗi cần chắn và PLC](UI_REVIEW_0.27.5.md) nằm trên nhánh `codex/android-0.27.5-recovery` từ Android 0.27.4 tại `1f0ef05`. Cache lỗi phiên bản 2 dựng lại từ dữ liệu cục bộ. Tài liệu liên kết APK ký gốc, checksum và kết quả kiểm thử.
